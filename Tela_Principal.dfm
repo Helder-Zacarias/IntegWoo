@@ -56,15 +56,6 @@ object Form2: TForm2
       TabOrder = 2
       OnClick = btnOpenModalClick
     end
-    object btnOpen: TButton
-      Left = 40
-      Top = 264
-      Width = 75
-      Height = 25
-      Caption = 'Teste Modal'
-      TabOrder = 3
-      OnClick = btnOpenModalClick
-    end
   end
   object MySQL: TMySQLUniProvider
     Left = 392

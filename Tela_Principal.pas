@@ -20,7 +20,6 @@ type
     btnEnviarFull: TBitBtn;
     btnHamburguer: TButton;
     panelSide: TPanel;
-    btnOpen: TButton;
     procedure DatabaseConnectionLost(Sender: TObject; Component: TComponent;
       ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
     procedure butEnviarProdutosdoBancoClick(Sender: TObject);
