@@ -1,0 +1,47 @@
+# Delphi project output
+*.dcu
+*.dcp
+*.bpl
+*.exe
+*.dll
+*.local
+*.~*    # backup files
+
+# Delphi IDE files
+*.identcache
+*.dsk
+*.cfg
+*.local
+*.~*
+
+# Delphi package build output
+*.bpl
+*.dcp
+*.cfg
+*.res
+
+# Debug / release folders
+\Win32\*
+\Win64\*
+\Debug\*
+\Release\*
+\bin\*
+
+# Compiled packages
+*.bpl
+*.dcp
+
+# Backup / autosave
+*.~*
+*.tmp
+*.bak
+*.log
+
+# Other OS files
+Thumbs.db
+.DS_Store
+
+#Config 
+AppConfig.pas
+AppConfig.dfm
+config.ini
