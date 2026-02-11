@@ -6,7 +6,7 @@ uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Data.DB, Uni, UniProvider,
   MySQLUniProvider, DBAccess, MemData, MemDS, Vcl.StdCtrls, Vcl.Buttons, System.IOUtils, REST.Json, Rest.Json.Types, WooProdutoResponse,
-  System.Generics.Collections, System.JSON, WPImagemResponse, WooImagemRequest, WooProdutoRequest, System.IniFiles, AppConfig;
+  System.Generics.Collections, System.JSON, WPImagemResponse, WooImagemRequest, WooProdutoRequest, System.IniFiles, AppConfig, Produto;
 
 type
   TForm2 = class(TForm)
@@ -162,6 +162,8 @@ end;
 procedure TForm2.butEnviarProdutosClick(Sender: TObject);
 var
 	iRes: IResponse;
+    ProdutoDB: TProduto;
+    WooProdutoRequest: TWooProdutoRequest;
 begin
     with sqlProdutos do
     begin
@@ -169,28 +171,34 @@ begin
         Connection:= Self.Database;
         Open;
 
-        while not Eof do
+//        while not Eof do
+        for var i := 1 to 5 do
         begin
-        	ShowMessage(
-            	'Id: ' + sqlProdutos.FieldByName('COD_ID_PRODUTO').AsString + sLineBreak +
-            	'Detalhes: ' + sqlProdutos.FieldByName('DSC_DETALHES').AsString
-            );
-//        	iRes := TRequest.New()
-//            	.BaseURL(WOOCOMMERCE_API_URL)
-//        		.Resource('products')
-//        		.BasicAuthentication(CONSUMER_KEY, CONSUMER_SECRET)
-//        		.ContentType('application/json')
-////        		.AddBody('{"name": "Tênis Delphi", "slug": "tenis-delphi", "description": "Envio teste do a partir da API Delphi", "short_description": "Tênis enviado por teste", "regular_price": "125" }')
-//        		.Post;
+            ProdutoDB := TProduto.Create;
 
-//            if iRes.StatusCode = 200 then
-//            begin
-//
-//
-//            end
-//            else
-//                raise Exception.Create(iRes.StatusText + #13 + iRes.Content);
-            //
+            ProdutoDB.CodIdProduto := sqlProdutos.FieldByName('COD_ID_PRODUTO').asInteger;
+            ProdutoDB.DscCompleta := sqlProdutos.FieldByName('DSC_COMPLETA').asString;
+            ProdutoDB.DscAbreviada := sqlProdutos.FieldByName('DSC_ABREVIADA').asString;
+            ProdutoDB.DscObservacoes := sqlProdutos.FieldByName('DSC_OBSERVACOES').asString;
+            ProdutoDB.DscDetalhes := sqlProdutos.FieldByName('DSC_DETALHES').asString;
+
+            ShowMessage(
+                'COD_ID_PRODUTO: ' +  sqlProdutos.FieldByName('COD_ID_PRODUTO').AsString + sLineBreak +
+                'DSC_COMPLETA: ' +  sqlProdutos.FieldByName('DSC_COMPLETA').asString + sLineBreak +
+                'DSC_ABREVIADA: ' +  sqlProdutos.FieldByName('DSC_ABREVIADA').asString + sLineBreak +
+                'DSC_OBSERVACOES: ' +  sqlProdutos.FieldByName('DSC_OBSERVACOES').asString + sLineBreak +
+                'DSC_DETALHES: ' +  sqlProdutos.FieldByName('DSC_DETALHES').asString + sLineBreak +
+                'DSC_CHAVE: ' +  sqlProdutos.FieldByName('DSC_CHAVE').asString + sLineBreak +
+                'NUM_PRECO_VAREJO: ' +  sqlProdutos.FieldByName('NUM_PRECO_VAREJO').asString + sLineBreak +
+                'NUM_ESTQ_ATUAL: ' +  sqlProdutos.FieldByName('NUM_ESTQ_ATUAL').asString + sLineBreak +
+                'IMG_PRODUTO: ' +  sqlProdutos.FieldByName('IMG_PRODUTO').asString
+            );
+
+//            WooProdutoRequest := TWooProdutoRequest.Create;
+//            WooProdutoRequest.Name := ProdutoDB.DscCompleta;
+//            WooProdutoRequest.ShortDescription := ProdutoDB.DscAbreviada;
+
+//            enviarProduto(WooProdutoRequest);
             Next;
         end;
     end;
