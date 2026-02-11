@@ -139,6 +139,10 @@
         <DCCReference Include="Produto.pas"/>
         <DCCReference Include="WooImagemRequest.pas"/>
         <DCCReference Include="AppConfig.pas"/>
+        <DCCReference Include="Tela_Envio_Produto.pas">
+            <Form>Form1</Form>
+            <FormType>dfm</FormType>
+        </DCCReference>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

@@ -4,7 +4,8 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, WooProdutoRequest, VCL.NumberBox;
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, WooProdutoRequest, VCL.NumberBox,
+  Vcl.ExtDlgs;
 
 type
   TForm1= class(TForm)
@@ -17,14 +18,20 @@ type
     labelNome: TLabel;
     btnEnviarProduto: TButton;
     boxPreco: TNumberBox;
+    dialogPathImagem: TOpenPictureDialog;
+    editPathImagem: TEdit;
+    labelPathImagem: TLabel;
     procedure FormShow(Sender: TObject);
     procedure DefinirPosicaoDosElementos();
     procedure FormResize(Sender: TObject);
     procedure btnRetornarInformacoes(Sender: TObject);
+    procedure editClickOpenImageExplorer(Sender: TObject);
   private
     FProdutoInfo: TWooProdutoRequest;
+    FPathImagem: string;
   public
     property ProdutoInfo: TWooProdutoRequest read FProdutoInfo write FProdutoInfo;
+    property PathImagem: string read FPathImagem write FPathImagem;
   end;
 
 var
@@ -52,6 +59,9 @@ begin
     FProdutoInfo.Description := editDescricao.Text;
     FProdutoInfo.ShortDescription := editDescricaoCurta.Text;
     FProdutoInfo.RegularPrice := boxPreco.Text;
+
+    FPathImagem := editPathImagem.text;
+
     ModalResult := mrOk;
 end;
 
@@ -62,11 +72,20 @@ begin
     editDescricaoCurta.Left := (editDescricaoCurta.Parent.ClientWidth - editDescricaoCurta.Width) div 2;
     boxPreco.Left := (boxPreco.Parent.ClientWidth - boxPreco.Width) div 2;
     btnEnviarProduto.Left := (btnEnviarProduto.Parent.ClientWidth - btnEnviarProduto.Width) div 2;
+    editPathImagem.Left := (editPathImagem.Parent.ClientWidth - editPathImagem.Width) div 2;
 
     labelNome.Left := editNome.Left;
     labelDescricao.Left := editDescricao.Left;
     labelDescricaoCurta.Left := editDescricaoCurta.Left;
     labelPreco.Left := boxPreco.Left;
+    labelPathImagem.Left := editPathImagem.Left;
+end;
+
+procedure TForm1.editClickOpenImageExplorer(Sender: TObject);
+begin
+ 	dialogPathImagem.Filter := 'Image Files|*.jpg;*.jpeg;*.png';
+    if dialogPathImagem.Execute then
+        editPathImagem.Text := dialogPathImagem.FileName;
 end;
 
 end.

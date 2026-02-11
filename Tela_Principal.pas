@@ -6,7 +6,8 @@ uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Data.DB, Uni, UniProvider,
   MySQLUniProvider, DBAccess, MemData, MemDS, Vcl.StdCtrls, Vcl.Buttons, System.IOUtils, REST.Json, Rest.Json.Types, WooProdutoResponse,
-  System.Generics.Collections, System.JSON, WPImagemResponse, WooImagemRequest, WooProdutoRequest, System.IniFiles, AppConfig, Produto;
+  System.Generics.Collections, System.JSON, WPImagemResponse, WooImagemRequest, WooProdutoRequest, System.IniFiles, AppConfig, Produto,
+  Vcl.ExtCtrls, Tela_Envio_Produto;
 
 type
   TForm2 = class(TForm)
@@ -16,18 +17,19 @@ type
     sqlImagens: TUniQuery;
     butEnviarProdutos: TBitBtn;
     butReceberProdutos: TBitBtn;
-    BitBtn1: TBitBtn;
-    BitBtn2: TBitBtn;
     btnEnviarFull: TBitBtn;
+    btnHamburguer: TButton;
+    panelSide: TPanel;
+    btnOpen: TButton;
     procedure DatabaseConnectionLost(Sender: TObject; Component: TComponent;
       ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
-    procedure butEnviarProdutosClick(Sender: TObject);
-    procedure butReceberProdutosClick(Sender: TObject);
-    procedure btnEnviarProduto(Sender: TObject);
-    procedure btnEnviarImagemTestClick(Sender: TObject);
+    procedure butEnviarProdutosdoBancoClick(Sender: TObject);
+    procedure butBuscarProdutosClick(Sender: TObject);
     function enviarImagem(ImagePath: string): TWPImagemResponse;
     function enviarProduto(Produto: TWooProdutoRequest): TWooProdutoResponse;
-    procedure btnEnviarFullClick(Sender: TObject);
+    procedure btnEnviarProdutoSimplesClick(Produto: TWooProdutoRequest; ImagePath: string);
+    procedure btnHamburguerClick(Sender: TObject);
+    procedure btnOpenModalClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -45,25 +47,17 @@ uses
 
 {$R *.dfm}
 
-procedure TForm2.btnEnviarFullClick(Sender: TObject);
+procedure TForm2.btnEnviarProdutoSimplesClick(Produto: TWooProdutoRequest; ImagePath: string);
 var
-	Produto: TWooProdutoRequest;
     WPImagemResponse: TWPImagemResponse;
     Arr: TArray<TWooImagemRequest>;
 begin
-    WPImagemResponse := enviarImagem(TAppConfig.TestImagePath);
+    WPImagemResponse := enviarImagem(ImagePath);
 
     if not Assigned(WPImagemResponse) then
     	raise(Exception.Create('Upload de Imagem Falhou'));
 
-    Produto := TWooProdutoRequest.Create;
     try
-    	Produto.Name := 'Produto Teste';
-        Produto.Slug := 'produto-teste';
-        Produto.Description := 'Essa é a descrição longa do produto teste';
-        Produto.ShortDescription := 'Desc Curta Teste';
-        Produto.RegularPrice := '77.89';
-        
         var Img := TWooImagemRequest.Create;
         Img.Id := WPImagemResponse.Id;
         Arr := Produto.Images;
@@ -81,8 +75,6 @@ function TForm2.enviarImagem(ImagePath: string): TWPImagemResponse;
 var
 	iRes: IResponse;
     MS: TMemoryStream;
-    Filename: String;
-    Lines: TStringList;
     WPImagemResponse: TWPImagemResponse;
 begin
 	Result := nil;
@@ -138,30 +130,8 @@ begin
     	raise(Exception.Create('Envio do produto falhou'))
 end;
 
-procedure TForm2.btnEnviarImagemTestClick(Sender: TObject);
-
-begin
-    enviarImagem(TAppConfig.TestImagePath);
-end;
-
-procedure TForm2.btnEnviarProduto(Sender: TObject);
+procedure TForm2.butEnviarProdutosdoBancoClick(Sender: TObject);
 var
-	iRes: IResponse;
-    ProdutoRequest: TWooProdutoRequest;
-begin
-	ProdutoRequest := TWooProdutoRequest.Create;
-    ProdutoRequest.Name := 'Produto Teste';
-    ProdutoRequest.Slug := 'produto-teste';
-    ProdutoRequest.Description := 'Essa é a descrição longa do produto teste';
-    ProdutoRequest.ShortDescription := 'Desc Curta Teste';
-    ProdutoRequest.RegularPrice := '77.89';
-    
-    enviarProduto(ProdutoRequest)
-end;
-
-procedure TForm2.butEnviarProdutosClick(Sender: TObject);
-var
-	iRes: IResponse;
     ProdutoDB: TProduto;
     WooProdutoRequest: TWooProdutoRequest;
 begin
@@ -194,17 +164,43 @@ begin
                 'IMG_PRODUTO: ' +  sqlProdutos.FieldByName('IMG_PRODUTO').asString
             );
 
-//            WooProdutoRequest := TWooProdutoRequest.Create;
-//            WooProdutoRequest.Name := ProdutoDB.DscCompleta;
-//            WooProdutoRequest.ShortDescription := ProdutoDB.DscAbreviada;
+            WooProdutoRequest := TWooProdutoRequest.Create;
+            WooProdutoRequest.Name := ProdutoDB.DscCompleta;
+            WooProdutoRequest.ShortDescription := ProdutoDB.DscAbreviada;
 
-//            enviarProduto(WooProdutoRequest);
+            enviarProduto(WooProdutoRequest);
             Next;
         end;
     end;
 end;
 
-procedure TForm2.butReceberProdutosClick(Sender: TObject);
+procedure TForm2.btnOpenModalClick(Sender: TObject);
+var
+    ProdutoForm: TForm1;
+    ProdutoRequest: TWooProdutoRequest;
+    PathImagem: string;
+begin
+    ProdutoForm := TForm1.Create(Self);
+    ProdutoForm.Position := poScreenCenter;
+    try
+        if ProdutoForm.ShowModal = mrOk then
+        begin
+            ProdutoRequest := ProdutoForm.ProdutoInfo;
+            PathImagem := ProdutoForm.PathImagem;
+            btnEnviarProdutoSimplesClick(ProdutoRequest, PathImagem);
+        end;
+    finally
+    	ProdutoForm.Free;
+    end;
+end;
+
+procedure TForm2.btnHamburguerClick(Sender: TObject);
+begin
+    panelSide.Visible := not panelSide.Visible;
+    btnHamburguer.BringToFront;
+end;
+
+procedure TForm2.butBuscarProdutosClick(Sender: TObject);
 var
     iRes: IResponse;
     JsonArray: TJSONArray;

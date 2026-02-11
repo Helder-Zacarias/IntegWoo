@@ -54,7 +54,7 @@ object Form2: TForm2
       Height = 33
       Caption = 'Enviar Produto Simples'
       TabOrder = 2
-      OnClick = btnEnviarProdutoSimplesClick
+      OnClick = btnOpenModalClick
     end
     object btnOpen: TButton
       Left = 40
