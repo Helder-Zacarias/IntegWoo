@@ -9,7 +9,8 @@ uses
   WPImagemResponse in 'WPImagemResponse.pas',
   Produto in 'Produto.pas',
   WooImagemRequest in 'WooImagemRequest.pas',
-  AppConfig in 'AppConfig.pas';
+  AppConfig in 'AppConfig.pas',
+  Tela_Envio_Produto in 'Tela_Envio_Produto.pas' {Form1};
 
 {$R *.res}
 
@@ -18,5 +19,6 @@ begin
   TAppConfig.Load;
   Application.MainFormOnTaskbar := True;
   Application.CreateForm(TForm2, Form2);
+  Application.CreateForm(TForm1, Form1);
   Application.Run;
 end.
