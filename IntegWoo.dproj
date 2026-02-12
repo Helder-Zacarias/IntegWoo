@@ -145,6 +145,7 @@
         </DCCReference>
         <DCCReference Include="config\AppConfig.pas"/>
         <DCCReference Include="models\Secao.pas"/>
+        <DCCReference Include="rest-client\woocommerce-api\WooProductVariationsRequest.pas"/>
         <None Include="bin\config.ini"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

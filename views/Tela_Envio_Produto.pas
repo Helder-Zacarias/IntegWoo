@@ -80,7 +80,7 @@ procedure TfrmTela_Envio.onFormCreate(Sender: TObject);
 begin
     AddItensToCombo(comboCategoria, ['Camisetas', 'Calçados', 'Acessórios', 'Moletons', 'Categoria Teste']);
     AddItensToCombo(listBoxCor, ['Azul', 'Vermelho', 'Marrom', 'Bege']);
-    AddItensToCombo(comboTipoProduto, ['simple', 'variable']);
+    AddItensToCombo(comboTipoProduto, ['Simples', 'Variável']);
 end;
 
 procedure TfrmTela_Envio.AddItensToCombo(CustomListControl: TCustomListControl; Items: TArray<string>);
@@ -99,7 +99,11 @@ begin
     FProdutoInfo.Description := editDescricao.Text;
     FProdutoInfo.ShortDescription := editDescricaoCurta.Text;
     FProdutoInfo.RegularPrice := boxPreco.Text;
-    FProdutoInfo.PType := comboTipoProduto.Text;
+
+    if comboTipoProduto.Text = 'Simples' then
+    	FProdutoInfo.PType := 'simple'
+    else
+    	FProdutoInfo.PType := 'variable';
 
     FPathImagem := editPathImagem.text;
     FCategoria := comboCategoria.Text;

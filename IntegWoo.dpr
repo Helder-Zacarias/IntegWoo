@@ -12,7 +12,8 @@ uses
   WPImagemResponse in 'rest-client\wordpress-media-api\WPImagemResponse.pas',
   Tela_Principal in 'views\Tela_Principal.pas' {frmTela_Principal},
   AppConfig in 'config\AppConfig.pas',
-  Secao in 'models\Secao.pas';
+  Secao in 'models\Secao.pas',
+  WooProductVariationsRequest in 'rest-client\woocommerce-api\WooProductVariationsRequest.pas';
 
 {$R *.res}
 
