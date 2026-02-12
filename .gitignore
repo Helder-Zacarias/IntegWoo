@@ -42,6 +42,4 @@ Thumbs.db
 .DS_Store
 
 #Config 
-AppConfig.pas
-AppConfig.dfm
 config.ini
