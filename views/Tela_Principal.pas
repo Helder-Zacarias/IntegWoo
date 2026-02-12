@@ -10,7 +10,7 @@ uses
   Vcl.ExtCtrls, Tela_Envio_Produto, WooCategoriaRequest;
 
 type
-  TForm2 = class(TForm)
+  TfrmTela_Principal = class(TForm)
     MySQL: TMySQLUniProvider;
     Database: TUniConnection;
     sqlProdutos: TUniQuery;
@@ -41,7 +41,7 @@ type
   end;
 
 var
-  Form2: TForm2;
+  frmTela_Principal: TfrmTela_Principal;
 
 implementation
 
@@ -51,7 +51,7 @@ uses
 
 {$R *.dfm}
 
-procedure TForm2.btnBuscarCategoriasClick(Sender: TObject);
+procedure TfrmTela_Principal.btnBuscarCategoriasClick(Sender: TObject);
 var
     Filename: string;
     Lines: TStringList;
@@ -79,7 +79,7 @@ begin
    
 end;
 
-procedure TForm2.btnEnviarProdutoSimplesClick(Produto: TWooProdutoRequest; ImagePath: string; CategoriaSelecionada: string);
+procedure TfrmTela_Principal.btnEnviarProdutoSimplesClick(Produto: TWooProdutoRequest; ImagePath: string; CategoriaSelecionada: string);
 var
     WPImagemResponse: TWPImagemResponse;
     ArrImagens: TArray<TWooImagemRequest>;
@@ -110,7 +110,7 @@ begin
     end;
 end;
 
-function TForm2.selectCategoria(CategoriaString: string): TWooCategoriaRequest;
+function TfrmTela_Principal.selectCategoria(CategoriaString: string): TWooCategoriaRequest;
 var
     Categoria: TWooCategoriaRequest;
 begin
@@ -150,7 +150,7 @@ begin
     Result := Categoria;
 end;
 
-function TForm2.enviarImagem(ImagePath: string): TWPImagemResponse;
+function TfrmTela_Principal.enviarImagem(ImagePath: string): TWPImagemResponse;
 var
 	iRes: IResponse;
     MS: TMemoryStream;
@@ -183,7 +183,7 @@ begin
 
 end;
 
-function TForm2.enviarProduto(Produto: TWooProdutoRequest): TWooProdutoResponse;
+function TfrmTela_Principal.enviarProduto(Produto: TWooProdutoRequest): TWooProdutoResponse;
 var
 	iRes: IResponse;
     JSONString: string;
@@ -209,7 +209,7 @@ begin
     	raise(Exception.Create('Envio do produto falhou'))
 end;
 
-procedure TForm2.butEnviarProdutosdoBancoClick(Sender: TObject);
+procedure TfrmTela_Principal.butEnviarProdutosdoBancoClick(Sender: TObject);
 var
     ProdutoDB: TProduto;
     WooProdutoRequest: TWooProdutoRequest;
@@ -253,13 +253,13 @@ begin
     end;
 end;
 
-procedure TForm2.btnOpenModalClick(Sender: TObject);
+procedure TfrmTela_Principal.btnOpenModalClick(Sender: TObject);
 var
-    ProdutoForm: TForm1;
+    ProdutoForm: TfrmTela_Envio;
     ProdutoRequest: TWooProdutoRequest;
     PathImagem: string;
 begin
-    ProdutoForm := TForm1.Create(Self);
+    ProdutoForm := TfrmTela_Envio.Create(Self);
     ProdutoForm.Position := poScreenCenter;
     try
         if ProdutoForm.ShowModal = mrOk then
@@ -273,7 +273,7 @@ begin
     end;
 end;
 
-procedure TForm2.btnTestarConexãoClick(Sender: TObject);
+procedure TfrmTela_Principal.btnTestarConexãoClick(Sender: TObject);
 var
     Tables: TStringList;
     Filename: string;
@@ -299,13 +299,13 @@ begin
 
 end;
 
-procedure TForm2.btnHamburguerClick(Sender: TObject);
+procedure TfrmTela_Principal.btnHamburguerClick(Sender: TObject);
 begin
     panelSide.Visible := not panelSide.Visible;
     btnHamburguer.BringToFront;
 end;
 
-procedure TForm2.butBuscarProdutosClick(Sender: TObject);
+procedure TfrmTela_Principal.butBuscarProdutosClick(Sender: TObject);
 var
     iRes: IResponse;
     JsonArray: TJSONArray;
@@ -355,7 +355,7 @@ begin
     	ShowMessage(iRes.StatusText);
 end;
 
-procedure TForm2.DatabaseConnectionLost(Sender: TObject; Component: TComponent;
+procedure TfrmTela_Principal.DatabaseConnectionLost(Sender: TObject; Component: TComponent;
   ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
 begin
 	RetryMode := rmReconnectExecute;

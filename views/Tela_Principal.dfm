@@ -1,7 +1,7 @@
-﻿object Form2: TForm2
+﻿object frmTela_Principal: TfrmTela_Principal
   Left = 0
   Top = 0
-  Caption = 'Form2'
+  Caption = 'frmTela_Principal'
   ClientHeight = 441
   ClientWidth = 645
   Color = clBtnFace

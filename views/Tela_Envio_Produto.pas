@@ -8,7 +8,7 @@ uses
   Vcl.ExtDlgs;
 
 type
-  TForm1= class(TForm)
+  TfrmTela_Envio= class(TForm)
     editNome: TEdit;
     labelDescricao: TLabel;
     editDescricao: TEdit;
@@ -40,23 +40,23 @@ type
   end;
 
 var
-  Form1: TForm1;
+  frmTela_Envio: TfrmTela_Envio;
 
 implementation
 
 {$R *.dfm}
 
-procedure TForm1.FormResize(Sender: TObject);
+procedure TfrmTela_Envio.FormResize(Sender: TObject);
 begin
     DefinirPosicaoDosElementos;
 end;
 
-procedure TForm1.FormShow(Sender: TObject);
+procedure TfrmTela_Envio.FormShow(Sender: TObject);
 begin
       DefinirPosicaoDosElementos;
 end;
 
-procedure TForm1.onFormCreate(Sender: TObject);
+procedure TfrmTela_Envio.onFormCreate(Sender: TObject);
 begin
 	comboCategoria.Items.Add('Camisetas');
     comboCategoria.Items.Add('Calçados');
@@ -66,7 +66,7 @@ begin
     comboCategoria.ItemIndex := 0;
 end;
 
-procedure TForm1.btnRetornarInformacoes(Sender: TObject);
+procedure TfrmTela_Envio.btnRetornarInformacoes(Sender: TObject);
 begin
     FProdutoInfo := TWooProdutoRequest.Create;
 
@@ -81,7 +81,7 @@ begin
     ModalResult := mrOk;
 end;
 
-procedure TForm1.DefinirPosicaoDosElementos;
+procedure TfrmTela_Envio.DefinirPosicaoDosElementos;
 begin
 	editNome.Left := (editNome.Parent.ClientWidth - editNome.Width) div 2;
     editDescricao.Left := (editDescricaoCurta.Parent.ClientWidth - editDescricao.Width) div 2;
@@ -99,7 +99,7 @@ begin
     labelCategoria.Left := comboCategoria.Left;
 end;
 
-procedure TForm1.editClickOpenImageExplorer(Sender: TObject);
+procedure TfrmTela_Envio.editClickOpenImageExplorer(Sender: TObject);
 begin
  	dialogPathImagem.Filter := 'Image Files|*.jpg;*.jpeg;*.png';
     if dialogPathImagem.Execute then

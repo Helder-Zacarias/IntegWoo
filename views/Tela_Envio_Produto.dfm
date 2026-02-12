@@ -1,8 +1,8 @@
-object Form1: TForm1
+object frmTela_Envio: TfrmTela_Envio
   Left = 0
   Top = 0
   Anchors = []
-  Caption = 'Form1'
+  Caption = 'frmTela_Envio'
   ClientHeight = 422
   ClientWidth = 596
   Color = clBtnFace

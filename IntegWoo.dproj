@@ -128,22 +128,23 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
-        <DCCReference Include="Tela_Principal.pas">
-            <Form>Form2</Form>
+        <DCCReference Include="views\Tela_Envio_Produto.pas">
+            <Form>frmTela_Envio</Form>
             <FormType>dfm</FormType>
         </DCCReference>
-        <DCCReference Include="WooProdutoRequest.pas"/>
-        <DCCReference Include="WooImagemResponse.pas"/>
-        <DCCReference Include="WooProdutoResponse.pas"/>
-        <DCCReference Include="WPImagemResponse.pas"/>
-        <DCCReference Include="Produto.pas"/>
-        <DCCReference Include="WooImagemRequest.pas"/>
-        <DCCReference Include="AppConfig.pas"/>
-        <DCCReference Include="Tela_Envio_Produto.pas">
-            <Form>Form1</Form>
+        <DCCReference Include="models\Produto.pas"/>
+        <DCCReference Include="rest-client\woocommerce-api\WooCategoriaRequest.pas"/>
+        <DCCReference Include="rest-client\woocommerce-api\WooImagemRequest.pas"/>
+        <DCCReference Include="rest-client\woocommerce-api\WooImagemResponse.pas"/>
+        <DCCReference Include="rest-client\woocommerce-api\WooProdutoRequest.pas"/>
+        <DCCReference Include="rest-client\woocommerce-api\WooProdutoResponse.pas"/>
+        <DCCReference Include="rest-client\wordpress-media-api\WPImagemResponse.pas"/>
+        <DCCReference Include="views\Tela_Principal.pas">
+            <Form>frmTela_Principal</Form>
             <FormType>dfm</FormType>
         </DCCReference>
-        <DCCReference Include="WooCategoriaRequest.pas"/>
+        <DCCReference Include="config\AppConfig.pas"/>
+        <None Include="bin\config.ini"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -173,6 +174,12 @@
                 <DeployFile LocalName="bin\IntegWoo.exe" Configuration="Debug" Class="ProjectOutput">
                     <Platform Name="Win32">
                         <RemoteName>IntegWoo.exe</RemoteName>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile LocalName="bin\config.ini" Configuration="Debug" Class="ProjectFile">
+                    <Platform Name="Win32">
+                        <RemoteDir>.\</RemoteDir>
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
