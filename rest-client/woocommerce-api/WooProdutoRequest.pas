@@ -6,8 +6,8 @@ uses
     REST.Json.Types,
     System.Generics.Collections,
     WooImagemRequest,
-    WooCategoriaRequest;
-
+    WooCategoriaRequest,
+    WooProductVariationsRequest;
 type
 	TWooProdutoRequest = class
     private
@@ -19,6 +19,7 @@ type
         FRegular_price: string;
         FImages: TArray<TWooImagemRequest>;
         FCategories: TArray<TWooCategoriaRequest>;
+        FVariations: TArray<TProductVariationsRequest>;
     public
         constructor Create;
         destructor Destroy; override;
@@ -46,6 +47,9 @@ type
 
         [JSONName('categories')]
         property Categories: TArray<TWooCategoriaRequest> read FCategories write FCategories;
+
+        [JSONName('variations')]
+        property Variations: TArray<TProductVariationsRequest> read FVariations write FVariations;
    end;
 implementation
     constructor TWooProdutoRequest.Create;
@@ -53,6 +57,7 @@ implementation
       inherited;
       SetLength(FImages, 0);
       SetLength(FCategories, 0);
+      SetLength(FVariations, 0);
     end;
 
     destructor TWooProdutoRequest.Destroy;
@@ -61,6 +66,8 @@ implementation
             Img.Free;
         for var Category in FCategories do
             Category.Free;
+        for var Variation in FVariations do
+            Variation.Free;
       inherited;
     end;
 end.
