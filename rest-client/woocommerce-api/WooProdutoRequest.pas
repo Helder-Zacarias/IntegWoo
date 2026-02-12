@@ -13,6 +13,7 @@ type
     private
     	FName: string;
         FSlug: string;
+        FType: string;
         FDescription: string;
         FShort_description: string;
         FRegular_price: string;
@@ -27,6 +28,9 @@ type
 
         [JSONName('slug')]
         property Slug: string read FSlug write FSlug;
+
+        [JSONName('type')]
+        property PType: string read FType write FType;
 
         [JSONName('description')]
         property Description: string read FDescription write FDescription;

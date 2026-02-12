@@ -190,7 +190,7 @@ var
     ProdutoResponse: TWooProdutoResponse;
 begin
 	JSONString := TJson.ObjectToJsonString(Produto);
-        
+
     iRes := TRequest.New()
       	.BaseURL(TAppConfig.WooApiUrl)
         .Resource('products')
@@ -207,6 +207,7 @@ begin
         end
     else
     	raise(Exception.Create('Envio do produto falhou'))
+
 end;
 
 procedure TfrmTela_Principal.butEnviarProdutosdoBancoClick(Sender: TObject);
@@ -310,6 +311,7 @@ var
     iRes: IResponse;
     JsonArray: TJSONArray;
     Produtos: TObjectList<TWooProdutoResponse>;
+    Lines: TStringList;
 begin
     iRes := TRequest.New()
         .BaseURL(TAppConfig.WooApiUrl)
@@ -322,20 +324,28 @@ begin
     begin
     	JsonArray := TJSONObject.ParseJSONValue(iRes.Content) as TJSONArray;
 
+        Lines := TStringList.Create;
+
+
         if not Assigned(JsonArray) then
         	raise Exception.Create('JSON Inválido');
         
     	Produtos := TObjectList<TWooProdutoResponse>.Create(True);
 
         try
+            var Count := 1;
             for var JsonValue in JsonArray do
             begin
+            	Lines.Add(JsonValue.ToString);
+                Lines.SaveToFile('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\produto-' + Count.ToString + '.txt');
+                Inc(Count);
             	var Produto := TJson.JsonToObject<TWooProdutoResponse>(JsonValue.ToJSON);
                 Produtos.Add(Produto);
             end;
 
             for var Produto in Produtos do
         	begin
+
                 ShowMessage(
                     'name: ' + Produto.Name + sLineBreak +
                     'slug: ' + Produto.Slug + sLineBreak +
@@ -349,6 +359,7 @@ begin
         	end;
         finally
             Produtos.Free;
+            Lines.Free;
         end;
     end
     else
