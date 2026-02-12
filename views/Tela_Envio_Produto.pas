@@ -25,6 +25,8 @@ type
     labelCategoria: TLabel;
     labelCor: TLabel;
     listBoxCor: TCheckListBox;
+    labelTipoProduto: TLabel;
+    comboTipoProduto: TComboBox;
     procedure FormShow(Sender: TObject);
     procedure DefinirPosicaoDosElementos();
     procedure FormResize(Sender: TObject);
@@ -32,6 +34,7 @@ type
     procedure editClickOpenImageExplorer(Sender: TObject);
     procedure onFormCreate(Sender: TObject);
     procedure AddItensToCombo(CustomListControl: TCustomListControl; Items: TArray<string>);
+    procedure onEscolhaTipoProduto(Sender: TObject);
   private
     FProdutoInfo: TWooProdutoRequest;
     FPathImagem: string;
@@ -59,10 +62,25 @@ begin
       DefinirPosicaoDosElementos;
 end;
 
+procedure TfrmTela_Envio.onEscolhaTipoProduto(Sender: TObject);
+begin
+    if comboTipoProduto.Text = 'Variável' then
+    begin
+        labelCor.Visible := True;
+        listBoxCor.Visible := True
+    end
+    else
+    begin
+    	labelCor.Visible := False;
+        listBoxCor.Visible := False
+    end;
+end;
+
 procedure TfrmTela_Envio.onFormCreate(Sender: TObject);
 begin
     AddItensToCombo(comboCategoria, ['Camisetas', 'Calçados', 'Acessórios', 'Moletons', 'Categoria Teste']);
     AddItensToCombo(listBoxCor, ['Azul', 'Vermelho', 'Marrom', 'Bege']);
+    AddItensToCombo(comboTipoProduto, ['Simples', 'Variável']);
 end;
 
 procedure TfrmTela_Envio.AddItensToCombo(CustomListControl: TCustomListControl; Items: TArray<string>);
@@ -97,6 +115,8 @@ begin
     btnEnviarProduto.Left := (btnEnviarProduto.Parent.ClientWidth - btnEnviarProduto.Width) div 2;
     editPathImagem.Left := (editPathImagem.Parent.ClientWidth - editPathImagem.Width) div 2;
     comboCategoria.Left := (comboCategoria.Parent.ClientWidth - comboCategoria.Width) div 2;
+    comboTipoProduto.Left := (comboTipoProduto.Parent.ClientWidth - comboTipoProduto.Width) div 2;
+
     listBoxCor.Left := (listBoxCor.Parent.ClientWidth - listBoxCor.Width) div 2;
 
     labelNome.Left := editNome.Left;
@@ -105,6 +125,8 @@ begin
     labelPreco.Left := boxPreco.Left;
     labelPathImagem.Left := editPathImagem.Left;
     labelCategoria.Left := comboCategoria.Left;
+    labelTipoProduto.Left := comboTipoProduto.Left;
+
     labelCor.Left := listBoxCor.Left;
 end;
 

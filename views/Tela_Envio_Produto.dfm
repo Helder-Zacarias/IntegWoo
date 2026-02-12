@@ -3,7 +3,7 @@ object frmTela_Envio: TfrmTela_Envio
   Top = 0
   Anchors = []
   Caption = 'frmTela_Envio'
-  ClientHeight = 535
+  ClientHeight = 596
   ClientWidth = 596
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -69,7 +69,7 @@ object frmTela_Envio: TfrmTela_Envio
   end
   object labelPathImagem: TLabel
     Left = 168
-    Top = 383
+    Top = 433
     Width = 112
     Height = 15
     Caption = 'Caminho da Imagem'
@@ -89,10 +89,18 @@ object frmTela_Envio: TfrmTela_Envio
   end
   object labelCor: TLabel
     Left = 168
-    Top = 258
+    Top = 308
     Width = 19
     Height = 15
     Caption = 'Cor'
+    Visible = False
+  end
+  object labelTipoProduto: TLabel
+    Left = 168
+    Top = 258
+    Width = 70
+    Height = 15
+    Caption = 'Tipo Produto'
   end
   object editNome: TEdit
     Left = 168
@@ -116,8 +124,8 @@ object frmTela_Envio: TfrmTela_Envio
     TabOrder = 2
   end
   object btnEnviarProduto: TButton
-    Left = 216
-    Top = 486
+    Left = 224
+    Top = 534
     Width = 155
     Height = 33
     Caption = 'Enviar Produto'
@@ -137,7 +145,7 @@ object frmTela_Envio: TfrmTela_Envio
   end
   object editPathImagem: TEdit
     Left = 168
-    Top = 404
+    Top = 454
     Width = 297
     Height = 23
     TabOrder = 5
@@ -152,14 +160,23 @@ object frmTela_Envio: TfrmTela_Envio
   end
   object listBoxCor: TCheckListBox
     Left = 168
-    Top = 279
+    Top = 329
     Width = 297
     Height = 98
     ItemHeight = 17
     TabOrder = 7
+    Visible = False
+  end
+  object comboTipoProduto: TComboBox
+    Left = 168
+    Top = 279
+    Width = 297
+    Height = 23
+    TabOrder = 8
+    OnSelect = onEscolhaTipoProduto
   end
   object dialogPathImagem: TOpenPictureDialog
-    Left = 488
-    Top = 408
+    Left = 496
+    Top = 448
   end
 end
