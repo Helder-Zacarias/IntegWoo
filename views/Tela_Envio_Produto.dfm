@@ -3,7 +3,7 @@ object frmTela_Envio: TfrmTela_Envio
   Top = 0
   Anchors = []
   Caption = 'frmTela_Envio'
-  ClientHeight = 422
+  ClientHeight = 535
   ClientWidth = 596
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -69,7 +69,7 @@ object frmTela_Envio: TfrmTela_Envio
   end
   object labelPathImagem: TLabel
     Left = 168
-    Top = 258
+    Top = 383
     Width = 112
     Height = 15
     Caption = 'Caminho da Imagem'
@@ -86,6 +86,13 @@ object frmTela_Envio: TfrmTela_Envio
     Width = 51
     Height = 15
     Caption = 'Categoria'
+  end
+  object labelCor: TLabel
+    Left = 168
+    Top = 258
+    Width = 19
+    Height = 15
+    Caption = 'Cor'
   end
   object editNome: TEdit
     Left = 168
@@ -109,8 +116,8 @@ object frmTela_Envio: TfrmTela_Envio
     TabOrder = 2
   end
   object btnEnviarProduto: TButton
-    Left = 224
-    Top = 368
+    Left = 216
+    Top = 486
     Width = 155
     Height = 33
     Caption = 'Enviar Produto'
@@ -130,7 +137,7 @@ object frmTela_Envio: TfrmTela_Envio
   end
   object editPathImagem: TEdit
     Left = 168
-    Top = 279
+    Top = 404
     Width = 297
     Height = 23
     TabOrder = 5
@@ -143,8 +150,16 @@ object frmTela_Envio: TfrmTela_Envio
     Height = 23
     TabOrder = 6
   end
+  object listBoxCor: TCheckListBox
+    Left = 168
+    Top = 279
+    Width = 297
+    Height = 98
+    ItemHeight = 17
+    TabOrder = 7
+  end
   object dialogPathImagem: TOpenPictureDialog
-    Left = 504
-    Top = 280
+    Left = 488
+    Top = 408
   end
 end

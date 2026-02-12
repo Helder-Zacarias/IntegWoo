@@ -144,6 +144,7 @@
             <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="config\AppConfig.pas"/>
+        <DCCReference Include="models\Secao.pas"/>
         <None Include="bin\config.ini"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

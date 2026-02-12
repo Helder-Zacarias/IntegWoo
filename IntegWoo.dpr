@@ -11,7 +11,8 @@ uses
   WooProdutoResponse in 'rest-client\woocommerce-api\WooProdutoResponse.pas',
   WPImagemResponse in 'rest-client\wordpress-media-api\WPImagemResponse.pas',
   Tela_Principal in 'views\Tela_Principal.pas' {frmTela_Principal},
-  AppConfig in 'config\AppConfig.pas';
+  AppConfig in 'config\AppConfig.pas',
+  Secao in 'models\Secao.pas';
 
 {$R *.res}
 

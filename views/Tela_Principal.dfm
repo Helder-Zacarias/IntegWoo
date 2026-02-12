@@ -82,7 +82,7 @@
   object Database: TUniConnection
     ProviderName = 'MySQL'
     Port = 33063
-    Database = 'db_sgci'
+    Database = 'information_schema'
     SpecificOptions.Strings = (
       'MySQL.Protocol=mpTCP'
       'MySQL.ConnectionTimeout=30'

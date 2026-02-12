@@ -279,19 +279,19 @@ var
     Filename: string;
     SelectQuery:  TUniQuery;
 begin
-    Filename := 'C:\Users\HELDER\Desktop\RESPONSE-DELPHI\tables.txt';
+    Filename := 'C:\Users\HELDER\Desktop\RESPONSE-DELPHI\schema-tables.txt';
     Tables := TStringList.Create;
     try
-//    	Database.GetTableNames(Tables);
-//    	ShowMessage(Tables.Text);
-//        Tables.SaveToFile(Filename);
+    	Database.GetTableNames(Tables);
+    	ShowMessage(Tables.Text);
+        Tables.SaveToFile(Filename);
 
         SelectQuery := TUniQuery.Create(nil);
 
-        SelectQuery.Connection := Database;
-        SelectQuery.SQL.Text := 'SELECT * FROM secoes LIMIT 10';
-        SelectQuery.Open;
-        SelectQuery.SaveToXML('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\select-secoes.xml');
+//        SelectQuery.Connection := Database;
+//        SelectQuery.SQL.Text := 'SELECT * FROM information_schema';
+//        SelectQuery.Open;
+//        SelectQuery.SaveToXML('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\select-schema.xml');
     finally
 //        Tables.Free;
         SelectQuery.Free;

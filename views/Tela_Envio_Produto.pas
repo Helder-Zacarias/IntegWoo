@@ -5,7 +5,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, WooProdutoRequest, VCL.NumberBox,
-  Vcl.ExtDlgs;
+  Vcl.ExtDlgs, Vcl.CheckLst;
 
 type
   TfrmTela_Envio= class(TForm)
@@ -23,12 +23,15 @@ type
     labelPathImagem: TLabel;
     comboCategoria: TComboBox;
     labelCategoria: TLabel;
+    labelCor: TLabel;
+    listBoxCor: TCheckListBox;
     procedure FormShow(Sender: TObject);
     procedure DefinirPosicaoDosElementos();
     procedure FormResize(Sender: TObject);
     procedure btnRetornarInformacoes(Sender: TObject);
     procedure editClickOpenImageExplorer(Sender: TObject);
     procedure onFormCreate(Sender: TObject);
+    procedure AddItensToCombo(CustomListControl: TCustomListControl; Items: TArray<string>);
   private
     FProdutoInfo: TWooProdutoRequest;
     FPathImagem: string;
@@ -58,12 +61,16 @@ end;
 
 procedure TfrmTela_Envio.onFormCreate(Sender: TObject);
 begin
-	comboCategoria.Items.Add('Camisetas');
-    comboCategoria.Items.Add('Calçados');
-    comboCategoria.Items.Add('Acessórios');
-    comboCategoria.Items.Add('Moletons');
-    comboCategoria.Items.Add('Categoria Teste');
-    comboCategoria.ItemIndex := 0;
+    AddItensToCombo(comboCategoria, ['Camisetas', 'Calçados', 'Acessórios', 'Moletons', 'Categoria Teste']);
+    AddItensToCombo(listBoxCor, ['Azul', 'Vermelho', 'Marrom', 'Bege']);
+end;
+
+procedure TfrmTela_Envio.AddItensToCombo(CustomListControl: TCustomListControl; Items: TArray<string>);
+begin
+    for var Item in Items do
+       CustomListControl.AddItem(Item, nil);
+
+    CustomListControl.ItemIndex := 0;
 end;
 
 procedure TfrmTela_Envio.btnRetornarInformacoes(Sender: TObject);
@@ -90,6 +97,7 @@ begin
     btnEnviarProduto.Left := (btnEnviarProduto.Parent.ClientWidth - btnEnviarProduto.Width) div 2;
     editPathImagem.Left := (editPathImagem.Parent.ClientWidth - editPathImagem.Width) div 2;
     comboCategoria.Left := (comboCategoria.Parent.ClientWidth - comboCategoria.Width) div 2;
+    listBoxCor.Left := (listBoxCor.Parent.ClientWidth - listBoxCor.Width) div 2;
 
     labelNome.Left := editNome.Left;
     labelDescricao.Left := editDescricao.Left;
@@ -97,6 +105,7 @@ begin
     labelPreco.Left := boxPreco.Left;
     labelPathImagem.Left := editPathImagem.Left;
     labelCategoria.Left := comboCategoria.Left;
+    labelCor.Left := listBoxCor.Left;
 end;
 
 procedure TfrmTela_Envio.editClickOpenImageExplorer(Sender: TObject);
