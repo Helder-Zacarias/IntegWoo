@@ -10,7 +10,8 @@ uses
   Produto in 'Produto.pas',
   WooImagemRequest in 'WooImagemRequest.pas',
   AppConfig in 'AppConfig.pas',
-  Tela_Envio_Produto in 'Tela_Envio_Produto.pas' {Form1};
+  Tela_Envio_Produto in 'Tela_Envio_Produto.pas' {Form1},
+  WooCategoriaRequest in 'WooCategoriaRequest.pas';
 
 {$R *.res}
 

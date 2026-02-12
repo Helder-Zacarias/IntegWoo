@@ -11,91 +11,99 @@ object Form1: TForm1
   Font.Height = -12
   Font.Name = 'Segoe UI'
   Font.Style = []
+  OnCreate = onFormCreate
   OnResize = FormResize
   OnShow = FormShow
   TextHeight = 15
   object labelDescricao: TLabel
     Left = 168
-    Top = 110
-    Width = 67
-    Height = 21
+    Top = 58
+    Width = 51
+    Height = 15
     Caption = 'Descri'#231#227'o'
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWindowText
-    Font.Height = -16
+    Font.Height = -12
     Font.Name = 'Segoe UI'
     Font.Style = []
     ParentFont = False
   end
   object labelDescricaoCurta: TLabel
     Left = 168
-    Top = 166
-    Width = 109
-    Height = 21
+    Top = 108
+    Width = 83
+    Height = 15
     Caption = 'Descri'#231#227'o Curta'
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWindowText
-    Font.Height = -16
+    Font.Height = -12
     Font.Name = 'Segoe UI'
     Font.Style = []
     ParentFont = False
   end
   object labelPreco: TLabel
     Left = 168
-    Top = 222
-    Width = 39
-    Height = 21
+    Top = 158
+    Width = 30
+    Height = 15
     Caption = 'Pre'#231'o'
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWindowText
-    Font.Height = -16
+    Font.Height = -12
     Font.Name = 'Segoe UI'
     Font.Style = []
     ParentFont = False
   end
   object labelNome: TLabel
     Left = 168
-    Top = 54
-    Width = 43
-    Height = 21
+    Top = 8
+    Width = 33
+    Height = 15
     Caption = 'Nome'
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWindowText
-    Font.Height = -16
+    Font.Height = -12
     Font.Name = 'Segoe UI'
     Font.Style = []
     ParentFont = False
   end
   object labelPathImagem: TLabel
     Left = 168
-    Top = 278
-    Width = 145
-    Height = 21
+    Top = 258
+    Width = 112
+    Height = 15
     Caption = 'Caminho da Imagem'
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWindowText
-    Font.Height = -16
+    Font.Height = -12
     Font.Name = 'Segoe UI'
     Font.Style = []
     ParentFont = False
   end
+  object labelCategoria: TLabel
+    Left = 168
+    Top = 208
+    Width = 51
+    Height = 15
+    Caption = 'Categoria'
+  end
   object editNome: TEdit
     Left = 168
-    Top = 81
+    Top = 29
     Width = 297
     Height = 23
     TabOrder = 0
   end
   object editDescricao: TEdit
     Left = 168
-    Top = 137
+    Top = 79
     Width = 297
     Height = 23
     TabOrder = 1
   end
   object editDescricaoCurta: TEdit
     Left = 168
-    Top = 193
+    Top = 129
     Width = 297
     Height = 23
     TabOrder = 2
@@ -111,24 +119,32 @@ object Form1: TForm1
   end
   object boxPreco: TNumberBox
     Left = 168
-    Top = 249
+    Top = 179
     Width = 297
     Height = 23
     Mode = nbmCurrency
     MinValue = 1.000000000000000000
     MaxValue = 1000000.000000000000000000
     TabOrder = 4
+    Value = 1.000000000000000000
   end
   object editPathImagem: TEdit
     Left = 168
-    Top = 299
+    Top = 279
     Width = 297
     Height = 23
     TabOrder = 5
     OnClick = editClickOpenImageExplorer
   end
+  object comboCategoria: TComboBox
+    Left = 168
+    Top = 229
+    Width = 297
+    Height = 23
+    TabOrder = 6
+  end
   object dialogPathImagem: TOpenPictureDialog
-    Left = 480
-    Top = 296
+    Left = 504
+    Top = 280
   end
 end

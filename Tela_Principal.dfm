@@ -1,4 +1,4 @@
-object Form2: TForm2
+﻿object Form2: TForm2
   Left = 0
   Top = 0
   Caption = 'Form2'
@@ -55,6 +55,24 @@ object Form2: TForm2
       Caption = 'Enviar Produto Simples'
       TabOrder = 2
       OnClick = btnOpenModalClick
+    end
+    object btnTestConexao: TButton
+      Left = 0
+      Top = 272
+      Width = 155
+      Height = 33
+      Caption = 'Teste Conex'#227'o'
+      TabOrder = 3
+      OnClick = btnTestarConexãoClick
+    end
+    object btnBuscarCategorias: TButton
+      Left = 0
+      Top = 205
+      Width = 155
+      Height = 33
+      Caption = 'Buscar categorias'
+      TabOrder = 4
+      OnClick = btnBuscarCategoriasClick
     end
   end
   object MySQL: TMySQLUniProvider

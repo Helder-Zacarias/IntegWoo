@@ -7,7 +7,7 @@ uses
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Data.DB, Uni, UniProvider,
   MySQLUniProvider, DBAccess, MemData, MemDS, Vcl.StdCtrls, Vcl.Buttons, System.IOUtils, REST.Json, Rest.Json.Types, WooProdutoResponse,
   System.Generics.Collections, System.JSON, WPImagemResponse, WooImagemRequest, WooProdutoRequest, System.IniFiles, AppConfig, Produto,
-  Vcl.ExtCtrls, Tela_Envio_Produto;
+  Vcl.ExtCtrls, Tela_Envio_Produto, WooCategoriaRequest;
 
 type
   TForm2 = class(TForm)
@@ -20,15 +20,20 @@ type
     btnEnviarFull: TBitBtn;
     btnHamburguer: TButton;
     panelSide: TPanel;
+    btnTestConexao: TButton;
+    btnBuscarCategorias: TButton;
     procedure DatabaseConnectionLost(Sender: TObject; Component: TComponent;
       ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
     procedure butEnviarProdutosdoBancoClick(Sender: TObject);
     procedure butBuscarProdutosClick(Sender: TObject);
     function enviarImagem(ImagePath: string): TWPImagemResponse;
     function enviarProduto(Produto: TWooProdutoRequest): TWooProdutoResponse;
-    procedure btnEnviarProdutoSimplesClick(Produto: TWooProdutoRequest; ImagePath: string);
+    procedure btnEnviarProdutoSimplesClick(Produto: TWooProdutoRequest; ImagePath: string; CategoriaSelecionada: string);
     procedure btnHamburguerClick(Sender: TObject);
     procedure btnOpenModalClick(Sender: TObject);
+    procedure btnTestarConexãoClick(Sender: TObject);
+    function selectCategoria(CategoriaString: string): TWooCategoriaRequest;
+    procedure btnBuscarCategoriasClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -46,10 +51,39 @@ uses
 
 {$R *.dfm}
 
-procedure TForm2.btnEnviarProdutoSimplesClick(Produto: TWooProdutoRequest; ImagePath: string);
+procedure TForm2.btnBuscarCategoriasClick(Sender: TObject);
+var
+    Filename: string;
+    Lines: TStringList;
+    Response: IResponse;
+begin
+	Filename :=  'C:\Users\HELDER\Desktop\RESPONSE-DELPHI\categorias.txt';
+    Lines := TStringList.Create;
+
+    try
+    	Response := TRequest.New()
+            .BaseURL(TAppConfig.WooApiUrl)
+            .Resource('products/categories')
+            .BasicAuthentication(TAppConfig.ConsumerKey, TAppConfig.ConsumerSecret)
+            .AddHeader('Content-Type', 'application/json', [poDoNoTEncode])
+            .Get;
+
+    	if Response.StatusCode = 200 then
+            begin
+            	Lines.Add(Response.Content);
+            	Lines.SaveToFile(Filename);
+    	end;
+    finally
+    	Lines.Free;
+    end;
+   
+end;
+
+procedure TForm2.btnEnviarProdutoSimplesClick(Produto: TWooProdutoRequest; ImagePath: string; CategoriaSelecionada: string);
 var
     WPImagemResponse: TWPImagemResponse;
-    Arr: TArray<TWooImagemRequest>;
+    ArrImagens: TArray<TWooImagemRequest>;
+    ArrCategorias: TArray<TWooCategoriaRequest>;
 begin
     WPImagemResponse := enviarImagem(ImagePath);
 
@@ -57,17 +91,63 @@ begin
     	raise(Exception.Create('Upload de Imagem Falhou'));
 
     try
+        var Categoria := selectCategoria(CategoriaSelecionada);
+        ArrCategorias := Produto.Categories;
+        SetLength(ArrCategorias, 1);
+        ArrCategorias[0] := Categoria;
+        Produto.Categories := ArrCategorias;
+        
         var Img := TWooImagemRequest.Create;
         Img.Id := WPImagemResponse.Id;
-        Arr := Produto.Images;
-  		SetLength(Arr, 1);
-  		Arr[0] := Img;
-  		Produto.Images := Arr;
+        ArrImagens := Produto.Images;
+  		SetLength(ArrImagens, 1);
+  		ArrImagens[0] := Img;
+  		Produto.Images := ArrImagens;
 
     	enviarProduto(Produto);
     finally
         Produto.Free;
     end;
+end;
+
+function TForm2.selectCategoria(CategoriaString: string): TWooCategoriaRequest;
+var
+    Categoria: TWooCategoriaRequest;
+begin
+    Categoria := TWooCategoriaRequest.Create;
+
+    if CategoriaString = 'Camisetas' then
+    begin
+    	Categoria.Id :=  '15';
+        Categoria.Name := 'Camisetas';
+        Categoria.Slug := 'camisetas';
+    end
+    else if CategoriaString = 'Calçados' then
+    begin
+    	Categoria.Id :=  '28';
+        Categoria.Name := 'Calçados';
+        Categoria.Slug := 'calçados';
+    end
+    else if CategoriaString = 'Acessórios' then
+    begin
+        Categoria.Id :=  '29';
+        Categoria.Name := 'Acessórios';
+        Categoria.Slug := 'acessorios';
+    end
+    else if CategoriaString = 'Moletons' then
+    begin
+    	Categoria.Id :=  '30';
+        Categoria.Name := 'Moletons';
+        Categoria.Slug := 'moletons';
+    end
+    else
+    begin
+       	Categoria.Id :=  '55';
+        Categoria.Name := 'Nova Categoria Teste';
+        Categoria.Slug := 'nova-categoria-teste';
+    end;
+
+    Result := Categoria;
 end;
 
 function TForm2.enviarImagem(ImagePath: string): TWPImagemResponse;
@@ -186,11 +266,37 @@ begin
         begin
             ProdutoRequest := ProdutoForm.ProdutoInfo;
             PathImagem := ProdutoForm.PathImagem;
-            btnEnviarProdutoSimplesClick(ProdutoRequest, PathImagem);
+            btnEnviarProdutoSimplesClick(ProdutoRequest, PathImagem, ProdutoForm.Categoria);
         end;
     finally
     	ProdutoForm.Free;
     end;
+end;
+
+procedure TForm2.btnTestarConexãoClick(Sender: TObject);
+var
+    Tables: TStringList;
+    Filename: string;
+    SelectQuery:  TUniQuery;
+begin
+    Filename := 'C:\Users\HELDER\Desktop\RESPONSE-DELPHI\tables.txt';
+    Tables := TStringList.Create;
+    try
+//    	Database.GetTableNames(Tables);
+//    	ShowMessage(Tables.Text);
+//        Tables.SaveToFile(Filename);
+
+        SelectQuery := TUniQuery.Create(nil);
+
+        SelectQuery.Connection := Database;
+        SelectQuery.SQL.Text := 'SELECT * FROM secoes LIMIT 10';
+        SelectQuery.Open;
+        SelectQuery.SaveToXML('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\select-secoes.xml');
+    finally
+//        Tables.Free;
+        SelectQuery.Free;
+    end;
+
 end;
 
 procedure TForm2.btnHamburguerClick(Sender: TObject);

@@ -5,7 +5,8 @@ interface
 uses
     REST.Json.Types,
     System.Generics.Collections,
-    WooImagemRequest;
+    WooImagemRequest,
+    WooCategoriaRequest;
 
 type
 	TWooProdutoRequest = class
@@ -16,6 +17,7 @@ type
         FShort_description: string;
         FRegular_price: string;
         FImages: TArray<TWooImagemRequest>;
+        FCategories: TArray<TWooCategoriaRequest>;
     public
         constructor Create;
         destructor Destroy; override;
@@ -37,18 +39,24 @@ type
 
         [JSONName('images')]
         property Images: TArray<TWooImagemRequest> read FImages write FImages;
+
+        [JSONName('categories')]
+        property Categories: TArray<TWooCategoriaRequest> read FCategories write FCategories;
    end;
 implementation
     constructor TWooProdutoRequest.Create;
     begin
       inherited;
       SetLength(FImages, 0);
+      SetLength(FCategories, 0);
     end;
 
     destructor TWooProdutoRequest.Destroy;
     begin
         for var Img in FImages do
             Img.Free;
+        for var Category in FCategories do
+            Category.Free;
       inherited;
     end;
 end.

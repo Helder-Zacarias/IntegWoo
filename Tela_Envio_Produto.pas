@@ -21,17 +21,22 @@ type
     dialogPathImagem: TOpenPictureDialog;
     editPathImagem: TEdit;
     labelPathImagem: TLabel;
+    comboCategoria: TComboBox;
+    labelCategoria: TLabel;
     procedure FormShow(Sender: TObject);
     procedure DefinirPosicaoDosElementos();
     procedure FormResize(Sender: TObject);
     procedure btnRetornarInformacoes(Sender: TObject);
     procedure editClickOpenImageExplorer(Sender: TObject);
+    procedure onFormCreate(Sender: TObject);
   private
     FProdutoInfo: TWooProdutoRequest;
     FPathImagem: string;
+    FCategoria: string;
   public
     property ProdutoInfo: TWooProdutoRequest read FProdutoInfo write FProdutoInfo;
     property PathImagem: string read FPathImagem write FPathImagem;
+    property Categoria: string read FCategoria write FCategoria;
   end;
 
 var
@@ -51,6 +56,16 @@ begin
       DefinirPosicaoDosElementos;
 end;
 
+procedure TForm1.onFormCreate(Sender: TObject);
+begin
+	comboCategoria.Items.Add('Camisetas');
+    comboCategoria.Items.Add('Calçados');
+    comboCategoria.Items.Add('Acessórios');
+    comboCategoria.Items.Add('Moletons');
+    comboCategoria.Items.Add('Categoria Teste');
+    comboCategoria.ItemIndex := 0;
+end;
+
 procedure TForm1.btnRetornarInformacoes(Sender: TObject);
 begin
     FProdutoInfo := TWooProdutoRequest.Create;
@@ -61,6 +76,7 @@ begin
     FProdutoInfo.RegularPrice := boxPreco.Text;
 
     FPathImagem := editPathImagem.text;
+    FCategoria := comboCategoria.Text;
 
     ModalResult := mrOk;
 end;
@@ -73,12 +89,14 @@ begin
     boxPreco.Left := (boxPreco.Parent.ClientWidth - boxPreco.Width) div 2;
     btnEnviarProduto.Left := (btnEnviarProduto.Parent.ClientWidth - btnEnviarProduto.Width) div 2;
     editPathImagem.Left := (editPathImagem.Parent.ClientWidth - editPathImagem.Width) div 2;
+    comboCategoria.Left := (comboCategoria.Parent.ClientWidth - comboCategoria.Width) div 2;
 
     labelNome.Left := editNome.Left;
     labelDescricao.Left := editDescricao.Left;
     labelDescricaoCurta.Left := editDescricaoCurta.Left;
     labelPreco.Left := boxPreco.Left;
     labelPathImagem.Left := editPathImagem.Left;
+    labelCategoria.Left := comboCategoria.Left;
 end;
 
 procedure TForm1.editClickOpenImageExplorer(Sender: TObject);
