@@ -150,11 +150,16 @@
         <DCCReference Include="rest-client\woocommerce-api\WooAtributoDaVariacao.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\WooVariacaoDoProduto.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\WooAtributoRequest.pas"/>
-        <DCCReference Include="rest-client\woocommerce-api\TermoDoAtributo.pas"/>
+        <DCCReference Include="rest-client\woocommerce-api\WooTermoAtributoRequest.pas"/>
         <DCCReference Include="views\Tela_Cadastro_Atributo.pas">
             <Form>frmTela_Cadastro_Atributo</Form>
             <FormType>dfm</FormType>
         </DCCReference>
+        <DCCReference Include="views\Tela_Adicionar_Termo.pas">
+            <Form>frmTela_Adicionar_Termo</Form>
+            <FormType>dfm</FormType>
+        </DCCReference>
+        <DCCReference Include="rest-client\woocommerce-api\WooAtributoResponse.pas"/>
         <None Include="bin\config.ini"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

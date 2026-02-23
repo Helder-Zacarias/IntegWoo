@@ -7,7 +7,7 @@ uses
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Data.DB, Uni, UniProvider,
   MySQLUniProvider, DBAccess, MemData, MemDS, Vcl.StdCtrls, Vcl.Buttons, System.IOUtils, REST.Json, Rest.Json.Types, WooProdutoResponse,
   System.Generics.Collections, System.JSON, WPImagemResponse, WooImagemRequest, WooProdutoRequest, System.IniFiles, AppConfig, Produto,
-  Vcl.ExtCtrls, Tela_Envio_Produto, WooCategoriaRequest, Tela_Cadastro_Atributo, WooAtributoRequest;
+  Vcl.ExtCtrls, Tela_Envio_Produto, WooCategoriaRequest, Tela_Cadastro_Atributo, WooAtributoRequest, WooTermoAtributoRequest, WooAtributoResponse;
 
 type
   TfrmTela_Principal = class(TForm)
@@ -38,6 +38,7 @@ type
     procedure btnBuscarCategoriasClick(Sender: TObject);
     procedure btnCriarAtributosClick(Sender: TObject);
     procedure btnBuscarAtributosClick(Sender: TObject);
+    procedure CriarTermosDoAtributo(Termos: TArray<string>; IdAtributo: Integer);
   private
     { Private declarations }
   public
@@ -61,7 +62,7 @@ var
     FileName: string;
     FileWriter: TStringList;
 begin
-	FileName := 'C:\Users\HELDER\Desktop\RESPONSE-DELPHI\atributos.txt';
+	FileName := 'C:\Users\HELDER\Desktop\RESPONSE-DELPHI\ATRIBUTOS-PAYLOADS\atributos.txt';
     FileWriter := TStringList.Create;
 
     try
@@ -110,6 +111,51 @@ begin
    
 end;
 
+procedure TfrmTela_Principal.CriarTermosDoAtributo(Termos: TArray<string>; IDAtributo: Integer);
+var
+	Termo: string;
+	TermoAtributoRequest: TWooTermoAtributoRequest;
+    JSONString: string;
+    Response: IResponse;
+    Filename: string;
+    FileWriter: TStringList;
+begin
+	TermoAtributoRequest := TWooTermoAtributoRequest.Create;
+    FileWriter := TStringList.Create;
+
+    try
+    	for Termo in Termos do
+        begin
+           TermoAtributoRequest.Name := Termo;
+
+           JSONString := TJson.ObjectToJsonString(TermoAtributoRequest);
+
+           Response := TRequest.New
+               .BaseURL(TAppConfig.WooApiUrl)
+               .Resource('/products/attributes/' + IDAtributo.ToString + '/terms')
+               .AddHeader('Content-Type', 'application/json', [poDoNotEncode])
+               .BasicAuthentication(TAppConfig.ConsumerKey, TAppConfig.ConsumerSecret)
+               .AddBody(JSONString)
+               .Post;
+           if Response.StatusCode in [200, 201] then
+           begin
+              Filename := 'C:\Users\HELDER\Desktop\RESPONSE-DELPHI\ATRIBUTOS-PAYLOADS\termos-response.txt';
+              if FileExists(Filename) then
+                FileWriter.LoadFromFile(FileName);
+
+              FileWriter.Add(Response.Content);
+              FileWriter.SaveToFile(Filename);
+           end
+           else
+           	raise(Exception.Create('Termo não foi salvo com sucesso'));
+        end;
+    finally
+    	FileWriter.Free;
+        TermoAtributoRequest.Free;
+    end;
+
+end;
+
 procedure TfrmTela_Principal.btnCriarAtributosClick(Sender: TObject);
 var
     FileName: string;
@@ -118,8 +164,10 @@ var
     TelaCadastroAtributo: TfrmTela_Cadastro_Atributo;
     JSONString: string;
     AtributoRequest: TWooAtributoRequest;
+    AtributoResponse: TWooAtributoResponse;
+
 begin
-	Filename := 'C:\Users\HELDER\Desktop\RESPONSE-DELPHI\novo-atributo-response.txt';
+	Filename := 'C:\Users\HELDER\Desktop\RESPONSE-DELPHI\ATRIBUTOS-PAYLOADS\novo-atributo-response.txt';
     FileWriter := TStringList.Create;
     TelaCadastroAtributo := TfrmTela_Cadastro_Atributo.Create(Self);
     TelaCadastroAtributo.Position := poScreenCenter;
@@ -140,13 +188,17 @@ begin
                 .AddBody(AtributoRequest)
                 .Post;
 
+            AtributoResponse := TJson.JsonToObject<TWooAtributoResponse>(Response.Content);
+
             if Response.StatusCode in [200, 201] then
                 begin
                     FileWriter.Add(Response.Content);
                     FileWriter.SaveToFile(FileName);
+                    CriarTermosDoAtributo(TelaCadastroAtributo.Termos, AtributoResponse.Id);
+                    ShowMessage('Atributo criado com sucesso');
                 end
         	else
-            	raise(Exception.Create('Criação de atributo não concluída'));
+            	raise(Exception.Create('Criação de atributo não foi bem sucedida'));
         finally
         	FileWriter.Free;
          	TelaCadastroAtributo.Free;

@@ -18,8 +18,10 @@ uses
   WooAtributoDaVariacao in 'rest-client\woocommerce-api\WooAtributoDaVariacao.pas',
   WooVariacaoDoProduto in 'rest-client\woocommerce-api\WooVariacaoDoProduto.pas',
   WooAtributoRequest in 'rest-client\woocommerce-api\WooAtributoRequest.pas',
-  TermoDoAtributo in 'rest-client\woocommerce-api\TermoDoAtributo.pas',
-  Tela_Cadastro_Atributo in 'views\Tela_Cadastro_Atributo.pas' {frmTela_Cadastro_Atributo};
+  WooTermoAtributoRequest in 'rest-client\woocommerce-api\WooTermoAtributoRequest.pas',
+  Tela_Cadastro_Atributo in 'views\Tela_Cadastro_Atributo.pas' {frmTela_Cadastro_Atributo},
+  Tela_Adicionar_Termo in 'views\Tela_Adicionar_Termo.pas' {frmTela_Adicionar_Termo},
+  WooAtributoResponse in 'rest-client\woocommerce-api\WooAtributoResponse.pas';
 
 {$R *.res}
 
@@ -29,5 +31,6 @@ begin
   Application.MainFormOnTaskbar := True;
   Application.CreateForm(TfrmTela_Principal, frmTela_Principal);
   Application.CreateForm(TfrmTela_Cadastro_Atributo, frmTela_Cadastro_Atributo);
+  Application.CreateForm(TfrmTela_Adicionar_Termo, frmTela_Adicionar_Termo);
   Application.Run;
 end.

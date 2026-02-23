@@ -1,10 +1,10 @@
-unit TermoDoAtributo;
+unit WooTermoAtributoRequest;
 
 interface
 uses
 	Rest.Json.Types;
 type
-    TSTermoDoAtributo = class
+    TWooTermoAtributoRequest = class
     private
     	FName: string;
     published
