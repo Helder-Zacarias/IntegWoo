@@ -7,7 +7,7 @@ uses
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Data.DB, Uni, UniProvider,
   MySQLUniProvider, DBAccess, MemData, MemDS, Vcl.StdCtrls, Vcl.Buttons, System.IOUtils, REST.Json, Rest.Json.Types, WooProdutoResponse,
   System.Generics.Collections, System.JSON, WPImagemResponse, WooImagemRequest, WooProdutoRequest, System.IniFiles, AppConfig, Produto,
-  Vcl.ExtCtrls, Tela_Envio_Produto, WooCategoriaRequest;
+  Vcl.ExtCtrls, Tela_Envio_Produto, WooCategoriaRequest, Tela_Cadastro_Atributo, WooAtributoRequest;
 
 type
   TfrmTela_Principal = class(TForm)
@@ -22,6 +22,8 @@ type
     panelSide: TPanel;
     btnTestConexao: TButton;
     btnBuscarCategorias: TButton;
+    btnCriarAtributos: TButton;
+    btnBuscarAtributos: TButton;
     procedure DatabaseConnectionLost(Sender: TObject; Component: TComponent;
       ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
     procedure butEnviarProdutosdoBancoClick(Sender: TObject);
@@ -34,6 +36,8 @@ type
     procedure btnTestarConexãoClick(Sender: TObject);
     function selectCategoria(CategoriaString: string): TWooCategoriaRequest;
     procedure btnBuscarCategoriasClick(Sender: TObject);
+    procedure btnCriarAtributosClick(Sender: TObject);
+    procedure btnBuscarAtributosClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -51,13 +55,40 @@ uses
 
 {$R *.dfm}
 
+procedure TfrmTela_Principal.btnBuscarAtributosClick(Sender: TObject);
+var
+	Response: IResponse;
+    FileName: string;
+    FileWriter: TStringList;
+begin
+	FileName := 'C:\Users\HELDER\Desktop\RESPONSE-DELPHI\atributos.txt';
+    FileWriter := TStringList.Create;
+
+    try
+    	Response := TRequest.New()
+            .BaseURL(TAppConfig.WooApiUrl)
+            .Resource('products/attributes')
+            .BasicAuthentication(TAppConfig.ConsumerKey, TAppConfig.ConsumerSecret)
+            .AddHeader('Content-Type', 'application/json', [poDoNotEncode])
+            .Get;
+
+    	if Response.StatusCode in [200, 201] then
+    		begin
+        		FileWriter.Add(Response.Content);
+        		FileWriter.SaveToFile(FileName);
+    	end;
+    finally
+       FileWriter.Free;
+    end;
+end;
+
 procedure TfrmTela_Principal.btnBuscarCategoriasClick(Sender: TObject);
 var
     Filename: string;
     Lines: TStringList;
     Response: IResponse;
 begin
-	Filename :=  'C:\Users\HELDER\Desktop\RESPONSE-DELPHI\categorias.txt';
+	Filename := 'C:\Users\HELDER\Desktop\RESPONSE-DELPHI\categorias.txt';
     Lines := TStringList.Create;
 
     try
@@ -72,11 +103,54 @@ begin
             begin
             	Lines.Add(Response.Content);
             	Lines.SaveToFile(Filename);
-    	end;
+    		end;
     finally
     	Lines.Free;
     end;
    
+end;
+
+procedure TfrmTela_Principal.btnCriarAtributosClick(Sender: TObject);
+var
+    FileName: string;
+    FileWriter: TStringList;
+    Response: IResponse;
+    TelaCadastroAtributo: TfrmTela_Cadastro_Atributo;
+    JSONString: string;
+    AtributoRequest: TWooAtributoRequest;
+begin
+	Filename := 'C:\Users\HELDER\Desktop\RESPONSE-DELPHI\novo-atributo-response.txt';
+    FileWriter := TStringList.Create;
+    TelaCadastroAtributo := TfrmTela_Cadastro_Atributo.Create(Self);
+    TelaCadastroAtributo.Position := poScreenCenter;
+    AtributoRequest := TWooAtributoRequest.Create;
+
+    if TelaCadastroAtributo.ShowModal = mrOk then
+        try
+
+            AtributoRequest.Name := TelaCadastroAtributo.Atributo;
+
+            JSONString := TJson.ObjectToJsonString(AtributoRequest);
+
+            Response := TRequest.New
+                .BaseURL(TAppConfig.WooApiUrl)
+                .Resource('products/attributes')
+                .BasicAuthentication(TAppConfig.ConsumerKey, TAppConfig.ConsumerSecret)
+                .AddHeader('Content-Type', 'application/json', [poDoNotEncode])
+                .AddBody(AtributoRequest)
+                .Post;
+
+            if Response.StatusCode in [200, 201] then
+                begin
+                    FileWriter.Add(Response.Content);
+                    FileWriter.SaveToFile(FileName);
+                end
+        	else
+            	raise(Exception.Create('Criação de atributo não concluída'));
+        finally
+        	FileWriter.Free;
+         	TelaCadastroAtributo.Free;
+    end;
 end;
 
 procedure TfrmTela_Principal.btnEnviarProdutoSimplesClick(Produto: TWooProdutoRequest; ImagePath: string; CategoriaSelecionada: string);

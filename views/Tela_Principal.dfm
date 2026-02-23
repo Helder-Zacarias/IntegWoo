@@ -58,7 +58,7 @@
     end
     object btnTestConexao: TButton
       Left = 0
-      Top = 272
+      Top = 384
       Width = 155
       Height = 33
       Caption = 'Teste Conex'#227'o'
@@ -67,12 +67,30 @@
     end
     object btnBuscarCategorias: TButton
       Left = 0
-      Top = 205
+      Top = 169
       Width = 155
       Height = 33
-      Caption = 'Buscar categorias'
+      Caption = 'Buscar Categorias'
       TabOrder = 4
       OnClick = btnBuscarCategoriasClick
+    end
+    object btnCriarAtributos: TButton
+      Left = 0
+      Top = 247
+      Width = 155
+      Height = 33
+      Caption = 'Criar Atributos'
+      TabOrder = 5
+      OnClick = btnCriarAtributosClick
+    end
+    object btnBuscarAtributos: TButton
+      Left = 0
+      Top = 208
+      Width = 155
+      Height = 33
+      Caption = 'Buscar Atributos'
+      TabOrder = 6
+      OnClick = btnBuscarAtributosClick
     end
   end
   object MySQL: TMySQLUniProvider

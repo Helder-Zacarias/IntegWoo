@@ -13,7 +13,13 @@ uses
   Tela_Principal in 'views\Tela_Principal.pas' {frmTela_Principal},
   AppConfig in 'config\AppConfig.pas',
   Secao in 'models\Secao.pas',
-  WooProductVariationsRequest in 'rest-client\woocommerce-api\WooProductVariationsRequest.pas';
+  WooProductVariationsRequest in 'rest-client\woocommerce-api\WooProductVariationsRequest.pas',
+  WooAtributoProduto in 'rest-client\woocommerce-api\WooAtributoProduto.pas',
+  WooAtributoDaVariacao in 'rest-client\woocommerce-api\WooAtributoDaVariacao.pas',
+  WooVariacaoDoProduto in 'rest-client\woocommerce-api\WooVariacaoDoProduto.pas',
+  WooAtributoRequest in 'rest-client\woocommerce-api\WooAtributoRequest.pas',
+  TermoDoAtributo in 'rest-client\woocommerce-api\TermoDoAtributo.pas',
+  Tela_Cadastro_Atributo in 'views\Tela_Cadastro_Atributo.pas' {frmTela_Cadastro_Atributo};
 
 {$R *.res}
 
@@ -22,5 +28,6 @@ begin
   TAppConfig.Load;
   Application.MainFormOnTaskbar := True;
   Application.CreateForm(TfrmTela_Principal, frmTela_Principal);
+  Application.CreateForm(TfrmTela_Cadastro_Atributo, frmTela_Cadastro_Atributo);
   Application.Run;
 end.
