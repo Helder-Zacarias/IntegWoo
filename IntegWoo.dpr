@@ -23,7 +23,9 @@ uses
   Tela_Adicionar_Termo in 'views\Tela_Adicionar_Termo.pas' {frmTela_Adicionar_Termo},
   WooAtributoResponse in 'rest-client\woocommerce-api\WooAtributoResponse.pas',
   CustomObjectMapper in 'utils\CustomObjectMapper.pas',
-  FileWriter in 'utils\FileWriter.pas';
+  FileWriter in 'utils\FileWriter.pas',
+  WooCreateCategoriaRequest in 'rest-client\woocommerce-api\WooCreateCategoriaRequest.pas',
+  WooCategoriaResponse in 'rest-client\woocommerce-api\WooCategoriaResponse.pas';
 
 {$R *.res}
 
