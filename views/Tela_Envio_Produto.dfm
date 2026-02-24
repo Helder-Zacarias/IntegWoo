@@ -4,7 +4,7 @@ object frmTela_Envio: TfrmTela_Envio
   Anchors = []
   Caption = 'frmTela_Envio'
   ClientHeight = 596
-  ClientWidth = 596
+  ClientWidth = 668
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText

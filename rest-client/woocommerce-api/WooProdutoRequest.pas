@@ -12,11 +12,11 @@ type
 	TWooProdutoRequest = class
     private
     	FName: string;
-        FSlug: string;
         FType: string;
         FDescription: string;
         FShort_description: string;
         FRegular_price: string;
+        FSku: string;
         FImages: TArray<TWooImagemRequest>;
         FCategories: TArray<TWooCategoriaRequest>;
         FVariations: TArray<TProductVariationsRequest>;
@@ -26,9 +26,6 @@ type
     published
         [JSONName('name')]
         property Name: string read FName write FName;
-
-        [JSONName('slug')]
-        property Slug: string read FSlug write FSlug;
 
         [JSONName('type')]
         property PType: string read FType write FType;
@@ -41,6 +38,9 @@ type
 
         [JSONName('regular_price')]
         property RegularPrice: string read FRegular_price write FRegular_price;
+
+        [JSONName('sku')]
+        property Sku: string read FSKU write FSku;
 
         [JSONName('images')]
         property Images: TArray<TWooImagemRequest> read FImages write FImages;

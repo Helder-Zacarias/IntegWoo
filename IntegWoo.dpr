@@ -21,7 +21,9 @@ uses
   WooTermoAtributoRequest in 'rest-client\woocommerce-api\WooTermoAtributoRequest.pas',
   Tela_Cadastro_Atributo in 'views\Tela_Cadastro_Atributo.pas' {frmTela_Cadastro_Atributo},
   Tela_Adicionar_Termo in 'views\Tela_Adicionar_Termo.pas' {frmTela_Adicionar_Termo},
-  WooAtributoResponse in 'rest-client\woocommerce-api\WooAtributoResponse.pas';
+  WooAtributoResponse in 'rest-client\woocommerce-api\WooAtributoResponse.pas',
+  CustomObjectMapper in 'utils\CustomObjectMapper.pas',
+  FileWriter in 'utils\FileWriter.pas';
 
 {$R *.res}
 

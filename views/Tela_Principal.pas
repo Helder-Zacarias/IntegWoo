@@ -7,7 +7,8 @@ uses
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Data.DB, Uni, UniProvider,
   MySQLUniProvider, DBAccess, MemData, MemDS, Vcl.StdCtrls, Vcl.Buttons, System.IOUtils, REST.Json, Rest.Json.Types, WooProdutoResponse,
   System.Generics.Collections, System.JSON, WPImagemResponse, WooImagemRequest, WooProdutoRequest, System.IniFiles, AppConfig, Produto,
-  Vcl.ExtCtrls, Tela_Envio_Produto, WooCategoriaRequest, Tela_Cadastro_Atributo, WooAtributoRequest, WooTermoAtributoRequest, WooAtributoResponse;
+  Vcl.ExtCtrls, Tela_Envio_Produto, WooCategoriaRequest, Tela_Cadastro_Atributo, WooAtributoRequest, WooTermoAtributoRequest,
+  WooAtributoResponse, CustomObjectMapper, FileWriter;
 
 type
   TfrmTela_Principal = class(TForm)
@@ -24,6 +25,9 @@ type
     btnBuscarCategorias: TButton;
     btnCriarAtributos: TButton;
     btnBuscarAtributos: TButton;
+    sqlGrades: TUniQuery;
+    sqlProdutosMandala: TUniQuery;
+    btnEnviarProdutosMandala: TBitBtn;
     procedure DatabaseConnectionLost(Sender: TObject; Component: TComponent;
       ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
     procedure butEnviarProdutosdoBancoClick(Sender: TObject);
@@ -39,6 +43,8 @@ type
     procedure btnCriarAtributosClick(Sender: TObject);
     procedure btnBuscarAtributosClick(Sender: TObject);
     procedure CriarTermosDoAtributo(Termos: TArray<string>; IdAtributo: Integer);
+    procedure btnEnviarProdutosMandalaClick(Sender: TObject);
+    procedure EnviarProdutoSimples(Produto: TWooProdutoRequest);
   private
     { Private declarations }
   public
@@ -97,7 +103,7 @@ begin
             .BaseURL(TAppConfig.WooApiUrl)
             .Resource('products/categories')
             .BasicAuthentication(TAppConfig.ConsumerKey, TAppConfig.ConsumerSecret)
-            .AddHeader('Content-Type', 'application/json', [poDoNoTEncode])
+            .AddHeader('Content-Type', 'application/json', [poDoNotEncode])
             .Get;
 
     	if Response.StatusCode = 200 then
@@ -236,6 +242,83 @@ begin
     end;
 end;
 
+procedure TfrmTela_Principal.EnviarProdutoSimples(Produto: TWooProdutoRequest);
+var
+    Response: IResponse;
+    JSONString: string;
+begin
+    JSONString := TJSON.ObjectToJsonString(Produto);
+
+    WriteContentToFile('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\STRING_PAYLOADS\produto-json.txt', JSONString);
+
+    Response := TRequest.New
+         .BaseURL(TAppConfig.WooApiUrl)
+         .Resource('products')
+         .AddHeader('Content-Type', 'application/json', [poDoNotEncode])
+         .BasicAuthentication(TAppConfig.ConsumerKey, TAppConfig.ConsumerSecret)
+         .AddBody(JSONString)
+         .Post;
+     try
+         if Response.StatusCode in [200, 201] then
+            ShowMessage('Requisição bem sucedida')
+         else
+            raise(Exception.Create('Requisição falhou.' + Response.StatusCode.ToString + ': ' + Response.Content));
+     finally
+     end;
+end;
+
+procedure TfrmTela_Principal.btnEnviarProdutosMandalaClick(Sender: TObject);
+var
+    ProdutoDB: TProduto;
+    WooProdutoRequest: TWooProdutoRequest;
+    Slug: string;
+    CodIdGrade: TField;
+    Count: Integer;
+    TipoProduto: string;
+begin
+    with sqlProdutosMandala do
+    begin
+    	Close;
+        Connection:= Self.Database;
+        Open;
+
+        ProdutoDB := TProduto.Create;
+        WooProdutoRequest := nil;
+        Count := 0;
+
+        try
+        	while (not sqlProdutosMandala.Eof) and (Count < 1) do
+
+            begin
+                CodIdGrade :=  sqlProdutosMandala.FindField('COD_ID_GRADE');
+            	if Assigned(CodIdGrade) and not CodIdGrade.IsNull then
+                    TipoProduto := 'simple'
+                else
+                	TipoProduto := 'variable';
+
+                ProdutoDB.CodIdProduto := sqlProdutosMandala.FieldByName('COD_ID_PRODUTO').AsString;
+                ProdutoDB.CodProduto := sqlProdutosMandala.FieldByName('COD_PRODUTO').AsString;
+                ProdutoDB.CodIdGrade := sqlProdutosMandala.FieldByName('COD_ID_GRADE').AsInteger;
+                ProdutoDB.NumPrecoVarejo := sqlProdutosMandala.FieldByName('NUM_PRECO_VAREJO').AsCurrency;
+                ProdutoDB.DscCompleta := sqlProdutosMandala.FieldByName('DSC_COMPLETA').AsString;
+                ProdutoDB.DscAbreviada := sqlProdutosMandala.FieldByName('DSC_ABREVIADA').AsString;
+                ProdutoDB.DscObservacoes := sqlProdutosMandala.FieldByName('DSC_OBSERVACOES').AsString;
+                ProdutoDB.DscDetalhes := sqlProdutosMandala.FieldByName('DSC_DETALHES').AsString;
+
+               	WooProdutoRequest := ProdutoToWooProdutoRequest(ProdutoDB, TipoProduto);
+
+                Inc(Count);
+                EnviarProdutoSimples(WooProdutoRequest);
+                Next;
+            end;
+        finally
+        	ProdutoDB.Free;
+            WooProdutoRequest.Free;
+        end;
+
+    end;
+end;
+
 function TfrmTela_Principal.selectCategoria(CategoriaString: string): TWooCategoriaRequest;
 var
     Categoria: TWooCategoriaRequest;
@@ -350,32 +433,41 @@ begin
 //        while not Eof do
         for var i := 1 to 5 do
         begin
+        	if sqlProdutos.FieldByName('COD_ID_GRADE').IsNull then
+                ShowMessage('Produto simples')
+            else
+            	ShowMessage('Produto variável');
+
             ProdutoDB := TProduto.Create;
 
-            ProdutoDB.CodIdProduto := sqlProdutos.FieldByName('COD_ID_PRODUTO').asInteger;
-            ProdutoDB.DscCompleta := sqlProdutos.FieldByName('DSC_COMPLETA').asString;
-            ProdutoDB.DscAbreviada := sqlProdutos.FieldByName('DSC_ABREVIADA').asString;
-            ProdutoDB.DscObservacoes := sqlProdutos.FieldByName('DSC_OBSERVACOES').asString;
-            ProdutoDB.DscDetalhes := sqlProdutos.FieldByName('DSC_DETALHES').asString;
-
-            ShowMessage(
-                'COD_ID_PRODUTO: ' +  sqlProdutos.FieldByName('COD_ID_PRODUTO').AsString + sLineBreak +
-                'DSC_COMPLETA: ' +  sqlProdutos.FieldByName('DSC_COMPLETA').asString + sLineBreak +
-                'DSC_ABREVIADA: ' +  sqlProdutos.FieldByName('DSC_ABREVIADA').asString + sLineBreak +
-                'DSC_OBSERVACOES: ' +  sqlProdutos.FieldByName('DSC_OBSERVACOES').asString + sLineBreak +
-                'DSC_DETALHES: ' +  sqlProdutos.FieldByName('DSC_DETALHES').asString + sLineBreak +
-                'DSC_CHAVE: ' +  sqlProdutos.FieldByName('DSC_CHAVE').asString + sLineBreak +
-                'NUM_PRECO_VAREJO: ' +  sqlProdutos.FieldByName('NUM_PRECO_VAREJO').asString + sLineBreak +
-                'NUM_ESTQ_ATUAL: ' +  sqlProdutos.FieldByName('NUM_ESTQ_ATUAL').asString + sLineBreak +
-                'IMG_PRODUTO: ' +  sqlProdutos.FieldByName('IMG_PRODUTO').asString
-            );
-
-            WooProdutoRequest := TWooProdutoRequest.Create;
-            WooProdutoRequest.Name := ProdutoDB.DscCompleta;
-            WooProdutoRequest.ShortDescription := ProdutoDB.DscAbreviada;
-
-            enviarProduto(WooProdutoRequest);
-            Next;
+            try
+//            	ProdutoDB.CodIdProduto := sqlProdutos.FieldByName('COD_ID_PRODUTO').asInteger;
+//                ProdutoDB.DscCompleta := sqlProdutos.FieldByName('DSC_COMPLETA').asString;
+//                ProdutoDB.DscAbreviada := sqlProdutos.FieldByName('DSC_ABREVIADA').asString;
+//                ProdutoDB.DscObservacoes := sqlProdutos.FieldByName('DSC_OBSERVACOES').asString;
+//                ProdutoDB.DscDetalhes := sqlProdutos.FieldByName('DSC_DETALHES').asString;
+//
+//                ShowMessage(
+//                    'COD_ID_PRODUTO: ' +  sqlProdutos.FieldByName('COD_ID_PRODUTO').AsString + sLineBreak +
+//                    'DSC_COMPLETA: ' +  sqlProdutos.FieldByName('DSC_COMPLETA').asString + sLineBreak +
+//                    'DSC_ABREVIADA: ' +  sqlProdutos.FieldByName('DSC_ABREVIADA').asString + sLineBreak +
+//                    'DSC_OBSERVACOES: ' +  sqlProdutos.FieldByName('DSC_OBSERVACOES').asString + sLineBreak +
+//                    'DSC_DETALHES: ' +  sqlProdutos.FieldByName('DSC_DETALHES').asString + sLineBreak +
+//                    'DSC_CHAVE: ' +  sqlProdutos.FieldByName('DSC_CHAVE').asString + sLineBreak +
+//                    'NUM_PRECO_VAREJO: ' +  sqlProdutos.FieldByName('NUM_PRECO_VAREJO').asString + sLineBreak +
+//                    'NUM_ESTQ_ATUAL: ' +  sqlProdutos.FieldByName('NUM_ESTQ_ATUAL').asString + sLineBreak +
+//                    'IMG_PRODUTO: ' +  sqlProdutos.FieldByName('IMG_PRODUTO').asString
+//                );
+//
+//                WooProdutoRequest := TWooProdutoRequest.Create;
+//                WooProdutoRequest.Name := ProdutoDB.DscCompleta;
+//                WooProdutoRequest.ShortDescription := ProdutoDB.DscAbreviada;
+//
+//                enviarProduto(WooProdutoRequest);
+                Next;
+            finally
+               ProdutoDB.Free;
+            end;
         end;
     end;
 end;
@@ -406,19 +498,19 @@ var
     Filename: string;
     SelectQuery:  TUniQuery;
 begin
-    Filename := 'C:\Users\HELDER\Desktop\RESPONSE-DELPHI\schema-tables.txt';
-    Tables := TStringList.Create;
+//    Filename := 'C:\Users\HELDER\Desktop\RESPONSE-DELPHI\grades.txt';
+//    Tables := TStringList.Create;
     try
-    	Database.GetTableNames(Tables);
-    	ShowMessage(Tables.Text);
-        Tables.SaveToFile(Filename);
+//    	Database.GetTableNames(Tables);
+//    	ShowMessage(Tables.Text);
+//        Tables.SaveToFile(Filename);
 
         SelectQuery := TUniQuery.Create(nil);
 
-//        SelectQuery.Connection := Database;
-//        SelectQuery.SQL.Text := 'SELECT * FROM information_schema';
-//        SelectQuery.Open;
-//        SelectQuery.SaveToXML('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\select-schema.xml');
+        SelectQuery.Connection := Database;
+        SelectQuery.SQL.Text := 'SELECT * FROM db_sgci.lojas';
+        SelectQuery.Open;
+        SelectQuery.SaveToXML('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\DB_QUERIES\select-lojas.xml');
     finally
 //        Tables.Free;
         SelectQuery.Free;

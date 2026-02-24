@@ -92,6 +92,15 @@
       TabOrder = 6
       OnClick = btnBuscarAtributosClick
     end
+    object btnEnviarProdutosMandala: TBitBtn
+      Left = 0
+      Top = 286
+      Width = 155
+      Height = 33
+      Caption = 'Enviar Produtos Mandala'
+      TabOrder = 7
+      OnClick = btnEnviarProdutosMandalaClick
+    end
   end
   object MySQL: TMySQLUniProvider
     Left = 392
@@ -139,5 +148,30 @@
       '   COD_ID_EMPRESA = 2433')
     Left = 480
     Top = 120
+  end
+  object sqlGrades: TUniQuery
+    Connection = Database
+    SQL.Strings = (
+      'SELECT'
+      '   *'
+      'FROM'
+      '   db_sgci.grades'
+      'WHERE'
+      '   COD_ID_EMPRESA = 2433')
+    Left = 384
+    Top = 208
+  end
+  object sqlProdutosMandala: TUniQuery
+    Connection = Database
+    SQL.Strings = (
+      'SELECT'
+      '   *'
+      'FROM'
+      '   db_sgci.produtos'
+      'WHERE'
+      '   COD_ID_EMPRESA = 1451 AND'
+      '   COD_ID_LOJA = 78')
+    Left = 480
+    Top = 216
   end
 end

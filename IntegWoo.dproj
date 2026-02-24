@@ -160,6 +160,8 @@
             <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="rest-client\woocommerce-api\WooAtributoResponse.pas"/>
+        <DCCReference Include="utils\CustomObjectMapper.pas"/>
+        <DCCReference Include="utils\FileWriter.pas"/>
         <None Include="bin\config.ini"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
