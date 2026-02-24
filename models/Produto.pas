@@ -6,7 +6,8 @@ type TProduto = class
     private
         FCod_Id_Produto: string;
         FCod_Produto: string;
-        FCod_ID_Grade: Integer;
+        FCod_Id_Grade: Integer;
+        FCod_Id_Secao: Integer;
         FDsc_Completa: string;
         FDsc_Abreviada: string;
         FDsc_Observacoes: string;
@@ -17,7 +18,8 @@ type TProduto = class
     public
         property CodIdProduto: string read FCod_Id_Produto write FCod_Id_Produto;
         property CodProduto: string read FCod_Produto write FCod_Produto;
-        property CodIdGrade: Integer read FCod_ID_Grade write FCod_ID_Grade;
+        property CodIdGrade: Integer read FCod_Id_Grade write FCod_Id_Grade;
+        property CodIdSecao: Integer read FCod_Id_Secao write FCod_Id_Secao;
         property DscCompleta: string read FDsc_Completa write FDsc_Completa;
         property DscAbreviada: string read FDsc_Abreviada write FDsc_Abreviada;
         property DscObservacoes: string read FDsc_Observacoes write FDsc_Observacoes;
