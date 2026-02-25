@@ -24,6 +24,8 @@ type
         constructor Create;
         destructor Destroy; override;
         procedure AdicionarCategoria(Categoria: TWooProdutoCategoriaRequest);
+        procedure AdicionarImagem(Imagem: TWooImagemRequest);
+        procedure AdicionarVariacoes(Variacao: TProductVariationsRequest);
     published
         [JSONName('name')]
         property Name: string read FName write FName;
@@ -65,6 +67,18 @@ implementation
     begin
         SetLength(FCategories, Length(FCategories) + 1);
         FCategories[High(FCategories)] := Categoria;
+    end;
+
+    procedure TWooProdutoRequest.AdicionarImagem(Imagem: TWooImagemRequest);
+    begin
+        SetLength(FImages, Length(FImages) + 1);
+        FImages[High(FImages)] := Imagem;
+    end;
+
+    procedure TWooProdutoRequest.AdicionarVariacoes(Variacao: TProductVariationsRequest);
+    begin
+        SetLength(FVariations, Length(FVariations) + 1);
+        FVariations[High(FVariations)] := Variacao;
     end;
 
     destructor TWooProdutoRequest.Destroy;

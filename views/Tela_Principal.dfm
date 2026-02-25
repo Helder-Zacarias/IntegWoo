@@ -38,67 +38,49 @@
       TabOrder = 0
       OnClick = butBuscarProdutosClick
     end
-    object butEnviarProdutos: TBitBtn
-      Left = 0
-      Top = 130
-      Width = 155
-      Height = 33
-      Caption = 'Enviar Produtos do Banco'
-      TabOrder = 1
-      OnClick = butEnviarProdutosdoBancoClick
-    end
-    object btnEnviarFull: TBitBtn
-      Left = 0
-      Top = 91
-      Width = 155
-      Height = 33
-      Caption = 'Enviar Produto Simples'
-      TabOrder = 2
-      OnClick = btnOpenModalClick
-    end
     object btnTestConexao: TButton
       Left = 0
       Top = 384
       Width = 155
       Height = 33
       Caption = 'Teste Conex'#227'o'
-      TabOrder = 3
+      TabOrder = 1
       OnClick = btnTestarConexãoClick
     end
     object btnBuscarCategorias: TButton
       Left = 0
-      Top = 169
+      Top = 91
       Width = 155
       Height = 33
       Caption = 'Buscar Categorias'
-      TabOrder = 4
+      TabOrder = 2
       OnClick = btnBuscarCategoriasClick
     end
     object btnCriarAtributos: TButton
       Left = 0
-      Top = 247
+      Top = 169
       Width = 155
       Height = 33
       Caption = 'Criar Atributos'
-      TabOrder = 5
+      TabOrder = 3
       OnClick = btnCriarAtributosClick
     end
     object btnBuscarAtributos: TButton
       Left = 0
-      Top = 208
+      Top = 130
       Width = 155
       Height = 33
       Caption = 'Buscar Atributos'
-      TabOrder = 6
+      TabOrder = 4
       OnClick = btnBuscarAtributosClick
     end
     object btnEnviarProdutosMandala: TBitBtn
       Left = 0
-      Top = 286
+      Top = 208
       Width = 155
       Height = 33
-      Caption = 'Enviar Produtos Mandala'
-      TabOrder = 7
+      Caption = 'Enviar Produtos'
+      TabOrder = 5
       OnClick = btnEnviarProdutosMandalaClick
     end
   end
