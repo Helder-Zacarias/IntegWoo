@@ -16,7 +16,7 @@ type
         FDescription: string;
         FShort_description: string;
         FRegular_price: string;
-        FSku: Int64;
+        FSku: string;
         FImages: TArray<TWooImagemRequest>;
         FCategories: TArray<TWooProdutoCategoriaRequest>;
         FVariations: TArray<TProductVariationsRequest>;
@@ -41,7 +41,7 @@ type
         property RegularPrice: string read FRegular_price write FRegular_price;
 
         [JSONName('sku')]
-        property Sku: Int64 read FSKU write FSku;
+        property Sku: string read FSKU write FSku;
 
         [JSONName('images')]
         property Images: TArray<TWooImagemRequest> read FImages write FImages;

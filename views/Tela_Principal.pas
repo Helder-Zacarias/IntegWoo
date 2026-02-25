@@ -8,7 +8,8 @@ uses
   MySQLUniProvider, DBAccess, MemData, MemDS, Vcl.StdCtrls, Vcl.Buttons, System.IOUtils, REST.Json, Rest.Json.Types, WooProdutoResponse,
   System.Generics.Collections, System.JSON, WPImagemResponse, WooImagemRequest, WooProdutoRequest, System.IniFiles, AppConfig, Produto,
   Vcl.ExtCtrls, Tela_Envio_Produto, WooCategoriaRequest, Tela_Cadastro_Atributo, WooAtributoRequest, WooTermoAtributoRequest,
-  WooAtributoResponse, CustomObjectMapper, FileWriter, WooCreateCategoriaRequest, RESTRequest4D, WooCategoriaResponse, Secao, WooProdutoCategoriaRequest;
+  WooAtributoResponse, CustomObjectMapper, FileWriter, WooCreateCategoriaRequest, RESTRequest4D, WooCategoriaResponse, Secao,
+  WooProdutoCategoriaRequest, TrimTexto;
 
 type
   TfrmTela_Principal = class(TForm)
@@ -49,6 +50,7 @@ type
     function WooCommerceAPICall(Resource: string; Method: string; MensagemAposRetorno: string; Body: string = ''): TJSONValue;
     function BuscarSecaoNoBanco(CodIdSecao: Integer): TSecao;
     function CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
+    function BuscarAtributos: TObjectList<TWooAtributoResponse>;
   private
     { Private declarations }
   public
@@ -67,57 +69,18 @@ uses
 
 procedure TfrmTela_Principal.btnBuscarAtributosClick(Sender: TObject);
 var
-	Response: IResponse;
-    FileName: string;
-    FileWriter: TStringList;
+	JSONResponse: TJSONValue;
 begin
-	FileName := 'C:\Users\HELDER\Desktop\RESPONSE-DELPHI\ATRIBUTOS-PAYLOADS\atributos.txt';
-    FileWriter := TStringList.Create;
-
-    try
-    	Response := TRequest.New()
-            .BaseURL(TAppConfig.WooApiUrl)
-            .Resource('products/attributes')
-            .BasicAuthentication(TAppConfig.ConsumerKey, TAppConfig.ConsumerSecret)
-            .AddHeader('Content-Type', 'application/json', [poDoNotEncode])
-            .Get;
-
-    	if Response.StatusCode in [200, 201] then
-    		begin
-        		FileWriter.Add(Response.Content);
-        		FileWriter.SaveToFile(FileName);
-    	end;
-    finally
-       FileWriter.Free;
-    end;
+    JSONResponse := WooCommerceAPICall('products/attributes', 'GET', 'Atributos retornados com sucesso!');
+    WriteContentToFile('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\ATRIBUTOS-PAYLOADS\atributos.txt', JSONResponse.ToJSON());
 end;
 
 procedure TfrmTela_Principal.btnBuscarCategoriasClick(Sender: TObject);
 var
-    Filename: string;
-    Lines: TStringList;
-    Response: IResponse;
+    JSONResponse: TJSONValue;
 begin
-	Filename := 'C:\Users\HELDER\Desktop\RESPONSE-DELPHI\categorias.txt';
-    Lines := TStringList.Create;
-
-    try
-    	Response := TRequest.New()
-            .BaseURL(TAppConfig.WooApiUrl)
-            .Resource('products/categories')
-            .BasicAuthentication(TAppConfig.ConsumerKey, TAppConfig.ConsumerSecret)
-            .AddHeader('Content-Type', 'application/json', [poDoNotEncode])
-            .Get;
-
-    	if Response.StatusCode = 200 then
-            begin
-            	Lines.Add(Response.Content);
-            	Lines.SaveToFile(Filename);
-    		end;
-    finally
-    	Lines.Free;
-    end;
-   
+    JSONResponse := WooCommerceAPICall('products/categories', 'GET', 'Categorias retornadas com sucesso');
+    WriteContentToFile('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\categorias.txt', JSONResponse.ToJSON());
 end;
 
 procedure TfrmTela_Principal.CriarTermosDoAtributo(Termos: TArray<string>; IDAtributo: Integer);
@@ -284,6 +247,25 @@ begin
     Result := TJSONObject.ParseJSONValue(Response.Content);
 end;
 
+function TfrmTela_Principal.BuscarAtributos: TObjectList<TWooAtributoResponse>;
+var
+    JSONResponse: TJSONValue;
+    Count: Integer;
+    Atributos: TObjectList<TWooAtributoResponse>;
+    Atributo: TWooAtributoResponse;
+begin
+    Atributos := TObjectList<TWooAtributoResponse>.Create;
+    JSONResponse := WooCommerceAPICall('products/attributes', 'GET', 'Atributos retornados com sucesso');
+
+    for var Response in JSONResponse as TJSONArray do
+    begin
+        Atributo := TJson.JsonToObject<TWooAtributoResponse>(Response.ToString);
+        Atributos.Add(Atributo);
+    end;
+
+    Result := Atributos;
+end;
+
 function TfrmTela_Principal.BuscarSecaoNoBanco(CodIdSecao: Integer) : TSecao;
 var
     SelectSecaoQuery: TUniQuery;
@@ -327,9 +309,9 @@ begin
     begin
         CategoriaRetornada := CategoriaJSON.GetValue<string>('name');
 
-        if SameText(Categoria, CategoriaRetornada) then
+        if RemoverEspacos(Categoria) = RemoverEspacos(CategoriaRetornada) then
         begin
-           CategoriaResponse := TJson.JsonToObject<TWooCategoriaResponse>(CategoriaJSON.ToJSON());
+           CategoriaResponse := TJson.JsonToObject<TWooCategoriaResponse>(CategoriaJSON as TJSONObject);
            Break;
         end;
     end;
@@ -363,25 +345,11 @@ procedure TfrmTela_Principal.EnviarProdutoSimples(Produto: TWooProdutoRequest);
 var
     Response: IResponse;
     JSONString: string;
+    JSONResponse: TJSONValue;
 begin
     JSONString := TJSON.ObjectToJsonString(Produto);
-
-    WriteContentToFile('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\STRING_PAYLOADS\produto-json.txt', JSONString);
-
-    Response := TRequest.New
-         .BaseURL(TAppConfig.WooApiUrl)
-         .Resource('products')
-         .AddHeader('Content-Type', 'application/json', [poDoNotEncode])
-         .BasicAuthentication(TAppConfig.ConsumerKey, TAppConfig.ConsumerSecret)
-         .AddBody(JSONString)
-         .Post;
-     try
-         if Response.StatusCode in [200, 201] then
-            ShowMessage('Requisição bem sucedida')
-         else
-            raise(Exception.Create('Requisição falhou.' + Response.StatusCode.ToString + ': ' + Response.Content));
-     finally
-     end;
+    JSONResponse := WooCommerceAPICall('products', 'POST', 'Produto cadastrado com sucesso', JSONString);
+    WriteContentToFile('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\WOOCOMMERCE-PAYLOADS\PRODUTO-JSON.TXT ', JSONResponse.ToJSON);
 end;
 
 procedure TfrmTela_Principal.btnEnviarProdutosMandalaClick(Sender: TObject);
@@ -395,6 +363,7 @@ var
     Secao: TSecao;
     CategoriaResponse: TWooCategoriaResponse;
     CategoriaId: Integer;
+    Atributos: TObjectList<TWooAtributoResponse>;
 begin
     with sqlProdutosMandala do
     begin
@@ -415,20 +384,22 @@ begin
             	if (not Assigned(CodIdGrade)) or (CodIdGrade.IsNull) or (not CodIdGrade.AsInteger <> 0) then
                     TipoProduto := 'simple'
                 else
+                begin
                     TipoProduto := 'variable';
+                end;
 
                 ProdutoDB := ProdutoQueryToProduto(sqlProdutosMandala);
 
                 Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdSecao);
                 CategoriaResponse := VerificarExistenciaDaCategoria(Secao.DscSecao);
 
-                if not Assigned(CategoriaResponse) then
+                if not Assigned(CategoriaResponse) or (CategoriaResponse = nil) then
                 	CategoriaResponse := CriarCategoria(Secao);
 
                	WooProdutoRequest := ProdutoToWooProdutoRequest(ProdutoDB, TipoProduto, CategoriaResponse.Id);
 
                 Inc(Count);
-//                EnviarProdutoSimples(WooProdutoRequest);
+                EnviarProdutoSimples(WooProdutoRequest);
                 Next;
             end;
         finally
@@ -650,58 +621,10 @@ var
     JsonArray: TJSONArray;
     Produtos: TObjectList<TWooProdutoResponse>;
     Lines: TStringList;
+    JSONResponse: TJSONValue;
 begin
-    iRes := TRequest.New()
-        .BaseURL(TAppConfig.WooApiUrl)
-        .Resource('products')
-        .BasicAuthentication(TAppConfig.ConsumerKey, TAppConfig.ConsumerSecret)
-        .AddHeader('ContentType', 'application/json', [poDoNotEncode])
-        .Get;
-
-    if iRes.StatusCode = 200 then
-    begin
-    	JsonArray := TJSONObject.ParseJSONValue(iRes.Content) as TJSONArray;
-
-        Lines := TStringList.Create;
-
-
-        if not Assigned(JsonArray) then
-        	raise Exception.Create('JSON Inválido');
-        
-    	Produtos := TObjectList<TWooProdutoResponse>.Create(True);
-
-        try
-            var Count := 1;
-            for var JsonValue in JsonArray do
-            begin
-            	Lines.Add(JsonValue.ToString);
-                Lines.SaveToFile('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\produto-' + Count.ToString + '.txt');
-                Inc(Count);
-            	var Produto := TJson.JsonToObject<TWooProdutoResponse>(JsonValue.ToJSON);
-                Produtos.Add(Produto);
-            end;
-
-            for var Produto in Produtos do
-        	begin
-
-                ShowMessage(
-                    'name: ' + Produto.Name + sLineBreak +
-                    'slug: ' + Produto.Slug + sLineBreak +
-                    'description: ' + Produto.Description + sLineBreak +
-                    'short_description: ' + Produto.ShortDescription + sLineBreak +
-                    'regular_price: ' + Produto.RegularPrice
-                );
-
-                for var Image in Produto.Images do
-                    ShowMessage('id: ' + Image.Id + sLineBreak + 'src: ' + Image.Src)
-        	end;
-        finally
-            Produtos.Free;
-            Lines.Free;
-        end;
-    end
-    else
-    	ShowMessage(iRes.StatusText);
+    JSONResponse := WooCommerceAPICall('products', 'GET', 'Produtos retornados com sucesso!');
+    WriteContentToFile('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\produtos.txt', JSONResponse.ToJSON);
 end;
 
 procedure TfrmTela_Principal.DatabaseConnectionLost(Sender: TObject; Component: TComponent;

@@ -2,10 +2,10 @@ unit CustomObjectMapper;
 
 interface
 uses
-System.SysUtils, Produto, WooProdutoRequest, WooProdutoCategoriaRequest, Uni;
+	System.SysUtils, Produto, WooProdutoRequest, WooProdutoCategoriaRequest, Uni;
 
-function ProdutoToWooProdutoRequest(Produto: TProduto; TipoProduto: string; CategoriaId: Integer): TWooProdutoRequest;
-function ProdutoQueryToProduto(SelectProdutoQuery: TUniQuery): TProduto;
+	function ProdutoToWooProdutoRequest(Produto: TProduto; TipoProduto: string; CategoriaId: Integer): TWooProdutoRequest;
+	function ProdutoQueryToProduto(SelectProdutoQuery: TUniQuery): TProduto;
 
 implementation
 function ProdutoToWooProdutoRequest(Produto: TProduto; TipoProduto: string; CategoriaId: Integer): TWooProdutoRequest;
@@ -19,7 +19,7 @@ begin
     ProdutoMapping := TWooProdutoRequest.Create;
     ProdutoMapping.Name := Produto.DscCompleta;
     ProdutoMapping.ShortDescription := Produto.DscAbreviada;
-    ProdutoMapping.Sku := Produto.CodProduto;
+    ProdutoMapping.Sku := Produto.CodProduto.ToString;
     ProdutoMapping.RegularPrice := Produto.NumPrecoVarejo.ToString;
     ProdutoMapping.PType := TipoProduto;
     ProdutoMapping.AdicionarCategoria(ProdutoCategoria);
