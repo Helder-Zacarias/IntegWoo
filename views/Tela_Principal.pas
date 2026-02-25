@@ -402,7 +402,7 @@ begin
         Connection:= Self.Database;
         Open;
 
-        ProdutoDB := TProduto.Create;
+        ProdutoDB := nil;
         WooProdutoRequest := nil;
         Count := 0;
 
@@ -417,15 +417,7 @@ begin
                 else
                     TipoProduto := 'variable';
 
-                ProdutoDB.CodIdProduto := sqlProdutosMandala.FieldByName('COD_ID_PRODUTO').AsInteger;
-                ProdutoDB.CodProduto := sqlProdutosMandala.FieldByName('COD_PRODUTO').AsLargeInt;
-                ProdutoDB.CodIdGrade := sqlProdutosMandala.FieldByName('COD_ID_GRADE').AsInteger;
-                ProdutoDB.CodIdSecao := sqlProdutosMandala.FieldByName('COD_ID_SECAO').AsInteger;
-                ProdutoDB.NumPrecoVarejo := sqlProdutosMandala.FieldByName('NUM_PRECO_VAREJO').AsCurrency;
-                ProdutoDB.DscCompleta := sqlProdutosMandala.FieldByName('DSC_COMPLETA').AsString;
-                ProdutoDB.DscAbreviada := sqlProdutosMandala.FieldByName('DSC_ABREVIADA').AsString;
-                ProdutoDB.DscObservacoes := sqlProdutosMandala.FieldByName('DSC_OBSERVACOES').AsString;
-                ProdutoDB.DscDetalhes := sqlProdutosMandala.FieldByName('DSC_DETALHES').AsString;
+                ProdutoDB := ProdutoQueryToProduto(sqlProdutosMandala);
 
                 Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdSecao);
                 CategoriaResponse := VerificarExistenciaDaCategoria(Secao.DscSecao);
