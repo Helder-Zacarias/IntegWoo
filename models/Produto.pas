@@ -4,8 +4,8 @@ interface
 
 type TProduto = class
     private
-        FCod_Id_Produto: string;
-        FCod_Produto: string;
+        FCod_Id_Produto: Integer;
+        FCod_Produto: Int64;
         FCod_Id_Grade: Integer;
         FCod_Id_Secao: Integer;
         FDsc_Completa: string;
@@ -16,8 +16,8 @@ type TProduto = class
         FNum_Preco_Varejo: Currency;
         FSku: string;
     public
-        property CodIdProduto: string read FCod_Id_Produto write FCod_Id_Produto;
-        property CodProduto: string read FCod_Produto write FCod_Produto;
+        property CodIdProduto: Integer read FCod_Id_Produto write FCod_Id_Produto;
+        property CodProduto: Int64 read FCod_Produto write FCod_Produto;
         property CodIdGrade: Integer read FCod_Id_Grade write FCod_Id_Grade;
         property CodIdSecao: Integer read FCod_Id_Secao write FCod_Id_Secao;
         property DscCompleta: string read FDsc_Completa write FDsc_Completa;

@@ -25,7 +25,8 @@ uses
   CustomObjectMapper in 'utils\CustomObjectMapper.pas',
   FileWriter in 'utils\FileWriter.pas',
   WooCreateCategoriaRequest in 'rest-client\woocommerce-api\WooCreateCategoriaRequest.pas',
-  WooCategoriaResponse in 'rest-client\woocommerce-api\WooCategoriaResponse.pas';
+  WooCategoriaResponse in 'rest-client\woocommerce-api\WooCategoriaResponse.pas',
+  WooProdutoCategoriaRequest in 'rest-client\woocommerce-api\WooProdutoCategoriaRequest.pas';
 
 {$R *.res}
 

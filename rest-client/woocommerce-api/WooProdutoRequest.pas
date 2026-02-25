@@ -6,7 +6,7 @@ uses
     REST.Json.Types,
     System.Generics.Collections,
     WooImagemRequest,
-    WooCategoriaRequest,
+    WooProdutoCategoriaRequest,
     WooProductVariationsRequest;
 type
 	TWooProdutoRequest = class
@@ -16,13 +16,14 @@ type
         FDescription: string;
         FShort_description: string;
         FRegular_price: string;
-        FSku: string;
+        FSku: Int64;
         FImages: TArray<TWooImagemRequest>;
-        FCategories: TArray<TWooCategoriaRequest>;
+        FCategories: TArray<TWooProdutoCategoriaRequest>;
         FVariations: TArray<TProductVariationsRequest>;
     public
         constructor Create;
         destructor Destroy; override;
+        procedure AdicionarCategoria(Categoria: TWooProdutoCategoriaRequest);
     published
         [JSONName('name')]
         property Name: string read FName write FName;
@@ -40,13 +41,13 @@ type
         property RegularPrice: string read FRegular_price write FRegular_price;
 
         [JSONName('sku')]
-        property Sku: string read FSKU write FSku;
+        property Sku: Int64 read FSKU write FSku;
 
         [JSONName('images')]
         property Images: TArray<TWooImagemRequest> read FImages write FImages;
 
         [JSONName('categories')]
-        property Categories: TArray<TWooCategoriaRequest> read FCategories write FCategories;
+        property Categories: TArray<TWooProdutoCategoriaRequest> read FCategories write FCategories;
 
         [JSONName('variations')]
         property Variations: TArray<TProductVariationsRequest> read FVariations write FVariations;
@@ -58,6 +59,12 @@ implementation
       SetLength(FImages, 0);
       SetLength(FCategories, 0);
       SetLength(FVariations, 0);
+    end;
+
+    procedure TWooProdutoRequest.AdicionarCategoria(Categoria: TWooProdutoCategoriaRequest);
+    begin
+        SetLength(FCategories, Length(FCategories) + 1);
+        FCategories[High(FCategories)] := Categoria;
     end;
 
     destructor TWooProdutoRequest.Destroy;
