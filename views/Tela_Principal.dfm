@@ -1,4 +1,4 @@
-﻿object frmTela_Principal: TfrmTela_Principal
+object frmTela_Principal: TfrmTela_Principal
   Left = 0
   Top = 0
   Caption = 'frmTela_Principal'
@@ -38,22 +38,13 @@
       TabOrder = 0
       OnClick = butBuscarProdutosClick
     end
-    object btnTestConexao: TButton
-      Left = 0
-      Top = 384
-      Width = 155
-      Height = 33
-      Caption = 'Teste Conex'#227'o'
-      TabOrder = 1
-      OnClick = btnTestarConexãoClick
-    end
     object btnBuscarCategorias: TButton
       Left = 0
       Top = 91
       Width = 155
       Height = 33
       Caption = 'Buscar Categorias'
-      TabOrder = 2
+      TabOrder = 1
       OnClick = btnBuscarCategoriasClick
     end
     object btnCriarAtributos: TButton
@@ -62,7 +53,7 @@
       Width = 155
       Height = 33
       Caption = 'Criar Atributos'
-      TabOrder = 3
+      TabOrder = 2
       OnClick = btnCriarAtributosClick
     end
     object btnBuscarAtributos: TButton
@@ -71,7 +62,7 @@
       Width = 155
       Height = 33
       Caption = 'Buscar Atributos'
-      TabOrder = 4
+      TabOrder = 3
       OnClick = btnBuscarAtributosClick
     end
     object btnEnviarProdutosMandala: TBitBtn
@@ -80,7 +71,7 @@
       Width = 155
       Height = 33
       Caption = 'Enviar Produtos'
-      TabOrder = 5
+      TabOrder = 4
       OnClick = btnEnviarProdutosMandalaClick
     end
   end

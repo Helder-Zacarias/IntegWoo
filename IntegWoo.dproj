@@ -166,6 +166,7 @@
         <DCCReference Include="rest-client\woocommerce-api\WooCategoriaResponse.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\WooProdutoCategoriaRequest.pas"/>
         <DCCReference Include="utils\TrimTexto.pas"/>
+        <DCCReference Include="utils\ContentPrinter.pas"/>
         <None Include="bin\config.ini"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
