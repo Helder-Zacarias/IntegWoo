@@ -48,7 +48,7 @@ type
     function VerificarExistenciaDaCategoria(Categoria: string): TWooCategoriaResponse;
     function WooCommerceAPICall(Resource: string; Method: string; MensagemAposRetorno: string; Body: string = ''): TJSONValue;
     function BuscarSecaoNoBanco(CodIdSecao: Integer): TSecao;
-    function CriarCategoria(Secao: TSecao): Integer;
+    function CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
   private
     { Private declarations }
   public
@@ -220,29 +220,29 @@ var
     ArrImagens: TArray<TWooImagemRequest>;
     ArrCategorias: TArray<TWooCategoriaRequest>;
 begin
-    WPImagemResponse := enviarImagem(ImagePath);
-
-    if not Assigned(WPImagemResponse) then
-    	raise(Exception.Create('Upload de Imagem Falhou'));
-
-    try
-        var Categoria := selectCategoria(CategoriaSelecionada);
-        ArrCategorias := Produto.Categories;
-        SetLength(ArrCategorias, 1);
-        ArrCategorias[0] := Categoria;
-        Produto.Categories := ArrCategorias;
-        
-        var Img := TWooImagemRequest.Create;
-        Img.Id := WPImagemResponse.Id;
-        ArrImagens := Produto.Images;
-  		SetLength(ArrImagens, 1);
-  		ArrImagens[0] := Img;
-  		Produto.Images := ArrImagens;
-
-    	enviarProduto(Produto);
-    finally
-        Produto.Free;
-    end;
+//    WPImagemResponse := enviarImagem(ImagePath);
+//
+//    if not Assigned(WPImagemResponse) then
+//    	raise(Exception.Create('Upload de Imagem Falhou'));
+//
+//    try
+//        var Categoria := selectCategoria(CategoriaSelecionada);
+//        ArrCategorias := Produto.Categories;
+//        SetLength(ArrCategorias, 1);
+//        ArrCategorias[0] := Categoria;
+//        Produto.Categories := ArrCategorias;
+//
+//        var Img := TWooImagemRequest.Create;
+//        Img.Id := WPImagemResponse.Id;
+//        ArrImagens := Produto.Images;
+//  		SetLength(ArrImagens, 1);
+//  		ArrImagens[0] := Img;
+//  		Produto.Images := ArrImagens;
+//
+//    	enviarProduto(Produto);
+//    finally
+//        Produto.Free;
+//    end;
 end;
 
 function TfrmTela_Principal.WooCommerceAPICall(
@@ -303,7 +303,6 @@ begin
             Secao := TSecao.Create;
             Secao.CodIdSecao := SelectSecaoQuery.FieldByName('COD_ID_SECAO').AsInteger;
             Secao.DscSecao := SelectSecaoQuery.FieldByName('DSC_SECAO').AsString;
-            ShowMessage('COD_ID_SECAO: ' + Secao.CodIdSecao.ToString + sLineBreak + 'DSC_SECAO:' + Secao.DscSecao);
         end;
 
     finally
@@ -338,17 +337,26 @@ begin
     Result := CategoriaResponse;
 end;
 
-function TfrmTela_Principal.CriarCategoria(Secao: TSecao): Integer;
+function TfrmTela_Principal.CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
 var
     CategoriaId: Integer;
     RequestPayload: string;
     JSONResponse: TJSONValue;
+    CategoriaRequest: TWooCategoriaRequest;
     CategoriaResponse: TWooCategoriaResponse;
 begin
-    RequestPayload := TJson.ObjectToJsonString(Secao);
-    JSONResponse := WooCommerceAPICall('/product/categories', 'POST', 'Categoria criada com sucesso!', RequestPayload);
-    CategoriaResponse := TJson.JsonToObject<TWooCategoriaResponse>(JSONResponse.ToJSON);
-	Result := CategoriaResponse.Id;
+    CategoriaRequest := TWooCategoriaRequest.Create;
+
+    try
+        CategoriaRequest.Name :=  Secao.DscSecao;
+    	RequestPayload := TJson.ObjectToJsonString(CategoriaRequest);
+    	JSONResponse := WooCommerceAPICall('products/categories', 'POST', 'Categoria criada com sucesso!', RequestPayload);
+    	CategoriaResponse := TJson.JsonToObject<TWooCategoriaResponse>(JSONResponse.ToJSON);
+    finally
+        CategoriaRequest.Free;
+    end;
+
+	Result := CategoriaResponse;
 end;
 
 procedure TfrmTela_Principal.EnviarProdutoSimples(Produto: TWooProdutoRequest);
@@ -402,34 +410,33 @@ begin
         	while (not sqlProdutosMandala.Eof) and (Count < 1) do
 
             begin
-                CodIdGrade :=  sqlProdutosMandala.FindField('COD_ID_GRADE');
-            	if Assigned(CodIdGrade) and not CodIdGrade.IsNull then
+                CodIdGrade := sqlProdutosMandala.FindField('COD_ID_GRADE');
+
+            	if (not Assigned(CodIdGrade)) or (CodIdGrade.IsNull) or (not CodIdGrade.AsInteger <> 0) then
                     TipoProduto := 'simple'
                 else
-                	TipoProduto := 'variable';
+                    TipoProduto := 'variable';
 
                 ProdutoDB.CodIdProduto := sqlProdutosMandala.FieldByName('COD_ID_PRODUTO').AsInteger;
                 ProdutoDB.CodProduto := sqlProdutosMandala.FieldByName('COD_PRODUTO').AsLargeInt;
                 ProdutoDB.CodIdGrade := sqlProdutosMandala.FieldByName('COD_ID_GRADE').AsInteger;
+                ProdutoDB.CodIdSecao := sqlProdutosMandala.FieldByName('COD_ID_SECAO').AsInteger;
                 ProdutoDB.NumPrecoVarejo := sqlProdutosMandala.FieldByName('NUM_PRECO_VAREJO').AsCurrency;
                 ProdutoDB.DscCompleta := sqlProdutosMandala.FieldByName('DSC_COMPLETA').AsString;
                 ProdutoDB.DscAbreviada := sqlProdutosMandala.FieldByName('DSC_ABREVIADA').AsString;
                 ProdutoDB.DscObservacoes := sqlProdutosMandala.FieldByName('DSC_OBSERVACOES').AsString;
                 ProdutoDB.DscDetalhes := sqlProdutosMandala.FieldByName('DSC_DETALHES').AsString;
-                ProdutoDB.CodIdSecao := sqlProdutos.FieldByName('COD_ID_SECAO').AsInteger;
 
                 Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdSecao);
                 CategoriaResponse := VerificarExistenciaDaCategoria(Secao.DscSecao);
 
                 if not Assigned(CategoriaResponse) then
-                begin
-                  CategoriaId :=  CriarCategoria(Secao);
-                end;
+                	CategoriaResponse := CriarCategoria(Secao);
 
-               	WooProdutoRequest := ProdutoToWooProdutoRequest(ProdutoDB, TipoProduto, CategoriaId);
+               	WooProdutoRequest := ProdutoToWooProdutoRequest(ProdutoDB, TipoProduto, CategoriaResponse.Id);
 
                 Inc(Count);
-                EnviarProdutoSimples(WooProdutoRequest);
+//                EnviarProdutoSimples(WooProdutoRequest);
                 Next;
             end;
         finally
@@ -440,10 +447,10 @@ begin
     end;
 end;
 
-//function TfrmTela_Principal.selectCategoria(CategoriaString: string): TWooCategoriaRequest;
-//var
-//    Categoria: TWooCategoriaRequest;
-//begin
+function TfrmTela_Principal.selectCategoria(CategoriaString: string): TWooCategoriaRequest;
+var
+    Categoria: TWooCategoriaRequest;
+begin
 //    Categoria := TWooCategoriaRequest.Create;
 //
 //    if CategoriaString = 'Camisetas' then
@@ -478,7 +485,7 @@ end;
 //    end;
 //
 //    Result := Categoria;
-//end;
+end;
 
 function TfrmTela_Principal.enviarImagem(ImagePath: string): TWPImagemResponse;
 var
