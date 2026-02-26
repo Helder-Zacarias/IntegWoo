@@ -40,7 +40,7 @@ object frmTela_Principal: TfrmTela_Principal
     end
     object btnEnviarProdutosMandala: TBitBtn
       Left = 0
-      Top = 177
+      Top = 155
       Width = 155
       Height = 33
       Caption = 'Enviar Produtos'
