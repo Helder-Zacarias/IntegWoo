@@ -9,7 +9,7 @@ uses
   System.Generics.Collections, System.JSON, WPImagemResponse, WooImagemRequest, WooProdutoRequest, System.IniFiles, AppConfig, Produto,
   Vcl.ExtCtrls, Tela_Envio_Produto, WooCategoriaRequest, Tela_Cadastro_Atributo, WooAtributoRequest, WooTermoAtributoRequest,
   WooAtributoResponse, CustomObjectMapper, FileWriter, WooCreateCategoriaRequest, RESTRequest4D, WooCategoriaResponse, Secao,
-  WooProdutoCategoriaRequest, TrimTexto, ContentPrinter;
+  WooProdutoCategoriaRequest, TrimTexto, ContentPrinter, ProdutoGrade;
 
 type
   TfrmTela_Principal = class(TForm)
@@ -20,9 +20,6 @@ type
     butReceberProdutos: TBitBtn;
     btnHamburguer: TButton;
     panelSide: TPanel;
-    btnBuscarCategorias: TButton;
-    btnCriarAtributos: TButton;
-    btnBuscarAtributos: TButton;
     sqlGrades: TUniQuery;
     sqlProdutosMandala: TUniQuery;
     btnEnviarProdutosMandala: TBitBtn;
@@ -31,9 +28,6 @@ type
     procedure butBuscarProdutosClick(Sender: TObject);
     function EnviarImagem(ImagePath: string): TWPImagemResponse;
     procedure btnHamburguerClick(Sender: TObject);
-    procedure btnBuscarCategoriasClick(Sender: TObject);
-    procedure btnCriarAtributosClick(Sender: TObject);
-    procedure btnBuscarAtributosClick(Sender: TObject);
     procedure CriarTermosDoAtributo(Termos: TArray<string>; IdAtributo: Integer);
     procedure btnEnviarProdutosMandalaClick(Sender: TObject);
     procedure EnviarProduto(Produto: TWooProdutoRequest);
@@ -42,7 +36,10 @@ type
     function BuscarSecaoNoBanco(CodIdSecao: Integer): TSecao;
     function CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
     function BuscarAtributos: TObjectList<TWooAtributoResponse>;
+    function CriarAtributos: TObjectList<TWooAtributoResponse>;
   private
+    function BuscarGradesNoBanco(CodIdEmpresa, CodIdGrade,
+      CodIdProduto: Integer): TProdutoGrade;
     { Private declarations }
   public
     { Public declarations }
@@ -110,20 +107,37 @@ begin
     WriteContentToFile('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\produtos.txt', JSONResponse.ToJSON);
 end;
 
-procedure TfrmTela_Principal.btnBuscarAtributosClick(Sender: TObject);
+function TfrmTela_Principal.BuscarGradesNoBanco(CodIdEmpresa, CodIdGrade,
+  CodIdProduto: Integer): TProdutoGrade;
 var
-	JSONResponse: TJSONValue;
+    SelectGradesQuery: TUniQuery;
 begin
-    JSONResponse := WooCommerceAPICall('products/attributes', 'GET', 'Atributos retornados com sucesso!');
-    WriteContentToFile('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\ATRIBUTOS-PAYLOADS\atributos.txt', JSONResponse.ToJSON());
-end;
+    SelectGradesQuery := TUniQuery.Create(nil);
 
-procedure TfrmTela_Principal.btnBuscarCategoriasClick(Sender: TObject);
-var
-    JSONResponse: TJSONValue;
-begin
-    JSONResponse := WooCommerceAPICall('products/categories', 'GET', 'Categorias retornadas com sucesso');
-    WriteContentToFile('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\categorias.txt', JSONResponse.ToJSON());
+    try
+        SelectGradesQuery.Connection := Database;
+        SelectGradesQuery.SQL.Text := 'SELECT g.DSC_GRADE, gv1.DSC_VARIACAO, gv2.DSC_VARIACAO' + sLineBreak +
+        	'FROM db_sgci.produtos_grades pg ' + sLineBreak +
+            'JOIN db_sgci.grades g ' + sLineBreak +
+            'ON pg.COD_ID_GRADE = g.COD_ID_GRADE ' + sLineBreak +
+            'JOIN db_sgci.grades_variacao_1 gv1 ' + sLineBreak +
+            'ON pg.COD_ID_GRADE = gv1.COD_ID_GRADE ' + sLineBreak +
+            'JOIN db_sgci.grades_variacao_2 gv2 ' + sLineBreak +
+            'ON pg.COD_ID_GRADE = gv2.COD_ID_GRADE ' + sLineBreak +
+        	'WHERE pg.COD_ID_EMPRESA = :COD_ID_EMPRESA AND ' + sLineBreak +
+            'pg.COD_ID_GRADE = :COD_ID_GRADE AND ' + sLineBreak +
+            'pg.COD_ID_PRODUTO = :COD_ID_PRODUTO';
+        SelectGradesQuery.ParamByName('COD_ID_EMPRESA').asInteger := CodIdEmpresa;
+        SelectGradesQuery.ParamByName('COD_ID_GRADE').asInteger := CodIdGrade;
+        SelectGradesQuery.ParamByName('COD_ID_PRODUTO').asInteger := CodIdProduto;
+        SelectGradesQuery.Open;
+
+        SelectGradesQuery.SaveToXML('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\grades_join_with_grades.xml')
+    finally
+        SelectGradesQuery.Free;
+    end;
+
+    Result := nil;
 end;
 
 procedure TfrmTela_Principal.CriarTermosDoAtributo(Termos: TArray<string>; IDAtributo: Integer);
@@ -171,52 +185,41 @@ begin
 
 end;
 
-procedure TfrmTela_Principal.btnCriarAtributosClick(Sender: TObject);
+function TfrmTela_Principal.CriarAtributos: TObjectList<TWooAtributoResponse>;
 var
-    FileName: string;
-    FileWriter: TStringList;
-    Response: IResponse;
-    TelaCadastroAtributo: TfrmTela_Cadastro_Atributo;
-    JSONString: string;
-    AtributoRequest: TWooAtributoRequest;
+    JSONResponse: TJSONValue;
+    Atributos: TArray<TWooAtributoRequest>;
+    AtributoRequest : TWooAtributoRequest;
+    Payload: string;
     AtributoResponse: TWooAtributoResponse;
-
 begin
-	Filename := 'C:\Users\HELDER\Desktop\RESPONSE-DELPHI\ATRIBUTOS-PAYLOADS\novo-atributo-response.txt';
-    FileWriter := TStringList.Create;
-    TelaCadastroAtributo := TfrmTela_Cadastro_Atributo.Create(Self);
-    TelaCadastroAtributo.Position := poScreenCenter;
+	SetLength(Atributos, 2);
     AtributoRequest := TWooAtributoRequest.Create;
 
-    if TelaCadastroAtributo.ShowModal = mrOk then
-        try
+    Atributos[0] := TWooAtributoRequest.Create;
+    Atributos[0].Name := 'Grade 1';
 
-            AtributoRequest.Name := TelaCadastroAtributo.Atributo;
+    Atributos[1] := TWooAtributoRequest.Create;
+    Atributos[1].Name := 'Grade 2';
 
-            JSONString := TJson.ObjectToJsonString(AtributoRequest);
+    Result := TObjectList<TWooAtributoResponse>.Create;
 
-            Response := TRequest.New
-                .BaseURL(TAppConfig.WooApiUrl)
-                .Resource('products/attributes')
-                .BasicAuthentication(TAppConfig.ConsumerKey, TAppConfig.ConsumerSecret)
-                .AddHeader('Content-Type', 'application/json', [poDoNotEncode])
-                .AddBody(AtributoRequest)
-                .Post;
+    try
+    	for var Atributo in Atributos do
+    	begin
+            Payload := TJson.ObjectToJsonString(Atributo);
+            JSONResponse := WooCommerceAPICall('products/attributes', 'POST', 'Atributos criados com sucesso', Payload);
 
-            AtributoResponse := TJson.JsonToObject<TWooAtributoResponse>(Response.Content);
-
-            if Response.StatusCode in [200, 201] then
-                begin
-                    FileWriter.Add(Response.Content);
-                    FileWriter.SaveToFile(FileName);
-                    CriarTermosDoAtributo(TelaCadastroAtributo.Termos, AtributoResponse.Id);
-                    ShowMessage('Atributo criado com sucesso');
-                end
-        	else
-            	raise(Exception.Create('Criação de atributo não foi bem sucedida'));
-        finally
-        	FileWriter.Free;
-         	TelaCadastroAtributo.Free;
+            try
+                AtributoResponse := TJson.JsonToObject<TWooAtributoResponse>(JSONResponse.ToString);
+                Result.Add(AtributoResponse);
+            finally
+                JSONResponse.Free;
+            end;
+    	end;
+    finally
+        for var Atributo in Atributos do
+            Atributo.Free;
     end;
 end;
 
@@ -300,7 +303,7 @@ begin
     CategoriaRequest := TWooCategoriaRequest.Create;
 
     try
-        CategoriaRequest.Name :=  Secao.DscSecao;
+        CategoriaRequest.Name := Secao.DscSecao;
     	RequestPayload := TJson.ObjectToJsonString(CategoriaRequest);
     	JSONResponse := WooCommerceAPICall('products/categories', 'POST', 'Categoria criada com sucesso!', RequestPayload);
     	CategoriaResponse := TJson.JsonToObject<TWooCategoriaResponse>(JSONResponse.ToJSON);
@@ -364,11 +367,20 @@ var
     CategoriaResponse: TWooCategoriaResponse;
     Atributos: TObjectList<TWooAtributoResponse>;
     SelectProdutosQuery: TUniQuery;
+    CodIdEmpresa: Integer;
+    CodIdLoja: Integer;
+    CodIdProduto: Integer;
 begin
 //    SelectProdutosQuery := sqlProdutos;
+	CodIdEmpresa :=  2433;
+    CodIdLoja := 90;
+    CodIdProduto := 4832698;
     SelectProdutosQuery := TUniQuery.Create(nil);
     SelectProdutosQuery.Connection := Database;
-    SelectProdutosQuery.SQL.Text := 'SELECT * FROM db_sgci.produtos WHERE COD_ID_EMPRESA = 2433 AND COD_ID_LOJA = 90 AND COD_ID_PRODUTO = 4832698';
+    SelectProdutosQuery.SQL.Text := 'SELECT * FROM db_sgci.produtos WHERE COD_ID_EMPRESA = :COD_ID_EMPRESA AND COD_ID_LOJA = :COD_ID_LOJA And COD_ID_PRODUTO = :COD_ID_PRODUTO';
+    SelectProdutosQuery.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
+    SelectProdutosQuery.ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
+    SelectProdutosQuery.ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
     SelectProdutosQuery.Open;
     Atributos := nil;
 
@@ -397,23 +409,25 @@ begin
                 begin
                 	TipoProduto := 'variable';
                     ShowMessage('Produto variável');
-//                    Atributos := BuscarAtributos;
+                    Atributos := BuscarAtributos;
                 end;
 
                 ProdutoDB := ProdutoQueryToProduto(SelectProdutosQuery);
 
                 PrintProduto(ProdutoDB);
+                CriarAtributos;
+//                BuscarGradesNoBanco(CodIdEmpresa, ProdutoDb.CodIdGrade, ProdutoDB.CodIdProduto);
+
+//                Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdSecao);
+//                CategoriaResponse := VerificarExistenciaDaCategoria(Secao.DscSecao);
 //
-                Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdSecao);
-                CategoriaResponse := VerificarExistenciaDaCategoria(Secao.DscSecao);
-
-                if not Assigned(CategoriaResponse) then
-                	CategoriaResponse := CriarCategoria(Secao);
-
-               	WooProdutoRequest := ProdutoToWooProdutoRequest(ProdutoDB, TipoProduto, CategoriaResponse.Id);
-
-                Inc(Count);
-                EnviarProduto(WooProdutoRequest);
+//                if not Assigned(CategoriaResponse) then
+//                	CategoriaResponse := CriarCategoria(Secao);
+//
+//               	WooProdutoRequest := ProdutoToWooProdutoRequest(ProdutoDB, TipoProduto, CategoriaResponse.Id);
+//
+//                Inc(Count);
+//                EnviarProduto(WooProdutoRequest);
                 Next;
             end;
         finally
@@ -421,7 +435,6 @@ begin
             WooProdutoRequest.Free;
             SelectProdutosQuery.Free;
         end;
-
     end;
 end;
 

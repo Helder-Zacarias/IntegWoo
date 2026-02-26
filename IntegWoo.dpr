@@ -28,7 +28,8 @@ uses
   WooCategoriaResponse in 'rest-client\woocommerce-api\WooCategoriaResponse.pas',
   WooProdutoCategoriaRequest in 'rest-client\woocommerce-api\WooProdutoCategoriaRequest.pas',
   TrimTexto in 'utils\TrimTexto.pas',
-  ContentPrinter in 'utils\ContentPrinter.pas';
+  ContentPrinter in 'utils\ContentPrinter.pas',
+  ProdutoGrade in 'models\ProdutoGrade.pas';
 
 {$R *.res}
 

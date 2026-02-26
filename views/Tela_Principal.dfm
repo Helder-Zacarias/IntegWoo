@@ -31,47 +31,20 @@ object frmTela_Principal: TfrmTela_Principal
     Visible = False
     object butReceberProdutos: TBitBtn
       Left = 0
-      Top = 52
+      Top = 116
       Width = 155
       Height = 33
       Caption = 'Buscar Produtos'
       TabOrder = 0
       OnClick = butBuscarProdutosClick
     end
-    object btnBuscarCategorias: TButton
-      Left = 0
-      Top = 91
-      Width = 155
-      Height = 33
-      Caption = 'Buscar Categorias'
-      TabOrder = 1
-      OnClick = btnBuscarCategoriasClick
-    end
-    object btnCriarAtributos: TButton
-      Left = 0
-      Top = 169
-      Width = 155
-      Height = 33
-      Caption = 'Criar Atributos'
-      TabOrder = 2
-      OnClick = btnCriarAtributosClick
-    end
-    object btnBuscarAtributos: TButton
-      Left = 0
-      Top = 130
-      Width = 155
-      Height = 33
-      Caption = 'Buscar Atributos'
-      TabOrder = 3
-      OnClick = btnBuscarAtributosClick
-    end
     object btnEnviarProdutosMandala: TBitBtn
       Left = 0
-      Top = 208
+      Top = 177
       Width = 155
       Height = 33
       Caption = 'Enviar Produtos'
-      TabOrder = 4
+      TabOrder = 1
       OnClick = btnEnviarProdutosMandalaClick
     end
   end
