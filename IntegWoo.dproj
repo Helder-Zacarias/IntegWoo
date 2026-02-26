@@ -168,6 +168,7 @@
         <DCCReference Include="utils\TrimTexto.pas"/>
         <DCCReference Include="utils\ContentPrinter.pas"/>
         <DCCReference Include="models\ProdutoGrade.pas"/>
+        <DCCReference Include="models\ProdutoImagem.pas"/>
         <None Include="bin\config.ini"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

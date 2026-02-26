@@ -9,7 +9,7 @@ uses
   System.Generics.Collections, System.JSON, WPImagemResponse, WooImagemRequest, WooProdutoRequest, System.IniFiles, AppConfig, Produto,
   Vcl.ExtCtrls, Tela_Envio_Produto, WooCategoriaRequest, Tela_Cadastro_Atributo, WooAtributoRequest, WooTermoAtributoRequest,
   WooAtributoResponse, CustomObjectMapper, FileWriter, WooCreateCategoriaRequest, RESTRequest4D, WooCategoriaResponse, Secao,
-  WooProdutoCategoriaRequest, TrimTexto, ContentPrinter, ProdutoGrade;
+  WooProdutoCategoriaRequest, TrimTexto, ContentPrinter, ProdutoGrade, WooImagemResponse, ProdutoImagem;
 
 type
   TfrmTela_Principal = class(TForm)
@@ -25,19 +25,22 @@ type
     btnEnviarProdutosMandala: TBitBtn;
     procedure DatabaseConnectionLost(Sender: TObject; Component: TComponent;
       ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
-    procedure butBuscarProdutosClick(Sender: TObject);
-    function EnviarImagem(ImagePath: string): TWPImagemResponse;
     procedure btnHamburguerClick(Sender: TObject);
-    procedure CriarTermosDoAtributo(Termos: TArray<string>; IdAtributo: Integer);
+    procedure butBuscarProdutosClick(Sender: TObject);
     procedure btnEnviarProdutosMandalaClick(Sender: TObject);
-    procedure EnviarProduto(Produto: TWooProdutoRequest);
-    function VerificarExistenciaDaCategoria(Categoria: string): TWooCategoriaResponse;
     function WooCommerceAPICall(Resource: string; Method: string; MensagemAposRetorno: string; Body: string = ''): TJSONValue;
-    function BuscarSecaoNoBanco(CodIdSecao: Integer): TSecao;
+    function DownloadImage(ImageUrl: string = ''): TMemoryStream;
+    function GetImageCacheFolder: string;
+    function EnviarImagem(ImageUrl: string): TWPImagemResponse;
+    procedure EnviarProduto(Produto: TWooProdutoRequest);
     function CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
-    function BuscarAtributos: TObjectList<TWooAtributoResponse>;
     function CriarAtributos: TObjectList<TWooAtributoResponse>;
     procedure CriarTermosDoBanco(Table: string; AtributoId: Integer);
+    procedure CriarTermosDoAtributo(Termos: TArray<string>; IdAtributo: Integer);
+    function VerificarExistenciaDaCategoria(Categoria: string): TWooCategoriaResponse;
+    function BuscarAtributos: TObjectList<TWooAtributoResponse>;
+    function BuscarSecaoNoBanco(CodIdEmpresa: Integer; CodIdSecao: Integer): TSecao;
+    function BuscarImagemProdutoNoBanco(CodIdEmpresa: Integer; CodIdProduto: Integer): TProdutoImagem;
   private
     function BuscarGradesNoBanco(CodIdEmpresa, CodIdGrade,
       CodIdProduto: Integer): TProdutoGrade;
@@ -277,7 +280,6 @@ begin
     finally
     	SelectVariacaoQuery.Free;
     end;
-
 end;
 
 function TfrmTela_Principal.BuscarAtributos: TObjectList<TWooAtributoResponse>;
@@ -289,38 +291,40 @@ begin
     JSONResponse := WooCommerceAPICall('products/attributes', 'GET', 'Atributos retornados com sucesso');
     WriteContentToFile('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\busca-atributos.txt', JSONResponse.ToString);
 
-    for var Response in JSONResponse as TJSONArray do
-    begin
-        Atributo := TJson.JsonToObject<TWooAtributoResponse>(Response.ToString);
-        Result.Add(Atributo);
-    end;
+     try
+     	for var Response in JSONResponse as TJSONArray do
+        begin
+            Atributo := TJson.JsonToObject<TWooAtributoResponse>(Response.ToString);
+            Result.Add(Atributo);
+        end;
+     finally
+        JsonResponse.Free;
+     end;
 end;
 
-function TfrmTela_Principal.BuscarSecaoNoBanco(CodIdSecao: Integer) : TSecao;
+function TfrmTela_Principal.BuscarSecaoNoBanco(CodIdEmpresa: Integer; CodIdSecao: Integer) : TSecao;
 var
     SelectSecaoQuery: TUniQuery;
-    Secao: TSecao;
 begin
 	SelectSecaoQuery := TUniQuery.Create(nil);
+    Result := TSecao.Create;
 
     try
     	SelectSecaoQuery.Connection := Database;
-    	SelectSecaoQuery.SQL.Text := 'SELECT * FROM db_sgci.secoes WHERE COD_ID_EMPRESA = 1451 AND COD_ID_SECAO = :COD_ID_SECAO LIMIT 10';
+    	SelectSecaoQuery.SQL.Text := 'SELECT * FROM db_sgci.secoes ' +sLineBreak +
+        	'WHERE COD_ID_EMPRESA = :COD_ID_EMPRESA AND COD_ID_SECAO = :COD_ID_SECAO LIMIT 10';
+        SelectSecaoQuery.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
         SelectSecaoQuery.ParamByName('COD_ID_SECAO').AsInteger := CodIdSecao;
     	SelectSecaoQuery.Open;
 
         if not SelectSecaoQuery.Eof then
         begin
-            Secao := TSecao.Create;
-            Secao.CodIdSecao := SelectSecaoQuery.FieldByName('COD_ID_SECAO').AsInteger;
-            Secao.DscSecao := SelectSecaoQuery.FieldByName('DSC_SECAO').AsString;
+            Result.CodIdSecao := SelectSecaoQuery.FieldByName('COD_ID_SECAO').AsInteger;
+            Result.DscSecao := SelectSecaoQuery.FieldByName('DSC_SECAO').AsString;
         end;
-
     finally
        SelectSecaoQuery.Free;
     end;
-
-    Result := Secao;
 end;
 
 function TfrmTela_Principal.VerificarExistenciaDaCategoria(Categoria: string): TWooCategoriaResponse;
@@ -328,9 +332,8 @@ var
 	JSONValue: TJSONValue;
     CategoriasJSONArray: TJSONArray;
     CategoriaRetornada: string;
-    CategoriaResponse: TWooCategoriaResponse;
 begin
-	CategoriaResponse := nil;
+	Result := nil;
     JSONValue := WooCommerceAPICall('products/categories', 'GET', 'Categorias retornadas com sucesso!');
     CategoriasJSONArray :=  JSONValue as TJSONArray;
 
@@ -340,12 +343,10 @@ begin
 
         if RemoverEspacos(Categoria) = RemoverEspacos(CategoriaRetornada) then
         begin
-           CategoriaResponse := TJson.JsonToObject<TWooCategoriaResponse>(CategoriaJSON as TJSONObject);
+           Result := TJson.JsonToObject<TWooCategoriaResponse>(CategoriaJSON as TJSONObject);
            Break;
         end;
     end;
-
-    Result := CategoriaResponse;
 end;
 
 function TfrmTela_Principal.CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
@@ -365,40 +366,72 @@ begin
     finally
         CategoriaRequest.Free;
     end;
-
 	Result := CategoriaResponse;
 end;
 
-function TfrmTela_Principal.EnviarImagem(ImagePath: string): TWPImagemResponse;
+function TfrmTela_Principal.BuscarImagemProdutoNoBanco(CodIdEmpresa: Integer; CodIdProduto: Integer): TProdutoImagem;
+var
+    Query: TUniQuery;
+    Count: Integer;
+begin
+    Query := TUniQuery.Create(nil);
+    Result := nil;
+    Count := 0;
+
+    try
+        Query.Connection := Database;
+        Query.SQL.Text := 'SELECT pi.COD_ID_IMAGEM, pi.COD_ID_EMPRESA, pi.COD_ID_PRODUTO, pi.URL_IMAGEM ' + sLineBreak +
+    		'FROM db_sgci.produtos_imagens pi ' + sLineBreak +
+            'WHERE COD_ID_EMPRESA = :COD_ID_EMPRESA AND ' + sLineBreak +
+            'COD_ID_PRODUTO = :COD_ID_PRODUTO';
+
+        Query.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
+        Query.ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
+        Query.SaveToXML('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\unico-produto-imagem.xml');
+        Query.Open;
+
+        while (not Query.Eof) and (Count < 1) do
+        begin
+            Result := ProdutoImagemQueryToProdutoImagem(Query);
+            Inc(Count);
+            Query.Next;
+        end;
+    finally
+    	Query.Free;
+    end;
+end;
+
+function TfrmTela_Principal.EnviarImagem(ImageUrl: string): TWPImagemResponse;
 var
 	iRes: IResponse;
     MS: TMemoryStream;
-    WPImagemResponse: TWPImagemResponse;
+    FilePath: string;
 begin
 	Result := nil;
-    MS := TMemoryStream.Create;
+
+    MS := DownloadImage(ImageUrl);
+    FilePath := TPath.Combine(GetImageCacheFolder, TGUID.NewGuid.ToString + '.png');
+    MS.Position := 0;
+    MS.SaveToFile(FilePath);
 
     try
-    	MS.LoadFromFile(ImagePath);
-
         iRes := TRequest.New()
             .BaseURL(TAppConfig.WordPressApiUrl)
             .BasicAuthentication(TAppConfig.WPUser, TAppConfig.WPPassword)
             .ContentType('image/png')
             .AddHeader('Content-Disposition', 'attachment; filename="delphi-img-test.png"', [poDoNotEncode])
-            .AddBody(MS)
+            .AddBody(MS, False)
             .Post;
 
     	if (iRes.StatusCode = 200) or (iRes.StatusCode = 201) then
-            begin
-            	WPImagemResponse := TJson.JsonToObject<TWPImagemResponse>(iRes.Content);
-                Result := WPImagemResponse;
-            end
+        begin
+        	Result := TJson.JsonToObject<TWPImagemResponse>(iRes.Content);
+        end
         else
             ShowMessage('Status code: ' + iRes.StatusCode.ToString);
     finally
+        MS.Free;
 	end;
-
 end;
 
 procedure TfrmTela_Principal.EnviarProduto(Produto: TWooProdutoRequest);
@@ -409,6 +442,26 @@ begin
     JSONString := TJSON.ObjectToJsonString(Produto);
     JSONResponse := WooCommerceAPICall('products', 'POST', 'Produto cadastrado com sucesso', JSONString);
     WriteContentToFile('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\WOOCOMMERCE-PAYLOADS\PRODUTO-JSON.TXT ', JSONResponse.ToJSON);
+end;
+
+function TfrmTela_Principal.DownloadImage(ImageUrl: string = ''): TMemoryStream;
+var
+	Response: IResponse;
+begin
+	Result := TMemoryStream.Create;
+    ImageUrl := 'https://storage.redesoftware-cloud.com/arquivos_sgci/2433/view?fileName=imagens/produtos/cam_1.png';
+    Response := TRequest.New.BaseURL(ImageUrl).Accept('	*/*').Get;
+
+    if Response.StatusCode <> 200 then
+      raise Exception.Create('Erro ao baixar imagem: ' + Response.StatusText);
+
+    Result.LoadFromStream(Response.ContentStream);
+end;
+
+function TfrmTela_Principal.GetImageCacheFolder: string;
+begin
+    Result := TPath.Combine(TPath.GetDocumentsPath, 'Ecommerce\cache\images');
+    TDirectory.CreateDirectory(Result);
 end;
 
 procedure TfrmTela_Principal.btnEnviarProdutosMandalaClick(Sender: TObject);
@@ -425,6 +478,9 @@ var
     CodIdEmpresa: Integer;
     CodIdLoja: Integer;
     CodIdProduto: Integer;
+    ProdutoImagem: TProdutoImagem;
+    ImagemResponse: TWPImagemResponse;
+    ImagemRequest: TWooImagemRequest;
 begin
 //    SelectProdutosQuery := sqlProdutos;
 	CodIdEmpresa :=  2433;
@@ -458,38 +514,42 @@ begin
                 if CodIdGrade.IsNull then
                 begin
                 	TipoProduto := 'simple';
-                    ShowMessage('Produto simples')
+//                    ShowMessage('Produto simples')
                 end
                 else
                 begin
                 	TipoProduto := 'variable';
-                    ShowMessage('Produto variável');
-                    Atributos := BuscarAtributos;
+//                    ShowMessage('Produto variável');
+//                    Atributos := BuscarAtributos;
                 end;
+//
+//                if (not Assigned(Atributos)) or (Atributos.IsEmpty) then
+//                begin
+//                    ShowMessage('Não há atributos no WooCommerce');
+//                	CriarAtributos;
+//                end
+//                else
+//                	ShowMessage('Erro na verificação da existência de atributos');
 
-                if (not Assigned(Atributos)) or (Atributos.IsEmpty) then
-                begin
-                    ShowMessage('Não há atributos no WooCommerce');
-                	CriarAtributos;
-                end
-                else
-                	ShowMessage('Erro na verificação da existência de atributos');
+                ProdutoDB := ProdutoQueryToProduto(SelectProdutosQuery);
 
-//                ProdutoDB := ProdutoQueryToProduto(SelectProdutosQuery);
-//
-//                PrintProduto(ProdutoDB);
-//                BuscarGradesNoBanco(CodIdEmpresa, ProdutoDb.CodIdGrade, ProdutoDB.CodIdProduto);
+                ProdutoImagem := BuscarImagemProdutoNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDB.CodIdProduto);
+                ImagemResponse := EnviarImagem(ProdutoImagem.UrlImagem);
+                ImagemRequest := WPImagemResponseToWooImagemRequest(ImagemResponse);
 
-//                Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdSecao);
-//                CategoriaResponse := VerificarExistenciaDaCategoria(Secao.DscSecao);
-//
-//                if not Assigned(CategoriaResponse) then
-//                	CategoriaResponse := CriarCategoria(Secao);
-//
-//               	WooProdutoRequest := ProdutoToWooProdutoRequest(ProdutoDB, TipoProduto, CategoriaResponse.Id);
-//
-//                Inc(Count);
-//                EnviarProduto(WooProdutoRequest);
+                PrintProduto(ProdutoDB);
+                BuscarGradesNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDb.CodIdGrade, ProdutoDB.CodIdProduto);
+
+                Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDB.CodIdSecao);
+                CategoriaResponse := VerificarExistenciaDaCategoria(Secao.DscSecao);
+
+                if not Assigned(CategoriaResponse) then
+                	CategoriaResponse := CriarCategoria(Secao);
+
+               	WooProdutoRequest := ProdutoToWooProdutoRequest(ProdutoDB, TipoProduto, CategoriaResponse.Id, ImagemRequest);
+
+                Inc(Count);
+                EnviarProduto(WooProdutoRequest);
                 Next;
             end;
         finally

@@ -6,11 +6,11 @@ uses
 type
     TWooImagemResponse = class
     private
-        FId: string;
+        FId: Integer;
         FSrc: string;
     published
         [JSONName('id')]
-        property Id: string read FId write FId;
+        property Id: Integer read FId write FId;
 
         [JSONName('src')]
         property Src: string read FSrc write FSrc;

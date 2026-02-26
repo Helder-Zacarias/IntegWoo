@@ -5,6 +5,7 @@ interface
 type TProduto = class
     private
         FCod_Id_Produto: Integer;
+        FCod_Id_Empresa: Integer;
         FCod_Produto: Int64;
         FCod_Id_Grade: Integer;
         FCod_Id_Secao: Integer;
@@ -17,6 +18,7 @@ type TProduto = class
         FSku: string;
     public
         property CodIdProduto: Integer read FCod_Id_Produto write FCod_Id_Produto;
+        property CodIdEmpresa: Integer read FCod_Id_Empresa write FCod_Id_Empresa;
         property CodProduto: Int64 read FCod_Produto write FCod_Produto;
         property CodIdGrade: Integer read FCod_Id_Grade write FCod_Id_Grade;
         property CodIdSecao: Integer read FCod_Id_Secao write FCod_Id_Secao;

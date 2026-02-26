@@ -2,48 +2,67 @@ unit CustomObjectMapper;
 
 interface
 uses
-	System.SysUtils, Produto, WooProdutoRequest, WooProdutoCategoriaRequest, Uni;
+	System.SysUtils, Produto, WooProdutoRequest, WooProdutoCategoriaRequest, Uni, WooImagemRequest, ProdutoImagem, WPImagemResponse;
 
-	function ProdutoToWooProdutoRequest(Produto: TProduto; TipoProduto: string; CategoriaId: Integer): TWooProdutoRequest;
-	function ProdutoQueryToProduto(SelectProdutoQuery: TUniQuery): TProduto;
+	function ProdutoToWooProdutoRequest(Produto: TProduto; TipoProduto: string;
+    	 CategoriaId: Integer; ProdutoImagem: TWooImagemRequest): TWooProdutoRequest;
+	function ProdutoQueryToProduto(Query: TUniQuery): TProduto;
+    function ProdutoImagemQueryToProdutoImagem(Query: TUniQuery): TProdutoImagem;
+    function WPImagemResponseToWooImagemRequest(ImagemResponse: TWPImagemResponse): TWooImagemRequest;
 
 implementation
-function ProdutoToWooProdutoRequest(Produto: TProduto; TipoProduto: string; CategoriaId: Integer): TWooProdutoRequest;
+function ProdutoToWooProdutoRequest(
+    Produto: TProduto;
+    TipoProduto: string;
+    CategoriaId: Integer;
+    ProdutoImagem: TWooImagemRequest
+): TWooProdutoRequest;
 var
-    ProdutoMapping: TWooProdutoRequest;
     ProdutoCategoria: TWooProdutoCategoriaRequest;
 begin
     ProdutoCategoria := TWooProdutoCategoriaRequest.Create;
     ProdutoCategoria.Id := CategoriaId;
 
-    ProdutoMapping := TWooProdutoRequest.Create;
-    ProdutoMapping.Name := Produto.DscCompleta;
-    ProdutoMapping.ShortDescription := Produto.DscAbreviada;
-    ProdutoMapping.Sku := Produto.CodProduto.ToString;
-    ProdutoMapping.RegularPrice := Produto.NumPrecoVarejo.ToString;
-    ProdutoMapping.PType := TipoProduto;
-    ProdutoMapping.AdicionarCategoria(ProdutoCategoria);
+    Result := TWooProdutoRequest.Create;
+    Result.Name := Produto.DscCompleta;
+    Result.ShortDescription := Produto.DscAbreviada;
+    Result.Sku := Produto.CodProduto.ToString;
+    Result.RegularPrice := Produto.NumPrecoVarejo.ToString;
+    Result.PType := TipoProduto;
+    Result.AdicionarCategoria(ProdutoCategoria);
 
-    Result := ProdutoMapping;
+    if Assigned(ProdutoImagem) then
+    	Result.AdicionarImagem(ProdutoImagem);
 end;
 
-function ProdutoQueryToProduto(SelectProdutoQuery: TUniQuery): TProduto;
-var
-	Produto: TProduto;
+function ProdutoQueryToProduto(Query: TUniQuery): TProduto;
 begin
-	Produto := TProduto.Create;
+	Result := TProduto.Create;
 
-    Produto.CodIdProduto := SelectProdutoQuery.FieldByName('COD_ID_PRODUTO').AsInteger;
-    Produto.CodProduto := SelectProdutoQuery.FieldByName('COD_PRODUTO').AsLargeInt;
-    Produto.CodIdGrade := SelectProdutoQuery.FieldByName('COD_ID_GRADE').AsInteger;
-    Produto.CodIdSecao := SelectProdutoQuery.FieldByName('COD_ID_SECAO').AsInteger;
-    Produto.NumPrecoVarejo := SelectProdutoQuery.FieldByName('NUM_PRECO_VAREJO').AsCurrency;
-    Produto.DscCompleta := SelectProdutoQuery.FieldByName('DSC_COMPLETA').AsString;
-    Produto.DscAbreviada := SelectProdutoQuery.FieldByName('DSC_ABREVIADA').AsString;
-    Produto.DscObservacoes := SelectProdutoQuery.FieldByName('DSC_OBSERVACOES').AsString;
-    Produto.DscDetalhes := SelectProdutoQuery.FieldByName('DSC_DETALHES').AsString;
-
-    Result := Produto;
+    Result.CodIdProduto := Query.FieldByName('COD_ID_PRODUTO').AsInteger;
+    Result.CodIdEmpresa := Query.FieldByName('COD_ID_EMPRESA').AsInteger;
+    Result.CodProduto := Query.FieldByName('COD_PRODUTO').AsLargeInt;
+    Result.CodIdGrade := Query.FieldByName('COD_ID_GRADE').AsInteger;
+    Result.CodIdSecao := Query.FieldByName('COD_ID_SECAO').AsInteger;
+    Result.NumPrecoVarejo := Query.FieldByName('NUM_PRECO_VAREJO').AsCurrency;
+    Result.DscCompleta := Query.FieldByName('DSC_COMPLETA').AsString;
+    Result.DscAbreviada := Query.FieldByName('DSC_ABREVIADA').AsString;
+    Result.DscObservacoes := Query.FieldByName('DSC_OBSERVACOES').AsString;
+    Result.DscDetalhes := Query.FieldByName('DSC_DETALHES').AsString;
 end;
 
+function ProdutoImagemQueryToProdutoImagem(Query: TUniQuery): TProdutoImagem;
+begin
+    Result := TProdutoImagem.Create;
+    Result.CodIdImagem := Query.FieldByName('COD_ID_IMAGEM').AsInteger;
+    Result.CodIdEmpresa := Query.FieldByName('COD_ID_EMPRESA').AsInteger;
+    Result.CodIdProduto := Query.FieldByName('COD_ID_PRODUTO').AsInteger;
+    Result.UrlImagem := Query.FieldByName('URL_IMAGEM').AsString;
+end;
+
+function WPImagemResponseToWooImagemRequest(ImagemResponse: TWPImagemResponse): TWooImagemRequest;
+begin
+    Result := TWooImagemRequest.Create;
+    Result.Id := ImagemResponse.Id;
+end;
 end.

@@ -6,10 +6,14 @@ uses
 
 type TWooImagemRequest = class
     private
-       FId: string;
+       FId: Integer;
+       FSrc: string;
     published
     	[JSONName('id')]
-        property Id: string read FId write Fid;
+        property Id: Integer read FId write Fid;
+
+        [JSONName('src')]
+        property Src: string read FSrc write FSrc;
 	end;
 implementation
 
