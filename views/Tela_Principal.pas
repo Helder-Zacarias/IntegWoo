@@ -30,7 +30,6 @@ type
     procedure btnEnviarProdutosMandalaClick(Sender: TObject);
     function WooCommerceAPICall(Resource: string; Method: string; MensagemAposRetorno: string; Body: string = ''): TJSONValue;
     function DownloadImage(ImageUrl: string = ''): TMemoryStream;
-    function GetImageCacheFolder: string;
 	function EnviarImagem(ListaImagens: TObjectList<TProdutoImagem>): TObjectList<TWPImagemResponse>;
     procedure EnviarProduto(Produto: TWooProdutoRequest);
     function CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
@@ -470,12 +469,6 @@ begin
       raise Exception.Create('Erro ao baixar imagem: ' + Response.StatusText);
 
     Result.LoadFromStream(Response.ContentStream);
-end;
-
-function TfrmTela_Principal.GetImageCacheFolder: string;
-begin
-    Result := TPath.Combine(TPath.GetDocumentsPath, 'Ecommerce\cache\images');
-    TDirectory.CreateDirectory(Result);
 end;
 
 procedure TfrmTela_Principal.btnEnviarProdutosMandalaClick(Sender: TObject);
