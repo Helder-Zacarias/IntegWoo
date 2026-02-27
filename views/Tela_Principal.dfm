@@ -11,6 +11,7 @@ object frmTela_Principal: TfrmTela_Principal
   Font.Name = 'Segoe UI'
   Font.Style = []
   Position = poScreenCenter
+  OnCreate = FormCreate
   TextHeight = 15
   object btnHamburguer: TButton
     Left = 0
@@ -79,7 +80,7 @@ object frmTela_Principal: TfrmTela_Principal
       '   db_sgci.produtos'
       'WHERE'
       '   COD_ID_EMPRESA = 2433 AND'
-      '   COD_ID_LOJA    = 90')
+      '   COD_ID_LOJA = 90')
     Left = 392
     Top = 120
   end
@@ -94,30 +95,5 @@ object frmTela_Principal: TfrmTela_Principal
       '   COD_ID_EMPRESA = 2433')
     Left = 480
     Top = 120
-  end
-  object sqlGrades: TUniQuery
-    Connection = Database
-    SQL.Strings = (
-      'SELECT'
-      '   *'
-      'FROM'
-      '   db_sgci.grades'
-      'WHERE'
-      '   COD_ID_EMPRESA = 2433')
-    Left = 384
-    Top = 208
-  end
-  object sqlProdutosMandala: TUniQuery
-    Connection = Database
-    SQL.Strings = (
-      'SELECT'
-      '   *'
-      'FROM'
-      '   db_sgci.produtos'
-      'WHERE'
-      '   COD_ID_EMPRESA = 1451 AND'
-      '   COD_ID_LOJA = 78')
-    Left = 480
-    Top = 216
   end
 end

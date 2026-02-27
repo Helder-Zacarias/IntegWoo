@@ -34,8 +34,11 @@ begin
     Result.PType := TipoProduto;
     Result.AdicionarCategoria(ProdutoCategoria);
 
-    for var ImagemProduto in ListaImagensProduto do
+    if Assigned(ListaImagensProduto) then
+    begin
+      for var ImagemProduto in ListaImagensProduto do
     	Result.AdicionarImagem(ImagemProduto);
+    end;
 end;
 
 function ProdutoQueryToProduto(Query: TUniQuery): TProduto;

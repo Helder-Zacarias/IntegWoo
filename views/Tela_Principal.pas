@@ -20,8 +20,6 @@ type
     butReceberProdutos: TBitBtn;
     btnHamburguer: TButton;
     panelSide: TPanel;
-    sqlGrades: TUniQuery;
-    sqlProdutosMandala: TUniQuery;
     btnEnviarProdutosMandala: TBitBtn;
     procedure DatabaseConnectionLost(Sender: TObject; Component: TComponent;
       ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
@@ -41,9 +39,15 @@ type
     function BuscarSecaoNoBanco(CodIdEmpresa: Integer; CodIdSecao: Integer): TSecao;
     function BuscarImagemProdutoNoBanco(CodIdEmpresa: Integer; CodIdProduto: Integer): TObjectList<TProdutoImagem>;
     function CriarQuery: TUniQuery;
+    function RetornarImagensRequest(CodIdProduto: Integer): TObjectList<TWooImagemRequest>;
+    procedure FormCreate(Sender: TObject);
   private
+    FSQLProdutosBase: string;
+  	FSQLImagensBase: string;
+    FCodIdProduto: Integer;
     function BuscarGradesNoBanco(CodIdEmpresa, CodIdGrade,
       CodIdProduto: Integer): TProdutoGrade;
+
     { Private declarations }
   public
     { Public declarations }
@@ -57,6 +61,13 @@ uses
 	DataSet.Serialize;
 
 {$R *.dfm}
+
+procedure TfrmTela_Principal.FormCreate(Sender: TObject);
+begin
+	FSQLProdutosBase := sqlProdutos.SQL.Text;
+    FSQLImagensBase := sqlImagens.SQL.Text;
+    FCodIdProduto := 4832699;
+end;
 
 function TfrmTela_Principal.CriarQuery: TUniQuery;
 begin
@@ -338,18 +349,26 @@ var
 begin
 	Result := nil;
     JSONValue := WooCommerceAPICall('products/categories', 'GET', 'Categorias retornadas com sucesso!');
-    CategoriasJSONArray :=  JSONValue as TJSONArray;
 
-    for var CategoriaJSON in CategoriasJSONArray do
-    begin
-        CategoriaRetornada := CategoriaJSON.GetValue<string>('name');
+    if not (JSONValue is TJSONArray) then
+    	Exit;
+    try
+    	CategoriasJSONArray :=  TJSONArray(JSONValue);
 
-        if RemoverEspacos(Categoria) = RemoverEspacos(CategoriaRetornada) then
+        for var CategoriaJSON in CategoriasJSONArray do
         begin
-           Result := TJson.JsonToObject<TWooCategoriaResponse>(CategoriaJSON as TJSONObject);
-           Break;
+            CategoriaRetornada := CategoriaJSON.GetValue<string>('name');
+
+            if RemoverEspacos(Categoria) = RemoverEspacos(CategoriaRetornada) then
+            begin
+               Result := TJson.JsonToObject<TWooCategoriaResponse>(CategoriaJSON as TJSONObject);
+               Break;
+            end;
         end;
+    finally
+        JSONValue.Free;
     end;
+
 end;
 
 function TfrmTela_Principal.CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
@@ -357,19 +376,26 @@ var
     RequestPayload: string;
     JSONResponse: TJSONValue;
     CategoriaRequest: TWooCategoriaRequest;
-    CategoriaResponse: TWooCategoriaResponse;
 begin
+    Result := nil;
     CategoriaRequest := TWooCategoriaRequest.Create;
 
     try
         CategoriaRequest.Name := Secao.DscSecao;
     	RequestPayload := TJson.ObjectToJsonString(CategoriaRequest);
-    	JSONResponse := WooCommerceAPICall('products/categories', 'POST', 'Categoria criada com sucesso!', RequestPayload);
-    	CategoriaResponse := TJson.JsonToObject<TWooCategoriaResponse>(JSONResponse.ToJSON);
+        JSONResponse := WooCommerceAPICall('products/categories', 'POST', 'Categoria criada com sucesso!', RequestPayload);
+
+        try
+        	if not (JSONResponse is TJSONObject) then
+        		Exit;
+    		Result := TJson.JsonToObject<TWooCategoriaResponse>(JSONResponse.ToJSON);
+        finally
+            JSONResponse.Free;
+        end;
+
     finally
         CategoriaRequest.Free;
     end;
-	Result := CategoriaResponse;
 end;
 
 function TfrmTela_Principal.BuscarImagemProdutoNoBanco(CodIdEmpresa: Integer; CodIdProduto: Integer): TObjectList<TProdutoImagem>;
@@ -409,6 +435,62 @@ begin
 
     finally
     	Query.Free;
+    end;
+end;
+
+function TfrmTela_Principal.DownloadImage(ImageUrl: string = ''): TMemoryStream;
+var
+	Response: IResponse;
+begin
+	Result := TMemoryStream.Create;
+    Response := TRequest.New.BaseURL(ImageUrl).Accept('*/*').Get;
+
+    if Response.StatusCode <> 200 then
+      raise Exception.Create('Erro ao baixar imagem: ' + Response.StatusText);
+
+    Result.LoadFromStream(Response.ContentStream);
+end;
+
+function TfrmTela_Principal.RetornarImagensRequest(CodIdProduto: Integer): TObjectList<TWooImagemRequest>;
+var
+	ListaImagens: TObjectList<TProdutoImagem>;
+    ListaImagensResponse: TObjectList<TWPImagemResponse>;
+    ListaImagensRequest: TObjectList<TWooImagemRequest>;
+    CodIdEmpresa: Integer;
+begin
+    Result := nil;
+
+	sqlImagens.Close;
+    sqlImagens.SQL.Text := FSQLImagensBase;
+
+    if sqlImagens.SQL.Text.Contains(':COD_ID_PRODUTO') = False then
+    	sqlImagens.SQL.Add('AND COD_ID_PRODUTO = :COD_ID_PRODUTO');
+
+    sqlImagens.ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
+    sqlImagens.Open;
+
+    if sqlImagens.IsEmpty then
+    	Exit(nil);
+
+    CodIdEmpresa := sqlImagens.FieldByName('COD_ID_EMPRESA').AsInteger;
+
+    ListaImagens := BuscarImagemProdutoNoBanco(CodIdEmpresa, CodIdProduto);
+
+    try
+    	ListaImagensResponse := EnviarImagem(ListaImagens);
+
+        try
+        	ListaImagensRequest := TObjectList<TWooImagemRequest>.Create(True);
+
+        	for var ImagemResponse in ListaImagensResponse do
+                ListaImagensRequest.Add(WPImagemResponseToWooImagemRequest(ImagemResponse));
+            Result := ListaImagensRequest;
+        finally
+        	ListaImagensResponse.Free;
+        end;
+
+    finally
+    	ListaImagens.Free;
     end;
 end;
 
@@ -454,119 +536,90 @@ var
     JSONResponse: TJSONValue;
 begin
     JSONString := TJSON.ObjectToJsonString(Produto);
-    JSONResponse := WooCommerceAPICall('products', 'POST', 'Produto cadastrado com sucesso', JSONString);
-    WriteContentToFile('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\WOOCOMMERCE-PAYLOADS\PRODUTO-JSON.TXT ', JSONResponse.ToJSON);
-end;
-
-function TfrmTela_Principal.DownloadImage(ImageUrl: string = ''): TMemoryStream;
-var
-	Response: IResponse;
-begin
-	Result := TMemoryStream.Create;
-    Response := TRequest.New.BaseURL(ImageUrl).Accept('*/*').Get;
-
-    if Response.StatusCode <> 200 then
-      raise Exception.Create('Erro ao baixar imagem: ' + Response.StatusText);
-
-    Result.LoadFromStream(Response.ContentStream);
+    try
+       JSONResponse := WooCommerceAPICall('products', 'POST', 'Produto cadastrado com sucesso', JSONString);
+    	WriteContentToFile('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\WOOCOMMERCE-PAYLOADS\PRODUTO-JSON.TXT ', JSONResponse.ToJSON);
+    finally
+       JSONResponse.Free;
+    end;
 end;
 
 procedure TfrmTela_Principal.btnEnviarProdutosMandalaClick(Sender: TObject);
 var
     ProdutoDB: TProduto;
     WooProdutoRequest: TWooProdutoRequest;
-    CodIdGrade: TField;
-    Count: Integer;
     TipoProduto: string;
     Secao: TSecao;
     CategoriaResponse: TWooCategoriaResponse;
     Atributos: TObjectList<TWooAtributoResponse>;
-    SelectProdutosQuery: TUniQuery;
-    CodIdEmpresa: Integer;
-    CodIdLoja: Integer;
-    CodIdProduto: Integer;
-    ListaImagens: TObjectList<TProdutoImagem>;
-    ListaImagensResponse: TObjectList<TWPImagemResponse>;
     ListaImagensRequest: TObjectList<TWooImagemRequest>;
-    ImagemRequest: TWooImagemRequest;
 begin
-//    SelectProdutosQuery := sqlProdutos;
-	CodIdEmpresa :=  2433;
-    CodIdLoja := 90;
-    CodIdProduto := 4832698;
+	with sqlProdutos do
+	begin
+        Close;
+        Connection:= Self.Database;
+        SQL.Text := FSQLProdutosBase;
 
-    SelectProdutosQuery := CriarQuery;
-    SelectProdutosQuery.SQL.Text := 'SELECT * FROM db_sgci.produtos WHERE COD_ID_EMPRESA = :COD_ID_EMPRESA AND COD_ID_LOJA = :COD_ID_LOJA And COD_ID_PRODUTO = :COD_ID_PRODUTO';
-    SelectProdutosQuery.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
-    SelectProdutosQuery.ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
-    SelectProdutosQuery.ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
-    SelectProdutosQuery.Open;
-    Atributos := nil;
+        if SQL.Text.Contains(':COD_ID_PRODUTO') = False then
+            SQL.Add('AND COD_ID_PRODUTO = :COD_ID_PRODUTO');
 
-    with SelectProdutosQuery do
-    begin
-//    	Close;
-//        Connection:= Self.Database;
-//        Open;
+        ParamByName('COD_ID_PRODUTO').AsInteger := FCodIdProduto;
+        Open;
+
+        if sqlProdutos.IsEmpty then
+        	Exit;
 
         ProdutoDB := nil;
         WooProdutoRequest := nil;
-        Count := 0;
+//    	Atributos := nil;
+        CategoriaResponse := nil;
+        ListaImagensRequest := nil;
+        Secao := nil;
 
         try
-        	while not SelectProdutosQuery.Eof do
-
+           if FieldByName('COD_ID_GRADE').IsNull then
+                TipoProduto := 'simple'
+            else
             begin
-                CodIdGrade := SelectProdutosQuery.FieldByName('COD_ID_GRADE');
-
-                if CodIdGrade.IsNull then
-                	TipoProduto := 'simple'
-                else
-                begin
-                	TipoProduto := 'variable';
-//                    Atributos := BuscarAtributos;
-                end;
-//
-//                if (not Assigned(Atributos)) or (Atributos.IsEmpty) then
-//                begin
-//                    ShowMessage('Não há atributos no WooCommerce');
-//                	CriarAtributos;
-//                end
-//                else
-//                	ShowMessage('Erro na verificação da existência de atributos');
-
-                ProdutoDB := ProdutoQueryToProduto(SelectProdutosQuery);
-
-                ListaImagens := BuscarImagemProdutoNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDB.CodIdProduto);
-                ListaImagensResponse := EnviarImagem(ListaImagens);
-                ListaImagensRequest := TObjectList<TWooImagemRequest>.Create(True);
-
-                for var ImagemResponse in ListaImagensResponse do
-                begin
-                    ImagemRequest := WPImagemResponseToWooImagemRequest(ImagemResponse);
-                    ListaImagensRequest.Add(ImagemRequest);
-                end;
-
-                BuscarGradesNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDb.CodIdGrade, ProdutoDB.CodIdProduto);
-
-                Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDB.CodIdSecao);
-                CategoriaResponse := VerificarExistenciaDaCategoria(Secao.DscSecao);
-
-                if not Assigned(CategoriaResponse) then
-                	CategoriaResponse := CriarCategoria(Secao);
-
-               	WooProdutoRequest := ProdutoToWooProdutoRequest(ProdutoDB, TipoProduto, CategoriaResponse.Id, ListaImagensRequest);
-
-                Inc(Count);
-                EnviarProduto(WooProdutoRequest);
-                Next;
+                TipoProduto := 'variable';
+//                Atributos := BuscarAtributos;
             end;
+
+//            if (not Assigned(Atributos)) or (Atributos.IsEmpty) then
+//            begin
+//                CriarAtributos;
+//            end
+//        	else
+//            	ShowMessage('Erro na verificação da existência de atributos');
+
+            ProdutoDB := ProdutoQueryToProduto(sqlProdutos);
+            ListaImagensRequest := RetornarImagensRequest(ProdutoDB.CodIdProduto);
+//            BuscarGradesNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDb.CodIdGrade, ProdutoDB.CodIdProduto);
+            Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDB.CodIdSecao);
+            CategoriaResponse := VerificarExistenciaDaCategoria(Secao.DscSecao);
+
+            if not Assigned(CategoriaResponse) then
+                CategoriaResponse := CriarCategoria(Secao);
+
+            if not Assigned(CategoriaResponse) then
+                raise Exception.Create('Categoria inválida retornada pela API');
+
+        	WooProdutoRequest := ProdutoToWooProdutoRequest(
+                ProdutoDB,
+                TipoProduto,
+                CategoriaResponse.Id,
+                ListaImagensRequest);
+
+        	EnviarProduto(WooProdutoRequest);
         finally
-        	ProdutoDB.Free;
-            WooProdutoRequest.Free;
-            SelectProdutosQuery.Free;
+        	WooProdutoRequest.Free;
+            CategoriaResponse.Free;
+            Secao.Free;
+            ListaImagensRequest.Free;
+            ProdutoDB.Free;
+//            Atributos.Free;
         end;
-    end;
+	end;
 end;
 
 procedure TfrmTela_Principal.DatabaseConnectionLost(Sender: TObject; Component: TComponent;
