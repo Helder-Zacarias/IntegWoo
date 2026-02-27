@@ -2,20 +2,23 @@ unit CustomObjectMapper;
 
 interface
 uses
-	System.SysUtils, Produto, WooProdutoRequest, WooProdutoCategoriaRequest, Uni, WooImagemRequest, ProdutoImagem, WPImagemResponse;
+	System.SysUtils, System.Generics.Collections, Uni,
+    Produto, ProdutoImagem, WooProdutoRequest,
+    WooProdutoCategoriaRequest, WooImagemRequest, WPImagemResponse;
 
 	function ProdutoToWooProdutoRequest(Produto: TProduto; TipoProduto: string;
-    	 CategoriaId: Integer; ProdutoImagem: TWooImagemRequest): TWooProdutoRequest;
+    	 CategoriaId: Integer; ListaImagensProduto: TObjectList<TWooImagemRequest>): TWooProdutoRequest;
 	function ProdutoQueryToProduto(Query: TUniQuery): TProduto;
     function ProdutoImagemQueryToProdutoImagem(Query: TUniQuery): TProdutoImagem;
     function WPImagemResponseToWooImagemRequest(ImagemResponse: TWPImagemResponse): TWooImagemRequest;
 
 implementation
+
 function ProdutoToWooProdutoRequest(
     Produto: TProduto;
     TipoProduto: string;
     CategoriaId: Integer;
-    ProdutoImagem: TWooImagemRequest
+    ListaImagensProduto: TObjectList<TWooImagemRequest>
 ): TWooProdutoRequest;
 var
     ProdutoCategoria: TWooProdutoCategoriaRequest;
@@ -31,8 +34,8 @@ begin
     Result.PType := TipoProduto;
     Result.AdicionarCategoria(ProdutoCategoria);
 
-    if Assigned(ProdutoImagem) then
-    	Result.AdicionarImagem(ProdutoImagem);
+    for var ImagemProduto in ListaImagensProduto do
+    	Result.AdicionarImagem(ImagemProduto);
 end;
 
 function ProdutoQueryToProduto(Query: TUniQuery): TProduto;

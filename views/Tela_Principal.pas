@@ -31,7 +31,7 @@ type
     function WooCommerceAPICall(Resource: string; Method: string; MensagemAposRetorno: string; Body: string = ''): TJSONValue;
     function DownloadImage(ImageUrl: string = ''): TMemoryStream;
     function GetImageCacheFolder: string;
-    function EnviarImagem(ImageUrl: string): TWPImagemResponse;
+	function EnviarImagem(ListaImagens: TObjectList<TProdutoImagem>): TObjectList<TWPImagemResponse>;
     procedure EnviarProduto(Produto: TWooProdutoRequest);
     function CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
     function CriarAtributos: TObjectList<TWooAtributoResponse>;
@@ -40,7 +40,8 @@ type
     function VerificarExistenciaDaCategoria(Categoria: string): TWooCategoriaResponse;
     function BuscarAtributos: TObjectList<TWooAtributoResponse>;
     function BuscarSecaoNoBanco(CodIdEmpresa: Integer; CodIdSecao: Integer): TSecao;
-    function BuscarImagemProdutoNoBanco(CodIdEmpresa: Integer; CodIdProduto: Integer): TProdutoImagem;
+    function BuscarImagemProdutoNoBanco(CodIdEmpresa: Integer; CodIdProduto: Integer): TObjectList<TProdutoImagem>;
+    function CriarQuery: TUniQuery;
   private
     function BuscarGradesNoBanco(CodIdEmpresa, CodIdGrade,
       CodIdProduto: Integer): TProdutoGrade;
@@ -57,6 +58,12 @@ uses
 	DataSet.Serialize;
 
 {$R *.dfm}
+
+function TfrmTela_Principal.CriarQuery: TUniQuery;
+begin
+    Result := TUniQuery.Create(nil);
+    Result.Connection := Database;
+end;
 
 procedure TfrmTela_Principal.btnHamburguerClick(Sender: TObject);
 begin
@@ -116,10 +123,9 @@ function TfrmTela_Principal.BuscarGradesNoBanco(CodIdEmpresa, CodIdGrade,
 var
     SelectGradesQuery: TUniQuery;
 begin
-    SelectGradesQuery := TUniQuery.Create(nil);
+    SelectGradesQuery := CriarQuery;
 
     try
-        SelectGradesQuery.Connection := Database;
         SelectGradesQuery.SQL.Text := 'SELECT g.DSC_GRADE, gv1.DSC_VARIACAO, gv2.DSC_VARIACAO' + sLineBreak +
         	'FROM db_sgci.produtos_grades pg ' + sLineBreak +
             'JOIN db_sgci.grades g ' + sLineBreak +
@@ -241,11 +247,10 @@ var
 begin
     ShowMessage('Table: ' + Table);
     SQLText := 'SELECT DSC_VARIACAO FROM ' + Table;
-    SelectVariacaoQuery := TUniQuery.Create(nil);
+    SelectVariacaoQuery := CriarQuery;
     Count := 0;
 
     try
-        SelectVariacaoQuery.Connection := Database;
         SelectVariacaoQuery.SQL.Text := SQLText;
         SelectVariacaoQuery.Open;
         SelectVariacaoQuery.SaveToXML('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\' + Table + '_descricao.xml');
@@ -306,11 +311,10 @@ function TfrmTela_Principal.BuscarSecaoNoBanco(CodIdEmpresa: Integer; CodIdSecao
 var
     SelectSecaoQuery: TUniQuery;
 begin
-	SelectSecaoQuery := TUniQuery.Create(nil);
+	SelectSecaoQuery := CriarQuery;
     Result := TSecao.Create;
 
     try
-    	SelectSecaoQuery.Connection := Database;
     	SelectSecaoQuery.SQL.Text := 'SELECT * FROM db_sgci.secoes ' +sLineBreak +
         	'WHERE COD_ID_EMPRESA = :COD_ID_EMPRESA AND COD_ID_SECAO = :COD_ID_SECAO LIMIT 10';
         SelectSecaoQuery.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
@@ -369,69 +373,80 @@ begin
 	Result := CategoriaResponse;
 end;
 
-function TfrmTela_Principal.BuscarImagemProdutoNoBanco(CodIdEmpresa: Integer; CodIdProduto: Integer): TProdutoImagem;
+function TfrmTela_Principal.BuscarImagemProdutoNoBanco(CodIdEmpresa: Integer; CodIdProduto: Integer): TObjectList<TProdutoImagem>;
 var
     Query: TUniQuery;
     Count: Integer;
+    ListaImagens: TObjectList<TProdutoImagem>;
+    ProdutoImagem: TProdutoImagem;
 begin
-    Query := TUniQuery.Create(nil);
-    Result := nil;
-    Count := 0;
+    Query := CriarQuery;
+    ListaImagens := TObjectList<TProdutoImagem>.Create(True);
 
     try
-        Query.Connection := Database;
-        Query.SQL.Text := 'SELECT pi.COD_ID_IMAGEM, pi.COD_ID_EMPRESA, pi.COD_ID_PRODUTO, pi.URL_IMAGEM ' + sLineBreak +
-    		'FROM db_sgci.produtos_imagens pi ' + sLineBreak +
-            'WHERE COD_ID_EMPRESA = :COD_ID_EMPRESA AND ' + sLineBreak +
-            'COD_ID_PRODUTO = :COD_ID_PRODUTO';
+        try
+        	Query.SQL.Text := 'SELECT pi.COD_ID_IMAGEM, pi.COD_ID_EMPRESA, pi.COD_ID_PRODUTO, pi.URL_IMAGEM ' + sLineBreak +
+                'FROM db_sgci.produtos_imagens pi ' + sLineBreak +
+                'WHERE COD_ID_EMPRESA = :COD_ID_EMPRESA AND ' + sLineBreak +
+                'COD_ID_PRODUTO = :COD_ID_PRODUTO';
 
-        Query.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
-        Query.ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
-        Query.SaveToXML('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\unico-produto-imagem.xml');
-        Query.Open;
+            Query.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
+            Query.ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
+            Query.SaveToXML('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\unico-produto-imagem.xml');
+            Query.Open;
 
-        while (not Query.Eof) and (Count < 1) do
-        begin
-            Result := ProdutoImagemQueryToProdutoImagem(Query);
-            Inc(Count);
-            Query.Next;
+            while not Query.Eof do
+            begin
+                ProdutoImagem := ProdutoImagemQueryToProdutoImagem(Query);
+                ListaImagens.Add(ProdutoImagem);
+                Query.Next;
+            end;
+
+        	Result := ListaImagens;
+        except
+            ListaImagens.Free;
+            raise;
         end;
+
     finally
     	Query.Free;
     end;
 end;
 
-function TfrmTela_Principal.EnviarImagem(ImageUrl: string): TWPImagemResponse;
+function TfrmTela_Principal.EnviarImagem(ListaImagens: TObjectList<TProdutoImagem>): TObjectList<TWPImagemResponse>;
 var
 	iRes: IResponse;
-    MS: TMemoryStream;
-    FilePath: string;
+    Stream: TMemoryStream;
+    ImagemProduto: TProdutoImagem;
+    ImagemResponse: TWPImagemResponse;
 begin
-	Result := nil;
+    Result := TObjectList<TWPImagemResponse>.Create(True);
 
-    MS := DownloadImage(ImageUrl);
-    FilePath := TPath.Combine(GetImageCacheFolder, TGUID.NewGuid.ToString + '.png');
-    MS.Position := 0;
-    MS.SaveToFile(FilePath);
+    for ImagemProduto in ListaImagens do
+    begin
+    	Stream := DownloadImage(ImagemProduto.UrlImagem);
 
-    try
-        iRes := TRequest.New()
-            .BaseURL(TAppConfig.WordPressApiUrl)
-            .BasicAuthentication(TAppConfig.WPUser, TAppConfig.WPPassword)
-            .ContentType('image/png')
-            .AddHeader('Content-Disposition', 'attachment; filename="delphi-img-test.png"', [poDoNotEncode])
-            .AddBody(MS, False)
-            .Post;
+        try
+        	Stream.Position := 0;
 
-    	if (iRes.StatusCode = 200) or (iRes.StatusCode = 201) then
-        begin
-        	Result := TJson.JsonToObject<TWPImagemResponse>(iRes.Content);
-        end
-        else
-            ShowMessage('Status code: ' + iRes.StatusCode.ToString);
-    finally
-        MS.Free;
-	end;
+            iRes := TRequest.New()
+        		.BaseURL(TAppConfig.WordPressApiUrl)
+                .BasicAuthentication(TAppConfig.WPUser, TAppConfig.WPPassword)
+                .AddHeader('Content-Type', 'image/png', [poDoNotEncode])
+                .AddHeader('Content-Disposition', 'attachment; filename="imagem.png"', [poDoNotEncode])
+                .AddBody(Stream, False)
+                .Post;
+
+            if not (iRes.StatusCode in [200, 201]) then
+                raise(Exception.Create('Upload de imagem falhou!'));
+
+            ImagemResponse := TJson.JsonToObject<TWPImagemResponse>(iRes.Content);
+            Result.Add(ImagemResponse);
+            ShowMessage('Upload de imagem bem sucedido');
+        finally
+        	Stream.Free;
+    	end;
+    end;
 end;
 
 procedure TfrmTela_Principal.EnviarProduto(Produto: TWooProdutoRequest);
@@ -449,8 +464,7 @@ var
 	Response: IResponse;
 begin
 	Result := TMemoryStream.Create;
-    ImageUrl := 'https://storage.redesoftware-cloud.com/arquivos_sgci/2433/view?fileName=imagens/produtos/cam_1.png';
-    Response := TRequest.New.BaseURL(ImageUrl).Accept('	*/*').Get;
+    Response := TRequest.New.BaseURL(ImageUrl).Accept('*/*').Get;
 
     if Response.StatusCode <> 200 then
       raise Exception.Create('Erro ao baixar imagem: ' + Response.StatusText);
@@ -478,16 +492,17 @@ var
     CodIdEmpresa: Integer;
     CodIdLoja: Integer;
     CodIdProduto: Integer;
-    ProdutoImagem: TProdutoImagem;
-    ImagemResponse: TWPImagemResponse;
+    ListaImagens: TObjectList<TProdutoImagem>;
+    ListaImagensResponse: TObjectList<TWPImagemResponse>;
+    ListaImagensRequest: TObjectList<TWooImagemRequest>;
     ImagemRequest: TWooImagemRequest;
 begin
 //    SelectProdutosQuery := sqlProdutos;
 	CodIdEmpresa :=  2433;
     CodIdLoja := 90;
     CodIdProduto := 4832698;
-    SelectProdutosQuery := TUniQuery.Create(nil);
-    SelectProdutosQuery.Connection := Database;
+
+    SelectProdutosQuery := CriarQuery;
     SelectProdutosQuery.SQL.Text := 'SELECT * FROM db_sgci.produtos WHERE COD_ID_EMPRESA = :COD_ID_EMPRESA AND COD_ID_LOJA = :COD_ID_LOJA And COD_ID_PRODUTO = :COD_ID_PRODUTO';
     SelectProdutosQuery.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
     SelectProdutosQuery.ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
@@ -512,14 +527,10 @@ begin
                 CodIdGrade := SelectProdutosQuery.FieldByName('COD_ID_GRADE');
 
                 if CodIdGrade.IsNull then
-                begin
-                	TipoProduto := 'simple';
-//                    ShowMessage('Produto simples')
-                end
+                	TipoProduto := 'simple'
                 else
                 begin
                 	TipoProduto := 'variable';
-//                    ShowMessage('Produto variável');
 //                    Atributos := BuscarAtributos;
                 end;
 //
@@ -533,11 +544,16 @@ begin
 
                 ProdutoDB := ProdutoQueryToProduto(SelectProdutosQuery);
 
-                ProdutoImagem := BuscarImagemProdutoNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDB.CodIdProduto);
-                ImagemResponse := EnviarImagem(ProdutoImagem.UrlImagem);
-                ImagemRequest := WPImagemResponseToWooImagemRequest(ImagemResponse);
+                ListaImagens := BuscarImagemProdutoNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDB.CodIdProduto);
+                ListaImagensResponse := EnviarImagem(ListaImagens);
+                ListaImagensRequest := TObjectList<TWooImagemRequest>.Create(True);
 
-                PrintProduto(ProdutoDB);
+                for var ImagemResponse in ListaImagensResponse do
+                begin
+                    ImagemRequest := WPImagemResponseToWooImagemRequest(ImagemResponse);
+                    ListaImagensRequest.Add(ImagemRequest);
+                end;
+
                 BuscarGradesNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDb.CodIdGrade, ProdutoDB.CodIdProduto);
 
                 Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDB.CodIdSecao);
@@ -546,7 +562,7 @@ begin
                 if not Assigned(CategoriaResponse) then
                 	CategoriaResponse := CriarCategoria(Secao);
 
-               	WooProdutoRequest := ProdutoToWooProdutoRequest(ProdutoDB, TipoProduto, CategoriaResponse.Id, ImagemRequest);
+               	WooProdutoRequest := ProdutoToWooProdutoRequest(ProdutoDB, TipoProduto, CategoriaResponse.Id, ListaImagensRequest);
 
                 Inc(Count);
                 EnviarProduto(WooProdutoRequest);

@@ -23,8 +23,8 @@ type
     public
         constructor Create;
         destructor Destroy; override;
-        procedure AdicionarCategoria(Categoria: TWooProdutoCategoriaRequest);
         procedure AdicionarImagem(Imagem: TWooImagemRequest);
+        procedure AdicionarCategoria(Categoria: TWooProdutoCategoriaRequest);
         procedure AdicionarVariacoes(Variacao: TProductVariationsRequest);
     published
         [JSONName('name')]
@@ -63,16 +63,16 @@ implementation
       SetLength(FVariations, 0);
     end;
 
-    procedure TWooProdutoRequest.AdicionarCategoria(Categoria: TWooProdutoCategoriaRequest);
-    begin
-        SetLength(FCategories, Length(FCategories) + 1);
-        FCategories[High(FCategories)] := Categoria;
-    end;
-
     procedure TWooProdutoRequest.AdicionarImagem(Imagem: TWooImagemRequest);
     begin
         SetLength(FImages, Length(FImages) + 1);
         FImages[High(FImages)] := Imagem;
+    end;
+
+    procedure TWooProdutoRequest.AdicionarCategoria(Categoria: TWooProdutoCategoriaRequest);
+    begin
+        SetLength(FCategories, Length(FCategories) + 1);
+        FCategories[High(FCategories)] := Categoria;
     end;
 
     procedure TWooProdutoRequest.AdicionarVariacoes(Variacao: TProductVariationsRequest);
@@ -83,12 +83,12 @@ implementation
 
     destructor TWooProdutoRequest.Destroy;
     begin
-        for var Img in FImages do
-            Img.Free;
-        for var Category in FCategories do
-            Category.Free;
-        for var Variation in FVariations do
-            Variation.Free;
+        for var Imagem in FImages do
+            Imagem.Free;
+        for var Categoria in FCategories do
+            Categoria.Free;
+        for var Variacao in FVariations do
+            Variacao.Free;
       inherited;
     end;
 end.
