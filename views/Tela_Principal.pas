@@ -9,7 +9,7 @@ uses
   System.Generics.Collections, System.JSON, WPImagemResponse, WooImagemRequest, WooProdutoRequest, System.IniFiles, AppConfig, Produto,
   Vcl.ExtCtrls, Tela_Envio_Produto, WooCategoriaRequest, Tela_Cadastro_Atributo, WooAtributoRequest, WooTermoAtributoRequest,
   WooAtributoResponse, CustomObjectMapper, FileWriter, WooCreateCategoriaRequest, RESTRequest4D, WooCategoriaResponse, Secao,
-  WooProdutoCategoriaRequest, TrimTexto, ContentPrinter, ProdutoGrade, WooImagemResponse, ProdutoImagem;
+  WooProdutoCategoriaRequest, TrimTexto, ContentPrinter, ProdutoGrade, WooImagemResponse, ProdutoImagem, System.Threading;
 
 type
   TfrmTela_Principal = class(TForm)
@@ -26,7 +26,8 @@ type
     procedure btnHamburguerClick(Sender: TObject);
     procedure butBuscarProdutosClick(Sender: TObject);
     procedure btnEnviarProdutosMandalaClick(Sender: TObject);
-    function WooCommerceAPICall(Resource: string; Method: string; MensagemAposRetorno: string; Body: string = ''): TJSONValue;
+    function WooCommerceAPICall(Resource: string; Method: string;
+    	MensagemAposRetorno: string = ''; Body: string = ''): TJSONValue;
     function DownloadImage(ImageUrl: string = ''): TMemoryStream;
 	function EnviarImagem(ListaImagens: TObjectList<TProdutoImagem>): TObjectList<TWPImagemResponse>;
     procedure EnviarProduto(Produto: TWooProdutoRequest);
@@ -84,7 +85,7 @@ end;
 function TfrmTela_Principal.WooCommerceAPICall(
     Resource: string;
     Method:string;
-    MensagemAposRetorno: string;
+    MensagemAposRetorno: string = '';
     Body: string = ''): TJSONValue;
 var
     Request: IRequest;
@@ -112,7 +113,8 @@ begin
 
     if Response.StatusCode in [200, 201] then
     begin
-        ShowMessage(MensagemAposRetorno);
+    	if (not MensagemAposRetorno.IsEmpty) then
+        	ShowMessage(MensagemAposRetorno);
     end
     else
         raise(Exception.Create('Requisição falhou. ' + Response.StatusCode.ToString + ': ' + Response.Content));
@@ -121,11 +123,33 @@ begin
 end;
 
 procedure TfrmTela_Principal.butBuscarProdutosClick(Sender: TObject);
-var
-    JSONResponse: TJSONValue;
+
 begin
-    JSONResponse := WooCommerceAPICall('products', 'GET', 'Produtos retornados com sucesso!');
-    WriteContentToFile('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\produtos.txt', JSONResponse.ToJSON);
+    TTask.Run(
+        procedure
+        var
+            JSONResponse: TJSONValue;
+        begin
+        	JSONResponse := nil;
+
+            try
+    			JSONResponse := WooCommerceAPICall('products', 'GET');
+                if (not Assigned(JSONResponse)) then
+                    Exit;
+                WriteContentToFile(TPath.Combine(TPath.GetDocumentsPath, 'produtos.txt'), JSONResponse.ToJSON);
+
+                TThread.Queue(
+                    nil,
+                    procedure
+                    begin
+                        ShowMessage('Produtos retornados com sucesso!');
+                    end
+                );
+    		finally
+         		JSONResponse.Free;
+    		end;
+        end
+    );
 end;
 
 function TfrmTela_Principal.BuscarGradesNoBanco(CodIdEmpresa, CodIdGrade,
