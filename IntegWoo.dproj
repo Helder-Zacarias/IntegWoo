@@ -145,7 +145,7 @@
         </DCCReference>
         <DCCReference Include="config\AppConfig.pas"/>
         <DCCReference Include="models\Secao.pas"/>
-        <DCCReference Include="rest-client\woocommerce-api\WooProductVariationsRequest.pas"/>
+        <DCCReference Include="rest-client\woocommerce-api\WooAtributosProdutoRequest.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\WooAtributoProduto.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\WooAtributoDaVariacao.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\WooVariacaoDoProduto.pas"/>
@@ -169,6 +169,7 @@
         <DCCReference Include="utils\ContentPrinter.pas"/>
         <DCCReference Include="models\ProdutoGrade.pas"/>
         <DCCReference Include="models\ProdutoImagem.pas"/>
+        <DCCReference Include="models\Variacao.pas"/>
         <None Include="bin\config.ini"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

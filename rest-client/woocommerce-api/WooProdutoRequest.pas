@@ -7,7 +7,7 @@ uses
     System.Generics.Collections,
     WooImagemRequest,
     WooProdutoCategoriaRequest,
-    WooProductVariationsRequest;
+    WooAtributosProdutoRequest;
 type
 	TWooProdutoRequest = class
     private
@@ -19,13 +19,13 @@ type
         FSku: string;
         FImages: TArray<TWooImagemRequest>;
         FCategories: TArray<TWooProdutoCategoriaRequest>;
-        FVariations: TArray<TProductVariationsRequest>;
+        FAttributes: TArray<TWooAtributosProdutoRequest>;
     public
         constructor Create;
         destructor Destroy; override;
         procedure AdicionarImagem(Imagem: TWooImagemRequest);
+        procedure AdicionarAtributo(Atributo: TWooAtributosProdutoRequest);
         procedure AdicionarCategoria(Categoria: TWooProdutoCategoriaRequest);
-        procedure AdicionarVariacoes(Variacao: TProductVariationsRequest);
     published
         [JSONName('name')]
         property Name: string read FName write FName;
@@ -51,8 +51,8 @@ type
         [JSONName('categories')]
         property Categories: TArray<TWooProdutoCategoriaRequest> read FCategories write FCategories;
 
-        [JSONName('variations')]
-        property Variations: TArray<TProductVariationsRequest> read FVariations write FVariations;
+        [JSONName('attributes')]
+        property Atributes: TArray<TWooAtributosProdutoRequest> read FAttributes write FAttributes;
    end;
 implementation
     constructor TWooProdutoRequest.Create;
@@ -60,7 +60,7 @@ implementation
       inherited;
       SetLength(FImages, 0);
       SetLength(FCategories, 0);
-      SetLength(FVariations, 0);
+      SetLength(FAttributes, 0);
     end;
 
     procedure TWooProdutoRequest.AdicionarImagem(Imagem: TWooImagemRequest);
@@ -75,10 +75,10 @@ implementation
         FCategories[High(FCategories)] := Categoria;
     end;
 
-    procedure TWooProdutoRequest.AdicionarVariacoes(Variacao: TProductVariationsRequest);
+    procedure TWooProdutoRequest.AdicionarAtributo(Atributo: TWooAtributosProdutoRequest);
     begin
-        SetLength(FVariations, Length(FVariations) + 1);
-        FVariations[High(FVariations)] := Variacao;
+        SetLength(FAttributes, Length(FAttributes) + 1);
+        FAttributes[High(FAttributes)] := Atributo;
     end;
 
     destructor TWooProdutoRequest.Destroy;
@@ -87,8 +87,8 @@ implementation
             Imagem.Free;
         for var Categoria in FCategories do
             Categoria.Free;
-        for var Variacao in FVariations do
-            Variacao.Free;
+        for var Atributo in FAttributes do
+            Atributo.Free;
       inherited;
     end;
 end.

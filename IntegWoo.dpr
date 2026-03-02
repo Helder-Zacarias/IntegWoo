@@ -13,7 +13,7 @@ uses
   Tela_Principal in 'views\Tela_Principal.pas' {frmTela_Principal},
   AppConfig in 'config\AppConfig.pas',
   Secao in 'models\Secao.pas',
-  WooProductVariationsRequest in 'rest-client\woocommerce-api\WooProductVariationsRequest.pas',
+  WooAtributosProdutoRequest in 'rest-client\woocommerce-api\WooAtributosProdutoRequest.pas',
   WooAtributoProduto in 'rest-client\woocommerce-api\WooAtributoProduto.pas',
   WooAtributoDaVariacao in 'rest-client\woocommerce-api\WooAtributoDaVariacao.pas',
   WooVariacaoDoProduto in 'rest-client\woocommerce-api\WooVariacaoDoProduto.pas',
@@ -30,7 +30,8 @@ uses
   TrimTexto in 'utils\TrimTexto.pas',
   ContentPrinter in 'utils\ContentPrinter.pas',
   ProdutoGrade in 'models\ProdutoGrade.pas',
-  ProdutoImagem in 'models\ProdutoImagem.pas';
+  ProdutoImagem in 'models\ProdutoImagem.pas',
+  Variacao in 'models\Variacao.pas';
 
 {$R *.res}
 

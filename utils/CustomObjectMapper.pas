@@ -4,10 +4,11 @@ interface
 uses
 	System.SysUtils, System.Generics.Collections, Uni,
     Produto, ProdutoImagem, WooProdutoRequest,
-    WooProdutoCategoriaRequest, WooImagemRequest, WPImagemResponse;
+    WooProdutoCategoriaRequest, WooImagemRequest, WPImagemResponse, WooAtributosProdutoRequest, WooAtributoResponse;
 
 	function ProdutoToWooProdutoRequest(Produto: TProduto; TipoProduto: string;
-    	 CategoriaId: Integer; ListaImagensProduto: TObjectList<TWooImagemRequest>): TWooProdutoRequest;
+    	 CategoriaId: Integer; ListaImagensProduto: TObjectList<TWooImagemRequest>;
+         TermosProduto: TDictionary<Integer, TArray<string>>): TWooProdutoRequest;
 	function ProdutoQueryToProduto(Query: TUniQuery): TProduto;
     function ProdutoImagemQueryToProdutoImagem(Query: TUniQuery): TProdutoImagem;
     function WPImagemResponseToWooImagemRequest(ImagemResponse: TWPImagemResponse): TWooImagemRequest;
@@ -18,10 +19,14 @@ function ProdutoToWooProdutoRequest(
     Produto: TProduto;
     TipoProduto: string;
     CategoriaId: Integer;
-    ListaImagensProduto: TObjectList<TWooImagemRequest>
+    ListaImagensProduto: TObjectList<TWooImagemRequest>;
+    TermosProduto: TDictionary<Integer, TArray<string>>
 ): TWooProdutoRequest;
 var
     ProdutoCategoria: TWooProdutoCategoriaRequest;
+    Termo: TPair<Integer, TArray<string>>;
+    Atributos: TArray<TWooAtributosProdutoRequest>;
+    Atributo: TWooAtributosProdutoRequest;
 begin
     ProdutoCategoria := TWooProdutoCategoriaRequest.Create;
     ProdutoCategoria.Id := CategoriaId;
@@ -34,10 +39,26 @@ begin
     Result.PType := TipoProduto;
     Result.AdicionarCategoria(ProdutoCategoria);
 
+    Atributo := TWooAtributosProdutoRequest.Create;
+
     if Assigned(ListaImagensProduto) then
     begin
       for var ImagemProduto in ListaImagensProduto do
     	Result.AdicionarImagem(ImagemProduto);
+    end;
+
+    if Assigned(TermosProduto) then
+    begin
+        try
+        	for Termo in TermosProduto do
+        	begin
+                Atributo.Id := Termo.Key;
+                Atributo.Options := Termo.Value;
+                SetLength(Atributos, Length(Atributos) + 1);
+                Atributos[High(Atributos)] := Atributo;
+        	end;
+        finally
+        end;
     end;
 end;
 

@@ -46,7 +46,7 @@ object frmTela_Principal: TfrmTela_Principal
       Height = 33
       Caption = 'Enviar Produtos'
       TabOrder = 1
-      OnClick = btnEnviarProdutosMandalaClick
+      OnClick = btnEnviarProdutosClick
     end
   end
   object MySQL: TMySQLUniProvider

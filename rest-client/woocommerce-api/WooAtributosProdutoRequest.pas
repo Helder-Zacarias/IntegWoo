@@ -1,18 +1,18 @@
-unit WooProductVariationsRequest;
+unit WooAtributosProdutoRequest;
 
 interface
 uses
     REST.Json.Types,
     System.Generics.Collections;
-type TProductVariationsRequest = class
+type TWooAtributosProdutoRequest = class
     private
-    	FName: string;
+    	FId: Integer;
         FVisible: Boolean;
         FVariation: Boolean;
         FOptions: TArray<string>;
     published
-        [JSONName('name')]
-        property Name: string read FName write FName;
+        [JSONName('id')]
+        property Id: Integer read FId write FId;
 
         [JSONName('visible')]
         property Visible: Boolean read FVisible write FVisible;
@@ -21,7 +21,7 @@ type TProductVariationsRequest = class
         property Variation: Boolean read FVariation write FVariation;
 
         [JSONName('options')]
-         property Options: TArray<string> read FOptions write FOptions;
+        property Options: TArray<string> read FOptions write FOptions;
 end;
 implementation
 
