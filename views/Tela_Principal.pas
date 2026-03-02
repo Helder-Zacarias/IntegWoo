@@ -606,16 +606,6 @@ begin
 
             ProdutoDB := ProdutoQueryToProduto(sqlProdutos);
             TermosProduto := BuscarTermosProduto(ProdutoDB.CodIdEmpresa, ProdutoDb.CodIdGrade, ProdutoDB.CodIdProduto, Atributos);
-
-            for TermoPair in TermosProduto do
-            begin
-            	var IDAtributo := TermoPair.Key;
-
-            	for var TermoDsc in TermoPair.Value do
-                	ShowMessage('ID Atributo: ' + IDAtributo.ToString + sLineBreak + 'Termo: ' + TermoDsc);
-            end;
-
-
             ListaImagensRequest := RetornarImagensRequest(ProdutoDB.CodIdProduto);
             Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDB.CodIdSecao);
             CategoriaResponse := VerificarExistenciaDaCategoria(Secao.DscSecao);
@@ -625,6 +615,7 @@ begin
 
             if not Assigned(CategoriaResponse) then
                 raise Exception.Create('Categoria inválida retornada pela API');
+
 
         	WooProdutoRequest := ProdutoToWooProdutoRequest(
                 ProdutoDB,

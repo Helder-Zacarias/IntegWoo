@@ -4,7 +4,7 @@ interface
 uses
 	System.SysUtils, System.Generics.Collections, Uni,
     Produto, ProdutoImagem, WooProdutoRequest,
-    WooProdutoCategoriaRequest, WooImagemRequest, WPImagemResponse, WooAtributosProdutoRequest, WooAtributoResponse;
+    WooProdutoCategoriaRequest, WooImagemRequest, WPImagemResponse, WooAtributosProdutoRequest, WooAtributoResponse, Vcl.Dialogs;
 
 	function ProdutoToWooProdutoRequest(Produto: TProduto; TipoProduto: string;
     	 CategoriaId: Integer; ListaImagensProduto: TObjectList<TWooImagemRequest>;
@@ -38,8 +38,6 @@ begin
     Result.PType := TipoProduto;
     Result.AdicionarCategoria(ProdutoCategoria);
 
-    Atributo := TWooAtributosProdutoRequest.Create;
-
     if Assigned(ListaImagensProduto) then
     begin
       for var ImagemProduto in ListaImagensProduto do
@@ -51,6 +49,7 @@ begin
         try
         	for Termo in TermosProduto do
         	begin
+                Atributo := TWooAtributosProdutoRequest.Create;
                 Atributo.Id := Termo.Key;
                 Atributo.Options := Termo.Value;
                 Result.AdicionarAtributo(Atributo);
