@@ -571,6 +571,7 @@ var
     ListaImagensRequest: TObjectList<TWooImagemRequest>;
     TermosAtributo: TArray<string>;
     TermosProduto: TDictionary<Integer, TArray<string>>;
+    TermoPair: TPair<Integer, TArray<string>>;
 begin
 	with sqlProdutos do
 	begin
@@ -604,8 +605,18 @@ begin
             end;
 
             ProdutoDB := ProdutoQueryToProduto(sqlProdutos);
-            ListaImagensRequest := RetornarImagensRequest(ProdutoDB.CodIdProduto);
             TermosProduto := BuscarTermosProduto(ProdutoDB.CodIdEmpresa, ProdutoDb.CodIdGrade, ProdutoDB.CodIdProduto, Atributos);
+
+            for TermoPair in TermosProduto do
+            begin
+            	var IDAtributo := TermoPair.Key;
+
+            	for var TermoDsc in TermoPair.Value do
+                	ShowMessage('ID Atributo: ' + IDAtributo.ToString + sLineBreak + 'Termo: ' + TermoDsc);
+            end;
+
+
+            ListaImagensRequest := RetornarImagensRequest(ProdutoDB.CodIdProduto);
             Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDB.CodIdSecao);
             CategoriaResponse := VerificarExistenciaDaCategoria(Secao.DscSecao);
 
@@ -630,6 +641,7 @@ begin
             ListaImagensRequest.Free;
             ProdutoDB.Free;
             Atributos.Free;
+            TermosProduto.Free;
         end;
 	end;
 end;

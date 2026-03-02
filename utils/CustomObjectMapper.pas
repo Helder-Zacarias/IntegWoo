@@ -25,7 +25,6 @@ function ProdutoToWooProdutoRequest(
 var
     ProdutoCategoria: TWooProdutoCategoriaRequest;
     Termo: TPair<Integer, TArray<string>>;
-    Atributos: TArray<TWooAtributosProdutoRequest>;
     Atributo: TWooAtributosProdutoRequest;
 begin
     ProdutoCategoria := TWooProdutoCategoriaRequest.Create;
@@ -54,8 +53,7 @@ begin
         	begin
                 Atributo.Id := Termo.Key;
                 Atributo.Options := Termo.Value;
-                SetLength(Atributos, Length(Atributos) + 1);
-                Atributos[High(Atributos)] := Atributo;
+                Result.AdicionarAtributo(Atributo);
         	end;
         finally
         end;
