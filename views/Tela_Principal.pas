@@ -65,22 +65,17 @@ uses
 
 {$R *.dfm}
 
-function TfrmTela_Principal.ChecarERetornarJSONArray(JSONResponse: TJSONValue): TJSONArray;
-begin
-	if not Assigned(JSONResponse) then
-        raise Exception.Create('JSONResponse é nulo!');
-
-	if not (JSONResponse is TJSONArray) then
-    	raise Exception.CreateFmt('Foi recebido %s ao invés de TJSONArray!', [JSONResponse.ClassName]);
-
-    Result := JSONResponse as TJSONArray;
-end;
-
 procedure TfrmTela_Principal.FormCreate(Sender: TObject);
 begin
 	FSQLProdutosBase := sqlProdutos.SQL.Text;
     FSQLImagensBase := sqlImagens.SQL.Text;
     FCodIdProduto := 4832699;
+end;
+
+procedure TfrmTela_Principal.btnHamburguerClick(Sender: TObject);
+begin
+    panelSide.Visible := not panelSide.Visible;
+    btnHamburguer.BringToFront;
 end;
 
 function TfrmTela_Principal.CriarQuery: TUniQuery;
@@ -90,12 +85,6 @@ begin
 
     Result := TUniQuery.Create(nil);
     Result.Connection := Database;
-end;
-
-procedure TfrmTela_Principal.btnHamburguerClick(Sender: TObject);
-begin
-    panelSide.Visible := not panelSide.Visible;
-    btnHamburguer.BringToFront;
 end;
 
 function TfrmTela_Principal.ChamadaAPIWooCommerce(
@@ -147,6 +136,17 @@ begin
         raise Exception.Create('JSON Retornado é inválido!');
 
     Result := JSONResposta;
+end;
+
+function TfrmTela_Principal.ChecarERetornarJSONArray(JSONResponse: TJSONValue): TJSONArray;
+begin
+	if not Assigned(JSONResponse) then
+        raise Exception.Create('JSONResponse é nulo!');
+
+	if not (JSONResponse is TJSONArray) then
+    	raise Exception.CreateFmt('Foi recebido %s ao invés de TJSONArray!', [JSONResponse.ClassName]);
+
+    Result := JSONResponse as TJSONArray;
 end;
 
 procedure TfrmTela_Principal.butBuscarProdutosClick(Sender: TObject);
@@ -251,6 +251,7 @@ var
 	Atributos: TArray<TWooAtributoRequest>;
     JSONResposta: TJSONValue;
 begin
+	ShowMessage('CriarAtributos executado às ' + TimeToStr(Now));
 	SetLength(Atributos, 2);
 	Atributos[0] := TWooAtributoRequest.Create;
     Atributos[0].Name := 'Grade 1';
@@ -292,7 +293,6 @@ begin
         JSONResposta := ChamadaAPIWooCommerce('products/attributes', 'GET', 'Atributos retornados com sucesso');
         JSONArray := ChecarERetornarJSONArray(JSONResposta);
 
-
         if (not Assigned(JSONArray)) or (JSONArray.Count = 0) then
     	begin
         	CriarAtributos;
@@ -301,7 +301,6 @@ begin
         	JSONArray := ChecarERetornarJSONArray(JSONResposta);
     	end;
 
-        ShowMessage('Tamanho do array de atributos: ' + JSONArray.Count.ToString);
     	SalvarConteudoEmArquivo(TPath.Combine(TPath.GetDocumentsPath, 'busca-atributos.txt'), JSONArray.ToJSON);
 
         try
@@ -331,7 +330,7 @@ begin
         end;
     except
        Result.Free;
-       raise Exception.Create('Erro na criação de atributos!');	
+       raise Exception.Create('Erro na criação dos termos!');	
     end;
 end;
 
@@ -341,18 +340,20 @@ var
     SQLText: string;
     JSONResposta: TJSONValue;
     Termo: TWooTermoAtributoRequest;
-    Count: Integer;
 begin
-    SQLText := 'SELECT DISTINCT DSC_VARIACAO FROM ' + Table;
+    SQLText := 'SELECT DISTINCT DSC_VARIACAO FROM ' + Table + ' LIMIT 5';
     SelectVariacaoQuery := CriarQuery;
-    Count := 1;
 
     try
         SelectVariacaoQuery.SQL.Text := SQLText;
         SelectVariacaoQuery.Open;
-        SelectVariacaoQuery.SaveToXML('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\' + Table + '_descricao.xml');
+        
+        SelectVariacaoQuery.SaveToXML(TPath.Combine(
+        	TPath.GetDocumentsPath, 
+        	Table + '_descricao.xml')
+        );
 
-        while (not SelectVariacaoQuery.Eof) and (Count <= 5) do
+        while not SelectVariacaoQuery.EoF do
         begin
         	JSONResposta := nil;
             Termo := nil;
@@ -369,7 +370,6 @@ begin
                 );
 
                 SelectVariacaoQuery.Next;
-                Inc(Count);
             finally
                 JSONResposta.Free;
                 Termo.Free;
