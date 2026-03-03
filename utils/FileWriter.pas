@@ -2,20 +2,23 @@ unit FileWriter;
 
 interface
 uses
-    System.Classes;
-procedure SalvarConteudoEmArquivo(Filename: string; Content: string);
+    System.SysUtils, System.Classes;
+procedure SalvarConteudoEmArquivo(Arquivo: string; Conteudo: string);
 
 implementation
 
-procedure SalvarConteudoEmArquivo(Filename: string; Content: string);
+procedure SalvarConteudoEmArquivo(Arquivo: string; Conteudo: string);
 var
 	FileWriter: TStringList;
 begin
 	FileWriter :=  TStringList.Create;
 
     try
-    	FileWriter.Add(Content);
-    	FileWriter.SaveToFile(FileName);
+        if FileExists(Arquivo) then
+        	FileWriter.LoadFromFile(Arquivo);
+
+    	FileWriter.Add(Conteudo);
+    	FileWriter.SaveToFile(Arquivo);
     finally
        FileWriter.Free;
     end;

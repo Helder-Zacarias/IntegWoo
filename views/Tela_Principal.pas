@@ -43,6 +43,7 @@ type
     function RetornarImagensRequest(CodIdProduto: Integer): TObjectList<TWooImagemRequest>;
     function ChecarERetornarJSONArray(JSONResponse: TJSONValue): TJSONArray;
     procedure FormCreate(Sender: TObject);
+    procedure CriarAtributos; 
   private
     FSQLProdutosBase: string;
   	FSQLImagensBase: string;
@@ -145,7 +146,7 @@ begin
     if not Assigned(JSONResposta) then
         raise Exception.Create('JSON Retornado é inválido!');
 
-    Result :=  JSONResposta;
+    Result := JSONResposta;
 end;
 
 procedure TfrmTela_Principal.butBuscarProdutosClick(Sender: TObject);
@@ -211,7 +212,8 @@ begin
             	'FROM db_sgci.produtos_grades pg ' + sLineBreak +
                 'JOIN ' + GV + ' ON pg.COD_ID_GRADE = ' + GV + '.COD_ID_GRADE ' + sLineBreak +
                 'WHERE pg.COD_ID_EMPRESA = :COD_ID_EMPRESA AND ' + sLineBreak +
-                'pg.COD_ID_GRADE = :COD_ID_GRADE AND ' + sLineBreak + 'pg.COD_ID_PRODUTO = :COD_ID_PRODUTO';
+                'pg.COD_ID_GRADE = :COD_ID_GRADE AND ' + sLineBreak + 
+                'pg.COD_ID_PRODUTO = :COD_ID_PRODUTO';
             SelectGradesQuery.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
             SelectGradesQuery.ParamByName('COD_ID_GRADE').AsInteger := CodIdGrade;
             SelectGradesQuery.ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
@@ -223,6 +225,10 @@ begin
             	while not SelectGradesQuery.Eof do
             	begin
                     ListaTermos.Add(SelectGradesQuery.FieldByName('DSC_VARIACAO').AsString);
+                    SalvarConteudoEmArquivo(
+                        TPath.Combine(TPath.GetDocumentsPath, 'termos-distintos-variacao-' + Indice.ToString + '.txt'), 
+                        SelectGradesQuery.FieldByName('DSC_VARIACAO').AsString
+                    );
                     SelectGradesQuery.Next;
             	end;
 
@@ -240,21 +246,63 @@ begin
     end;
 end;
 
+procedure TfrmTela_Principal.CriarAtributos;
+var
+	Atributos: TArray<TWooAtributoRequest>;
+    JSONResposta: TJSONValue;
+begin
+	SetLength(Atributos, 2);
+	Atributos[0] := TWooAtributoRequest.Create;
+    Atributos[0].Name := 'Grade 1';
+
+    Atributos[1] := TWooAtributoRequest.Create;
+    Atributos[1].Name := 'Grade 2';
+    
+    try
+    	for var I := 0 to High(Atributos) do
+        begin
+        	JSONResposta := nil;
+            
+        	try
+            	JSONResposta := ChamadaAPIWooCommerce(
+                    'products/attributes', 'POST', 'Atributo criado com sucesso',
+                    TJson.ObjectToJsonString(Atributos[I])
+            	);
+            finally
+                JSONResposta.Free;
+            end;
+        end;
+    finally
+    	for var I := 0 to High(Atributos) do
+        	Atributos[I].Free;
+    end;
+end;
+
 function TfrmTela_Principal.BuscarAtributos: TObjectList<TWooAtributoResponse>;
 var
     JSONResposta: TJSONValue;
     JSONArray: TJSONArray;
+    Payload: string;
 begin
-	Result := nil;
+	Result := TObjectList<TWooAtributoResponse>.Create(True);
     JSONResposta := nil;
+    JSONArray := nil;
 
      try
         JSONResposta := ChamadaAPIWooCommerce('products/attributes', 'GET', 'Atributos retornados com sucesso');
         JSONArray := ChecarERetornarJSONArray(JSONResposta);
 
-    	SalvarConteudoEmArquivo(TPath.Combine(TPath.GetDocumentsPath, 'busca-atributos.txt'), JSONArray.ToJSON);
 
-     	Result := TObjectList<TWooAtributoResponse>.Create(True);
+        if (not Assigned(JSONArray)) or (JSONArray.Count = 0) then
+    	begin
+        	CriarAtributos;
+            JSONResposta.Free;
+            JSONResposta := ChamadaAPIWooCommerce('products/attributes', 'GET', 'Atributos retornados com sucesso');
+        	JSONArray := ChecarERetornarJSONArray(JSONResposta);
+    	end;
+
+        ShowMessage('Tamanho do array de atributos: ' + JSONArray.Count.ToString);
+    	SalvarConteudoEmArquivo(TPath.Combine(TPath.GetDocumentsPath, 'busca-atributos.txt'), JSONArray.ToJSON);
 
         try
         	for var Response in JSONArray do
@@ -270,56 +318,21 @@ end;
 
 function TfrmTela_Principal.EnviarAtributos: TObjectList<TWooAtributoResponse>;
 var
-    JSONResposta: TJSONValue;
-    Atributos: TArray<TWooAtributoRequest>;
-    Payload: string;
-    AtributoResponse: TWooAtributoResponse;
     Count: Integer;
 begin
 	Result := BuscarAtributos;
-
-    if Assigned(Result) and (not Result.isEmpty) then
-    begin
-    	ShowMessage('Atributos já existem no WooCommerce!');
-        Exit;
-    end;
-
-    Result.Free;
-    Result := TObjectList<TWooAtributoResponse>.Create(True);
-    
-    SetLength(Atributos, 2);
-
-    Atributos[0] := TWooAtributoRequest.Create;
-    Atributos[0].Name := 'Grade 1';
-
-    Atributos[1] := TWooAtributoRequest.Create;
-    Atributos[1].Name := 'Grade 2';
-
     Count := 1;
 
     try
-        for var Atributo in Atributos do
+        for var Atributo in Result do
         begin
-        	JSONResposta := nil;
-        	Payload := TJson.ObjectToJsonString(Atributo);
-            
-            try
-            	JSONResposta := ChamadaAPIWooCommerce('products/attributes', 'POST', 'Atributo criado com sucesso', Payload);
-            	AtributoResponse := TJson.JsonToObject<TWooAtributoResponse>(JSONResposta.ToString);
-                Result.Add(AtributoResponse);
-                CriarTermosDoBanco('db_sgci.grades_variacao_' + Count.ToString, AtributoResponse.Id);
-                Inc(Count);
-            finally
-            	JSONResposta.Free;
-            end;
+        	CriarTermosDoBanco('db_sgci.grades_variacao_' + Count.ToString, Atributo.Id);
+            Inc(Count);
         end;
     except
        Result.Free;
        raise Exception.Create('Erro na criação de atributos!');	
     end;
-
-    for var Atributo in Atributos do
-    	Atributo.Free;
 end;
 
 procedure TfrmTela_Principal.CriarTermosDoBanco(Table: string; AtributoId: Integer);
@@ -662,7 +675,6 @@ begin
 
             if not Assigned(CategoriaResponse) then
                 raise Exception.Create('Categoria inválida retornada pela API');
-
 
         	WooProdutoRequest := ProdutoToWooProdutoRequest(
                 ProdutoDB,

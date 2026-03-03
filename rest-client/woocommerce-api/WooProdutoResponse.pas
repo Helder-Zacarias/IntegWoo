@@ -13,6 +13,7 @@ type
         FType: string;
         FDescription: string;
         FShort_Description: string;
+        FSku: string;
         FRegular_Price: string;
         FImages: TArray<TWooImagemResponse>;
     published
@@ -30,6 +31,9 @@ type
 
         [JSONName('short_description')]
         property ShortDescription: string read FShort_Description write FShort_Description;
+
+        [JSONName('sku')]
+        property Sku: string read FSku write FSku;
 
         [JSONName('regular_price')]
         property RegularPrice: string read FRegular_Price write FRegular_Price;
