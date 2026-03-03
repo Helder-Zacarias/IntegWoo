@@ -27,7 +27,7 @@ type
     procedure btnHamburguerClick(Sender: TObject);
     procedure butBuscarProdutosClick(Sender: TObject);
     procedure btnEnviarProdutosClick(Sender: TObject);
-    function WooCommerceAPICall(Resource: string; Method: string;
+    function ChamadaAPIWooCommerce(Resource: string; Metodo: string;
     	MensagemAposRetorno: string = ''; Body: string = ''): TJSONValue;
     function DownloadImage(ImageUrl: string = ''): TMemoryStream;
 	function EnviarImagem(ListaImagens: TObjectList<TProdutoImagem>): TObjectList<TWPImagemResponse>;
@@ -66,8 +66,11 @@ uses
 
 function TfrmTela_Principal.ChecarERetornarJSONArray(JSONResponse: TJSONValue): TJSONArray;
 begin
+	if not Assigned(JSONResponse) then
+        raise Exception.Create('JSONResponse é nulo!');
+
 	if not (JSONResponse is TJSONArray) then
-    	Exit;
+    	raise Exception.CreateFmt('Foi recebido %s ao invés de TJSONArray!', [JSONResponse.ClassName]);
 
     Result := JSONResponse as TJSONArray;
 end;
@@ -81,6 +84,9 @@ end;
 
 function TfrmTela_Principal.CriarQuery: TUniQuery;
 begin
+    if not Assigned(Database) then
+        raise Exception.Create('Não há conexão com o banco!');
+
     Result := TUniQuery.Create(nil);
     Result.Connection := Database;
 end;
@@ -91,15 +97,18 @@ begin
     btnHamburguer.BringToFront;
 end;
 
-function TfrmTela_Principal.WooCommerceAPICall(
+function TfrmTela_Principal.ChamadaAPIWooCommerce(
     Resource: string;
-    Method:string;
+    Metodo: string;
     MensagemAposRetorno: string = '';
     Body: string = ''): TJSONValue;
 var
     Request: IRequest;
     Response: IResponse;
+    JSONResposta: TJSONValue;
 begin
+	Result := nil;
+
     Request := TRequest.New
         .BaseURL(TAppConfig.WooApiUrl)
         .Resource(Resource)
@@ -109,19 +118,19 @@ begin
     if not Body.IsEmpty then
     	Request.AddBody(Body);
 
-    if  UpperCase(Method) = 'GET' then
+    if  UpperCase(Metodo) = 'GET' then
     	Response := Request.Get
-    else if UpperCase(Method) = 'POST' then
+    else if UpperCase(Metodo) = 'POST' then
         Response := Request.Post
-    else if UpperCase(Method) = 'PUT' then
+    else if UpperCase(Metodo) = 'PUT' then
          Response := Request.Put
-    else if UpperCase(Method) = 'DELETE' then
+    else if UpperCase(Metodo) = 'DELETE' then
          Response := Request.Delete
     else
-        raise(Exception.Create('Método HTTP não suportado'));
+        raise Exception.CreateFmt('Método %s não suportado', [Metodo]);
 
      if (not Assigned(Response)) then
-     	Exit;
+     	raise Exception.Create('Nehuma resposta do servidor!');
 
     if Response.StatusCode in [200, 201] then
     begin
@@ -131,23 +140,28 @@ begin
     else
         raise(Exception.Create('Requisição falhou. ' + Response.StatusCode.ToString + ': ' + Response.Content));
 
-    Result := TJSONObject.ParseJSONValue(Response.Content);
+    JSONResposta := TJSONObject.ParseJSONValue(Response.Content);
+
+    if not Assigned(JSONResposta) then
+        raise Exception.Create('JSON Retornado é inválido!');
+
+    Result :=  JSONResposta;
 end;
 
 procedure TfrmTela_Principal.butBuscarProdutosClick(Sender: TObject);
-
 begin
     TTask.Run(
         procedure
         var
-            JSONResponse: TJSONValue;
+            JSONResposta: TJSONValue;
         begin
-        	JSONResponse := nil;
+        	JSONResposta := nil;
 
             try
-    			JSONResponse := WooCommerceAPICall('products', 'GET');
+    			JSONResposta := ChamadaAPIWooCommerce('products', 'GET');
 
-                WriteContentToFile(TPath.Combine(TPath.GetDocumentsPath, 'produtos.txt'), JSONResponse.ToJSON);
+                if not Assigned(JSONResposta) then
+                    raise Exception.Create('Nenhuma Resposta da API do WOooComemrce!');
 
                 TThread.Queue(
                     nil,
@@ -157,7 +171,7 @@ begin
                     end
                 );
     		finally
-         		JSONResponse.Free;
+         		JSONResposta.Free;
     		end;
         end
     );
@@ -172,17 +186,27 @@ var
     GV: string;
     ListaTermos: TList<string>;
 begin
+	if not Assigned(Atributos) then
+    	raise Exception.Create('Atributos é nulo!');
+
+    TabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
+
+    if Atributos.Count <> Length(TabelasVariacao) then
+    	raise Exception.CreateFmt(
+        	'Atributos não é do mesmo tamanho de TabelasVariacao. Atributos: %d. TabelasVariacao: %d',
+        	[Atributos.Count, Length(TabelasVariacao)]
+        );
+
     Result := TDictionary<Integer, TArray<string>>.Create;
-    SelectGradesQuery := CriarQuery;
-
-    SetLength(TabelasVariacao, 2);
-    TabelasVariacao[0] := 'db_sgci.grades_variacao_1';
-    TabelasVariacao[1] := 'db_sgci.grades_variacao_2';
-
+    
     try
+    	SelectGradesQuery := CriarQuery;
+        
         for Indice := 0 to High(TabelasVariacao) do
         begin
             GV := TabelasVariacao[Indice];
+            
+            SelectGradesQuery.Close;
         	SelectGradesQuery.SQL.Text := 'SELECT DISTINCT ' + GV + '.DSC_VARIACAO ' + sLineBreak +
             	'FROM db_sgci.produtos_grades pg ' + sLineBreak +
                 'JOIN ' + GV + ' ON pg.COD_ID_GRADE = ' + GV + '.COD_ID_GRADE ' + sLineBreak +
@@ -218,30 +242,35 @@ end;
 
 function TfrmTela_Principal.BuscarAtributos: TObjectList<TWooAtributoResponse>;
 var
-    JSONResponse: TJSONValue;
+    JSONResposta: TJSONValue;
     JSONArray: TJSONArray;
 begin
 	Result := nil;
-    JSONResponse := nil;
+    JSONResposta := nil;
 
      try
-        JSONResponse := WooCommerceAPICall('products/attributes', 'GET', 'Atributos retornados com sucesso');
-        JSONArray := ChecarERetornarJSONArray(JSONResponse);
+        JSONResposta := ChamadaAPIWooCommerce('products/attributes', 'GET', 'Atributos retornados com sucesso');
+        JSONArray := ChecarERetornarJSONArray(JSONResposta);
 
-    	WriteContentToFile(TPath.Combine(TPath.GetDocumentsPath, 'busca-atributos.txt'), JSONArray.ToString);
+    	SalvarConteudoEmArquivo(TPath.Combine(TPath.GetDocumentsPath, 'busca-atributos.txt'), JSONArray.ToJSON);
 
      	Result := TObjectList<TWooAtributoResponse>.Create(True);
 
-     	for var Response in JSONArray do
-            Result.Add(TJson.JsonToObject<TWooAtributoResponse>(Response.ToString));
+        try
+        	for var Response in JSONArray do
+            	Result.Add(TJson.JsonToObject<TWooAtributoResponse>(Response.ToString));
+        except
+           Result.Free;
+           raise Exception.Create('Erro ao adicionar atributos a lista!');
+        end;
      finally
-        JsonResponse.Free;
+        JSONResposta.Free;
      end;
 end;
 
 function TfrmTela_Principal.EnviarAtributos: TObjectList<TWooAtributoResponse>;
 var
-    JSONResponse: TJSONValue;
+    JSONResposta: TJSONValue;
     Atributos: TArray<TWooAtributoRequest>;
     Payload: string;
     AtributoResponse: TWooAtributoResponse;
@@ -249,55 +278,55 @@ var
 begin
 	Result := BuscarAtributos;
 
-    if (not Assigned(Result)) or (Result.IsEmpty) then
+    if Assigned(Result) and (not Result.isEmpty) then
     begin
-    	SetLength(Atributos, 2);
+    	ShowMessage('Atributos já existem no WooCommerce!');
+        Exit;
+    end;
 
-        Atributos[0] := TWooAtributoRequest.Create;
-        Atributos[0].Name := 'Grade 1';
+    Result.Free;
+    Result := TObjectList<TWooAtributoResponse>.Create(True);
+    
+    SetLength(Atributos, 2);
 
-        Atributos[1] := TWooAtributoRequest.Create;
-        Atributos[1].Name := 'Grade 2';
+    Atributos[0] := TWooAtributoRequest.Create;
+    Atributos[0].Name := 'Grade 1';
 
-        ShowMessage('Tamanho de atributos array: ' + Length(Atributos).ToString);
+    Atributos[1] := TWooAtributoRequest.Create;
+    Atributos[1].Name := 'Grade 2';
 
-        Count := 1;
+    Count := 1;
 
-        JSONResponse := nil;
-
-        try
-            Result := TObjectList<TWooAtributoResponse>.Create;
-
-        	for var Atributo in Atributos do
-            begin
-            	Payload := TJson.ObjectToJsonString(Atributo);
-                ShowMessage('Atributo: ' + Payload);
-                JSONResponse := WooCommerceAPICall('products/attributes', 'POST', 'Atributo criado com sucesso', Payload);
-
-                try
-                	AtributoResponse := TJson.JsonToObject<TWooAtributoResponse>(JSONResponse.ToString);
-                    Result.Add(AtributoResponse);
-                    CriarTermosDoBanco('db_sgci.grades_variacao_' + Count.ToString, AtributoResponse.Id);
-                    Inc(Count);
-                finally
-                	JSONResponse.Free;
-            	end;
-    		end;
-        finally
-        	for var Atributo in Atributos do
-            	Atributo.Free;
+    try
+        for var Atributo in Atributos do
+        begin
+        	JSONResposta := nil;
+        	Payload := TJson.ObjectToJsonString(Atributo);
+            
+            try
+            	JSONResposta := ChamadaAPIWooCommerce('products/attributes', 'POST', 'Atributo criado com sucesso', Payload);
+            	AtributoResponse := TJson.JsonToObject<TWooAtributoResponse>(JSONResposta.ToString);
+                Result.Add(AtributoResponse);
+                CriarTermosDoBanco('db_sgci.grades_variacao_' + Count.ToString, AtributoResponse.Id);
+                Inc(Count);
+            finally
+            	JSONResposta.Free;
+            end;
         end;
-    end
-    else
-        ShowMessage('Atributos já existem no WooCommerce!');
-    ShowMessage('Tamanho atributos response: ' + Result.Count.ToString);
+    except
+       Result.Free;
+       raise Exception.Create('Erro na criação de atributos!');	
+    end;
+
+    for var Atributo in Atributos do
+    	Atributo.Free;
 end;
 
 procedure TfrmTela_Principal.CriarTermosDoBanco(Table: string; AtributoId: Integer);
 var
 	SelectVariacaoQuery: TUniQuery;
     SQLText: string;
-    JSONResponse: TJSONValue;
+    JSONResposta: TJSONValue;
     Termo: TWooTermoAtributoRequest;
     Count: Integer;
 begin
@@ -312,11 +341,14 @@ begin
 
         while (not SelectVariacaoQuery.Eof) and (Count <= 5) do
         begin
+        	JSONResposta := nil;
+            Termo := nil;
+            
             try
                 Termo := TWooTermoAtributoRequest.Create;
             	Termo.Name := SelectVariacaoQuery.FieldByName('DSC_VARIACAO').AsString;
 
-                JSONResponse := WooCommerceAPICall(
+                JSONResposta := ChamadaAPIWooCommerce(
                     '/products/attributes/' + AtributoId.ToString + '/terms',
                     'POST',
                     'Termo criado com sucesso!',
@@ -326,7 +358,7 @@ begin
                 SelectVariacaoQuery.Next;
                 Inc(Count);
             finally
-                JSONResponse.Free;
+                JSONResposta.Free;
                 Termo.Free;
             end;
         end;
@@ -339,8 +371,8 @@ function TfrmTela_Principal.BuscarSecaoNoBanco(CodIdEmpresa: Integer; CodIdSecao
 var
     SelectSecaoQuery: TUniQuery;
 begin
+	Result := nil;
 	SelectSecaoQuery := CriarQuery;
-    Result := TSecao.Create;
 
     try
     	SelectSecaoQuery.SQL.Text := 'SELECT * FROM db_sgci.secoes ' +sLineBreak +
@@ -349,8 +381,9 @@ begin
         SelectSecaoQuery.ParamByName('COD_ID_SECAO').AsInteger := CodIdSecao;
     	SelectSecaoQuery.Open;
 
-        if not SelectSecaoQuery.Eof then
+        if not SelectSecaoQuery.IsEmpty then
         begin
+        	Result := TSecao.Create;
             Result.CodIdSecao := SelectSecaoQuery.FieldByName('COD_ID_SECAO').AsInteger;
             Result.DscSecao := SelectSecaoQuery.FieldByName('DSC_SECAO').AsString;
         end;
@@ -361,16 +394,16 @@ end;
 
 function TfrmTela_Principal.VerificarExistenciaDaCategoria(Categoria: string): TWooCategoriaResponse;
 var
-	JSONResponse: TJSONValue;
+	JSONResposta: TJSONValue;
     CategoriasJSONArray: TJSONArray;
     CategoriaRetornada: string;
 begin
 	Result := nil;
-    JSONResponse := nil;
+    JSONResposta := nil;
 
     try
-        JSONResponse := WooCommerceAPICall('products/categories', 'GET', 'Categorias retornadas com sucesso!');
-    	CategoriasJSONArray := ChecarERetornarJSONArray(JSONResponse);
+        JSONResposta := ChamadaAPIWooCommerce('products/categories', 'GET', 'Categorias retornadas com sucesso!');
+    	CategoriasJSONArray := ChecarERetornarJSONArray(JSONResposta);
 
         for var CategoriaJSON in CategoriasJSONArray do
         begin
@@ -383,7 +416,7 @@ begin
             end;
         end;
     finally
-        JSONResponse.Free;
+        JSONResposta.Free;
     end;
 
 end;
@@ -391,24 +424,22 @@ end;
 function TfrmTela_Principal.CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
 var
     RequestPayload: string;
-    JSONResponse: TJSONValue;
+    JSONResposta: TJSONValue;
     CategoriaRequest: TWooCategoriaRequest;
 begin
     Result := nil;
-    CategoriaRequest := TWooCategoriaRequest.Create;
+    JSONResposta := nil;
+    CategoriaRequest := nil;
 
     try
+    	CategoriaRequest := TWooCategoriaRequest.Create;
         CategoriaRequest.Name := Secao.DscSecao;
     	RequestPayload := TJson.ObjectToJsonString(CategoriaRequest);
-        JSONResponse := WooCommerceAPICall('products/categories', 'POST', 'Categoria criada com sucesso!', RequestPayload);
-
-        try
-    		Result := TJson.JsonToObject<TWooCategoriaResponse>(JSONResponse.ToJSON);
-        finally
-            JSONResponse.Free;
-        end;
+        JSONResposta := ChamadaAPIWooCommerce('products/categories', 'POST', 'Categoria criada com sucesso!', RequestPayload);
+        Result := TJson.JsonToObject<TWooCategoriaResponse>(JSONResposta as TJSONObject);
 
     finally
+    	JSONResposta.Free;
         CategoriaRequest.Free;
     end;
 end;
@@ -416,14 +447,14 @@ end;
 function TfrmTela_Principal.BuscarImagemProdutoNoBanco(CodIdEmpresa: Integer; CodIdProduto: Integer): TObjectList<TProdutoImagem>;
 var
     Query: TUniQuery;
-    Count: Integer;
-    ListaImagens: TObjectList<TProdutoImagem>;
     ProdutoImagem: TProdutoImagem;
 begin
+	Result := nil;
     Query := CriarQuery;
-    ListaImagens := TObjectList<TProdutoImagem>.Create(True);
 
     try
+    	Result := TObjectList<TProdutoImagem>.Create(True);
+        
         try
         	Query.SQL.Text := 'SELECT pi.COD_ID_IMAGEM, pi.COD_ID_EMPRESA, pi.COD_ID_PRODUTO, pi.URL_IMAGEM ' + sLineBreak +
                 'FROM db_sgci.produtos_imagens pi ' + sLineBreak +
@@ -432,22 +463,18 @@ begin
 
             Query.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
             Query.ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
-            Query.SaveToXML('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\unico-produto-imagem.xml');
             Query.Open;
 
             while not Query.Eof do
             begin
                 ProdutoImagem := ProdutoImagemQueryToProdutoImagem(Query);
-                ListaImagens.Add(ProdutoImagem);
+                Result.Add(ProdutoImagem);
                 Query.Next;
             end;
-
-        	Result := ListaImagens;
         except
-            ListaImagens.Free;
-            raise;
+        	Result.Free;
+            raise Exception.Create('Erro ao buscar imagens no banco!');
         end;
-
     finally
     	Query.Free;
     end;
@@ -458,12 +485,18 @@ var
 	Response: IResponse;
 begin
 	Result := TMemoryStream.Create;
-    Response := TRequest.New.BaseURL(ImageUrl).Accept('*/*').Get;
 
-    if Response.StatusCode <> 200 then
-      raise Exception.Create('Erro ao baixar imagem: ' + Response.StatusText);
+    try
+    	Response := TRequest.New.BaseURL(ImageUrl).Accept('*/*').Get;
+        
+        if Response.StatusCode <> 200 then
+        	raise Exception.Create('Rquisição falhou: ' + Response.StatusText);
 
-    Result.LoadFromStream(Response.ContentStream);
+        Result.LoadFromStream(Response.ContentStream);
+    except
+       Result.Free;
+       raise Exception.Create('Error ao baixar a imagem!');
+    end;
 end;
 
 function TfrmTela_Principal.RetornarImagensRequest(CodIdProduto: Integer): TObjectList<TWooImagemRequest>;
@@ -497,13 +530,18 @@ begin
         try
         	ListaImagensRequest := TObjectList<TWooImagemRequest>.Create(True);
 
-        	for var ImagemResponse in ListaImagensResponse do
-                ListaImagensRequest.Add(WPImagemResponseToWooImagemRequest(ImagemResponse));
-            Result := ListaImagensRequest;
+            try
+            	for var ImagemResponse in ListaImagensResponse do
+                	ListaImagensRequest.Add(WPImagemResponseToWooImagemRequest(ImagemResponse));
+            	Result := ListaImagensRequest;
+            except
+            	ListaImagensRequest.Free;
+                raise Exception.Create('Erro!');
+            end;
+
         finally
         	ListaImagensResponse.Free;
         end;
-
     finally
     	ListaImagens.Free;
     end;
@@ -518,45 +556,51 @@ var
 begin
     Result := TObjectList<TWPImagemResponse>.Create(True);
 
-    for ImagemProduto in ListaImagens do
-    begin
-    	Stream := DownloadImage(ImagemProduto.UrlImagem);
+    try
+    	for ImagemProduto in ListaImagens do
+    	begin
+    		Stream := DownloadImage(ImagemProduto.UrlImagem);
 
-        try
-        	Stream.Position := 0;
+        	try
+        		Stream.Position := 0;
 
-            iRes := TRequest.New()
-        		.BaseURL(TAppConfig.WordPressApiUrl)
-                .BasicAuthentication(TAppConfig.WPUser, TAppConfig.WPPassword)
-                .AddHeader('Content-Type', 'image/png', [poDoNotEncode])
-                .AddHeader('Content-Disposition', 'attachment; filename="imagem.png"', [poDoNotEncode])
-                .AddBody(Stream, False)
-                .Post;
+            	iRes := TRequest.New()
+                    .BaseURL(TAppConfig.WordPressApiUrl)
+                    .BasicAuthentication(TAppConfig.WPUser, TAppConfig.WPPassword)
+                    .AddHeader('Content-Type', 'image/png', [poDoNotEncode])
+                    .AddHeader('Content-Disposition', 'attachment; filename="imagem.png"', [poDoNotEncode])
+                    .AddBody(Stream, False)
+                    .Post;
 
-            if not (iRes.StatusCode in [200, 201]) then
-                raise(Exception.Create('Upload de imagem falhou!'));
+            	if not (iRes.StatusCode in [200, 201]) then
+                	raise Exception.Create('Requisição falhou: ' + iRes.StatusCode.ToString + '. ' + iRes.Content);
 
-            ImagemResponse := TJson.JsonToObject<TWPImagemResponse>(iRes.Content);
-            Result.Add(ImagemResponse);
-            ShowMessage('Upload de imagem bem sucedido');
-        finally
-        	Stream.Free;
+            	ImagemResponse := TJson.JsonToObject<TWPImagemResponse>(iRes.Content);
+            	Result.Add(ImagemResponse);
+            	ShowMessage('Upload de imagem bem sucedido');
+        	finally
+        		Stream.Free;
+    		end;
     	end;
+    except
+    	Result.Free;
+        raise Exception.Create('Erro ao enviar imagem para o WooCommerce');
     end;
 end;
 
 procedure TfrmTela_Principal.EnviarProduto(Produto: TWooProdutoRequest);
 var
     JSONString: string;
-    JSONResponse: TJSONValue;
+    JSONResposta: TJSONValue;
 begin
+	JSONResposta := nil;
     JSONString := TJSON.ObjectToJsonString(Produto);
 
     try
-    	JSONResponse := WooCommerceAPICall('products', 'POST', 'Produto cadastrado com sucesso', JSONString);
-    	WriteContentToFile('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\WOOCOMMERCE-PAYLOADS\PRODUTO-JSON.TXT ', JSONResponse.ToJSON);
+    	JSONResposta := ChamadaAPIWooCommerce('products', 'POST', 'Produto cadastrado com sucesso', JSONString);
+    	SalvarConteudoEmArquivo('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\WOOCOMMERCE-PAYLOADS\PRODUTO-JSON.TXT ', JSONResposta.ToJSON);
     finally
-       JSONResponse.Free;
+       JSONResposta.Free;
     end;
 end;
 
@@ -569,9 +613,7 @@ var
     CategoriaResponse: TWooCategoriaResponse;
     Atributos: TObjectList<TWooAtributoResponse>;
     ListaImagensRequest: TObjectList<TWooImagemRequest>;
-    TermosAtributo: TArray<string>;
     TermosProduto: TDictionary<Integer, TArray<string>>;
-    TermoPair: TPair<Integer, TArray<string>>;
 begin
 	with sqlProdutos do
 	begin
@@ -594,6 +636,7 @@ begin
         CategoriaResponse := nil;
         ListaImagensRequest := nil;
         Secao := nil;
+        TermosProduto := nil;
 
         try
            if FieldByName('COD_ID_GRADE').IsNull then
@@ -608,6 +651,10 @@ begin
             TermosProduto := BuscarTermosProduto(ProdutoDB.CodIdEmpresa, ProdutoDb.CodIdGrade, ProdutoDB.CodIdProduto, Atributos);
             ListaImagensRequest := RetornarImagensRequest(ProdutoDB.CodIdProduto);
             Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDB.CodIdSecao);
+
+            if not Assigned(Secao) then
+            	raise Exception.Create('Seção não encontrda no banco!');
+            
             CategoriaResponse := VerificarExistenciaDaCategoria(Secao.DscSecao);
 
             if not Assigned(CategoriaResponse) then

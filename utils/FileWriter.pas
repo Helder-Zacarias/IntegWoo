@@ -3,11 +3,11 @@ unit FileWriter;
 interface
 uses
     System.Classes;
-procedure WriteContentToFile(Filename: string; Content: string);
+procedure SalvarConteudoEmArquivo(Filename: string; Content: string);
 
 implementation
 
-procedure WriteContentToFile(Filename: string; Content: string);
+procedure SalvarConteudoEmArquivo(Filename: string; Content: string);
 var
 	FileWriter: TStringList;
 begin
