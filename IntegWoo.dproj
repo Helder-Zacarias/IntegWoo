@@ -170,6 +170,7 @@
         <DCCReference Include="models\ProdutoGrade.pas"/>
         <DCCReference Include="models\ProdutoImagem.pas"/>
         <DCCReference Include="models\Variacao.pas"/>
+        <DCCReference Include="rest-client\woocommerce-api\WooTermoResponse.pas"/>
         <None Include="bin\config.ini"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

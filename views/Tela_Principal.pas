@@ -3,14 +3,20 @@ unit Tela_Principal;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Data.DB, Uni, UniProvider,
-  MySQLUniProvider, DBAccess, MemData, MemDS, Vcl.StdCtrls, Vcl.Buttons, System.IOUtils, REST.Json, Rest.Json.Types, WooProdutoResponse,
-  System.Generics.Collections, System.JSON, WPImagemResponse, WooImagemRequest, WooProdutoRequest, System.IniFiles, AppConfig, Produto,
-  Vcl.ExtCtrls, Tela_Envio_Produto, WooCategoriaRequest, Tela_Cadastro_Atributo, WooAtributoRequest, WooTermoAtributoRequest,
-  WooAtributoResponse, CustomObjectMapper, FileWriter, WooCreateCategoriaRequest, RESTRequest4D, WooCategoriaResponse, Secao,
-  WooProdutoCategoriaRequest, TrimTexto, ContentPrinter, ProdutoGrade, WooImagemResponse, ProdutoImagem, System.Threading,
-  Variacao, WooAtributosProdutoRequest;
+  Winapi.Windows, Winapi.Messages,
+  System.SysUtils, System.Variants, System.Classes, System.IOUtils,
+  System.Generics.Collections, System.JSON, System.IniFiles, System.Threading,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Buttons, Vcl.ExtCtrls,
+  Data.DB, Uni, UniProvider, MySQLUniProvider, DBAccess, MemData, MemDS,
+  REST.Json, Rest.Json.Types, RESTRequest4D,
+  AppConfig, Tela_Envio_Produto, Tela_Cadastro_Atributo,
+  FileWriter, TrimTexto, ContentPrinter, CustomObjectMapper,
+  Produto, ProdutoGrade, ProdutoImagem, Secao, Variacao,
+  WooProdutoRequest, WooProdutoResponse, WPImagemResponse, WooImagemRequest,
+  WooCategoriaRequest, WooAtributoRequest, WooTermoAtributoRequest,
+  WooAtributoResponse, WooCreateCategoriaRequest, WooCategoriaResponse,
+  WooProdutoCategoriaRequest, WooImagemResponse,
+  WooAtributosProdutoRequest, WooTermoResponse;
 
 type
   TfrmTela_Principal = class(TForm)
@@ -33,8 +39,7 @@ type
 	function EnviarImagem(ListaImagens: TObjectList<TProdutoImagem>): TObjectList<TWPImagemResponse>;
     procedure EnviarProduto(Produto: TWooProdutoRequest);
     function CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
-    function EnviarAtributos: TObjectList<TWooAtributoResponse>;
-    procedure CriarTermosDoBanco(Table: string; AtributoId: Integer);
+    function EnviarTermos(TabelaVariacao: string; AtributoId: Integer): TObjectList<TWooTermoResponse>;
     function VerificarExistenciaDaCategoria(Categoria: string): TWooCategoriaResponse;
     function BuscarAtributos: TObjectList<TWooAtributoResponse>;
     function BuscarSecaoNoBanco(CodIdEmpresa: Integer; CodIdSecao: Integer): TSecao;
@@ -43,14 +48,15 @@ type
     function RetornarImagensRequest(CodIdProduto: Integer): TObjectList<TWooImagemRequest>;
     function ChecarERetornarJSONArray(JSONResponse: TJSONValue): TJSONArray;
     procedure FormCreate(Sender: TObject);
-    procedure CriarAtributos; 
+    function CriarAtributos: TObjectList<TWooAtributoResponse>;
+    function CompararTermos(TermosAPI: TObjectList<TWooTermoResponse>; TermosDB: TList<string>): TList<string>;
+    function BuscarTermosProduto(CodIdEmpresa: Integer; CodIdGrade: Integer;
+    	CodIdProduto: Integer; TabelaVariacao: string): TList<string>;
   private
     FSQLProdutosBase: string;
   	FSQLImagensBase: string;
     FCodIdProduto: Integer;
-    function BuscarTermosProduto(CodIdEmpresa: Integer; CodIdGrade: Integer;
-  CodIdProduto: Integer; Atributos: TObjectList<TWooAtributoResponse>): TDictionary<Integer, TArray<string>>;
-
+    FTabelasVariacao: TArray<string>;
     { Private declarations }
   public
     { Public declarations }
@@ -70,6 +76,7 @@ begin
 	FSQLProdutosBase := sqlProdutos.SQL.Text;
     FSQLImagensBase := sqlImagens.SQL.Text;
     FCodIdProduto := 4832699;
+    FTabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
 end;
 
 procedure TfrmTela_Principal.btnHamburguerClick(Sender: TObject);
@@ -178,80 +185,60 @@ begin
     );
 end;
 
-function TfrmTela_Principal.BuscarTermosProduto(CodIdEmpresa: Integer; CodIdGrade: Integer;
-  CodIdProduto: Integer; Atributos: TObjectList<TWooAtributoResponse>): TDictionary<Integer, TArray<string>>;
+function TfrmTela_Principal.BuscarTermosProduto(
+    CodIdEmpresa: Integer;
+    CodIdGrade: Integer;
+    CodIdProduto: Integer;
+    TabelaVariacao: string
+): TList<string>;
 var
     SelectGradesQuery: TUniQuery;
-    TabelasVariacao: TArray<string>;
-    Indice: Integer;
-    GV: string;
-    ListaTermos: TList<string>;
 begin
-	if not Assigned(Atributos) then
-    	raise Exception.Create('Atributos é nulo!');
+    Result := nil;
 
-    TabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
-
-    if Atributos.Count <> Length(TabelasVariacao) then
-    	raise Exception.CreateFmt(
-        	'Atributos não é do mesmo tamanho de TabelasVariacao. Atributos: %d. TabelasVariacao: %d',
-        	[Atributos.Count, Length(TabelasVariacao)]
-        );
-
-    Result := TDictionary<Integer, TArray<string>>.Create;
-    
     try
+        Result := TList<string>.Create;
+
     	SelectGradesQuery := CriarQuery;
-        
-        for Indice := 0 to High(TabelasVariacao) do
-        begin
-            GV := TabelasVariacao[Indice];
-            
-            SelectGradesQuery.Close;
-        	SelectGradesQuery.SQL.Text := 'SELECT DISTINCT ' + GV + '.DSC_VARIACAO ' + sLineBreak +
-            	'FROM db_sgci.produtos_grades pg ' + sLineBreak +
-                'JOIN ' + GV + ' ON pg.COD_ID_GRADE = ' + GV + '.COD_ID_GRADE ' + sLineBreak +
-                'WHERE pg.COD_ID_EMPRESA = :COD_ID_EMPRESA AND ' + sLineBreak +
-                'pg.COD_ID_GRADE = :COD_ID_GRADE AND ' + sLineBreak + 
-                'pg.COD_ID_PRODUTO = :COD_ID_PRODUTO';
-            SelectGradesQuery.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
-            SelectGradesQuery.ParamByName('COD_ID_GRADE').AsInteger := CodIdGrade;
-            SelectGradesQuery.ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
-            SelectGradesQuery.Open;
+        SelectGradesQuery.Close;
+        SelectGradesQuery.SQL.Text := 'SELECT DISTINCT ' + TabelaVariacao + '.DSC_VARIACAO ' + sLineBreak +
+        	'FROM db_sgci.produtos_grades pg ' + sLineBreak +
+            'JOIN ' + TabelaVariacao + ' ON pg.COD_ID_GRADE = ' + TabelaVariacao + '.COD_ID_GRADE ' + sLineBreak +
+            'WHERE pg.COD_ID_EMPRESA = :COD_ID_EMPRESA AND ' + sLineBreak +
+            'pg.COD_ID_GRADE = :COD_ID_GRADE AND ' + sLineBreak +
+            'pg.COD_ID_PRODUTO = :COD_ID_PRODUTO';
+        SelectGradesQuery.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
+        SelectGradesQuery.ParamByName('COD_ID_GRADE').AsInteger := CodIdGrade;
+        SelectGradesQuery.ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
+        SelectGradesQuery.Open;
 
-            ListaTermos := TList<string>.Create;
-
-            try
-            	while not SelectGradesQuery.Eof do
-            	begin
-                    ListaTermos.Add(SelectGradesQuery.FieldByName('DSC_VARIACAO').AsString);
-                    SalvarConteudoEmArquivo(
-                        TPath.Combine(TPath.GetDocumentsPath, 'termos-distintos-variacao-' + Indice.ToString + '.txt'), 
-                        SelectGradesQuery.FieldByName('DSC_VARIACAO').AsString
-                    );
-                    SelectGradesQuery.Next;
-            	end;
-
-                Result.Add(Atributos[Indice].Id, ListaTermos.ToArray);
-
-            	SelectGradesQuery.SaveToXML(TPath.Combine(TPath.GetDocumentsPath, 'variacao1.xml'));
-
-            	SelectGradesQuery.Close;
-            finally
-            	ListaTermos.Free;
+        try
+        	while not SelectGradesQuery.Eof do
+            begin
+            	Result.Add(SelectGradesQuery.FieldByName('DSC_VARIACAO').AsString);
+                SalvarConteudoEmArquivo(
+                	TPath.Combine(TPath.GetDocumentsPath, 'termos-distintos-variacao-' + TabelaVariacao + '.txt'),
+                	SelectGradesQuery.FieldByName('DSC_VARIACAO').AsString
+                );
+                SelectGradesQuery.Next;
             end;
-        end;
+
+            SelectGradesQuery.Close;
+            except
+            	Result.Free;
+                raise Exception.Create('Erro na criação da lista de termos');
+            end;
     finally
         SelectGradesQuery.Free;
     end;
 end;
 
-procedure TfrmTela_Principal.CriarAtributos;
+function TfrmTela_Principal.CriarAtributos: TObjectList<TWooAtributoResponse>;
 var
 	Atributos: TArray<TWooAtributoRequest>;
     JSONResposta: TJSONValue;
 begin
-	ShowMessage('CriarAtributos executado às ' + TimeToStr(Now));
+	Result := nil;
 	SetLength(Atributos, 2);
 	Atributos[0] := TWooAtributoRequest.Create;
     Atributos[0].Name := 'Grade 1';
@@ -260,6 +247,8 @@ begin
     Atributos[1].Name := 'Grade 2';
     
     try
+        Result := TObjectList<TWooAtributoResponse>.Create(True);
+
     	for var I := 0 to High(Atributos) do
         begin
         	JSONResposta := nil;
@@ -269,6 +258,7 @@ begin
                     'products/attributes', 'POST', 'Atributo criado com sucesso',
                     TJson.ObjectToJsonString(Atributos[I])
             	);
+                Result.Add(TJson.JsonToObject<TWooAtributoResponse>(JSONResposta.ToJSON)) ;
             finally
                 JSONResposta.Free;
             end;
@@ -285,7 +275,7 @@ var
     JSONArray: TJSONArray;
     Payload: string;
 begin
-	Result := TObjectList<TWooAtributoResponse>.Create(True);
+	Result := nil;
     JSONResposta := nil;
     JSONArray := nil;
 
@@ -295,17 +285,18 @@ begin
 
         if (not Assigned(JSONArray)) or (JSONArray.Count = 0) then
     	begin
-        	CriarAtributos;
-            JSONResposta.Free;
-            JSONResposta := ChamadaAPIWooCommerce('products/attributes', 'GET', 'Atributos retornados com sucesso');
-        	JSONArray := ChecarERetornarJSONArray(JSONResposta);
-    	end;
+//            JSONResposta.Free;
+//            JSONArray.Free;
+            Result := CriarAtributos;
 
-    	SalvarConteudoEmArquivo(TPath.Combine(TPath.GetDocumentsPath, 'busca-atributos.txt'), JSONArray.ToJSON);
+            if not Assigned(Result) then
+                raise Exception.Create('Erro na criação de atributos');
+        	Exit(Result);
+    	end;
 
         try
         	for var Response in JSONArray do
-            	Result.Add(TJson.JsonToObject<TWooAtributoResponse>(Response.ToString));
+            	Result.Add(TJson.JsonToObject<TWooAtributoResponse>(Response.ToJSON));
         except
            Result.Free;
            raise Exception.Create('Erro ao adicionar atributos a lista!');
@@ -315,42 +306,29 @@ begin
      end;
 end;
 
-function TfrmTela_Principal.EnviarAtributos: TObjectList<TWooAtributoResponse>;
-var
-    Count: Integer;
-begin
-	Result := BuscarAtributos;
-    Count := 1;
-
-    try
-        for var Atributo in Result do
-        begin
-        	CriarTermosDoBanco('db_sgci.grades_variacao_' + Count.ToString, Atributo.Id);
-            Inc(Count);
-        end;
-    except
-       Result.Free;
-       raise Exception.Create('Erro na criação dos termos!');	
-    end;
-end;
-
-procedure TfrmTela_Principal.CriarTermosDoBanco(Table: string; AtributoId: Integer);
+function TfrmTela_Principal.EnviarTermos(
+	TabelaVariacao: string;
+	AtributoId: Integer
+): TObjectList<TWooTermoResponse>;
 var
 	SelectVariacaoQuery: TUniQuery;
     SQLText: string;
     JSONResposta: TJSONValue;
     Termo: TWooTermoAtributoRequest;
 begin
-    SQLText := 'SELECT DISTINCT DSC_VARIACAO FROM ' + Table + ' LIMIT 5';
+    SQLText := 'SELECT DISTINCT DSC_VARIACAO FROM ' + TabelaVariacao + ' LIMIT 5';
     SelectVariacaoQuery := CriarQuery;
+    Result := nil;
 
     try
+        Result := TObjectList<TWooTermoResponse>.Create(True);
+
         SelectVariacaoQuery.SQL.Text := SQLText;
         SelectVariacaoQuery.Open;
         
         SelectVariacaoQuery.SaveToXML(TPath.Combine(
         	TPath.GetDocumentsPath, 
-        	Table + '_descricao.xml')
+        	TabelaVariacao + '_descricao.xml')
         );
 
         while not SelectVariacaoQuery.EoF do
@@ -369,6 +347,13 @@ begin
                     TJson.ObjectToJsonString(Termo)
                 );
 
+                try
+                	Result.Add(TJson.JsonToObject<TWooTermoResponse>(JSONResposta.ToJson));
+                except
+                    Result.Free;
+                    raise Exception.Create('Erro na criação do termo!');
+                end;
+
                 SelectVariacaoQuery.Next;
             finally
                 JSONResposta.Free;
@@ -380,7 +365,10 @@ begin
     end;
 end;
 
-function TfrmTela_Principal.BuscarSecaoNoBanco(CodIdEmpresa: Integer; CodIdSecao: Integer) : TSecao;
+function TfrmTela_Principal.BuscarSecaoNoBanco(
+    CodIdEmpresa: Integer;
+	CodIdSecao: Integer
+ ): TSecao;
 var
     SelectSecaoQuery: TUniQuery;
 begin
@@ -457,7 +445,10 @@ begin
     end;
 end;
 
-function TfrmTela_Principal.BuscarImagemProdutoNoBanco(CodIdEmpresa: Integer; CodIdProduto: Integer): TObjectList<TProdutoImagem>;
+function TfrmTela_Principal.BuscarImagemProdutoNoBanco(
+    CodIdEmpresa: Integer;
+    CodIdProduto: Integer
+): TObjectList<TProdutoImagem>;
 var
     Query: TUniQuery;
     ProdutoImagem: TProdutoImagem;
@@ -617,6 +608,33 @@ begin
     end;
 end;
 
+function TfrmTela_Principal.CompararTermos(
+	TermosAPI: TObjectList<TWooTermoResponse>;
+	TermosDB: TList<string>
+) : TList<string>;
+var
+    TermosDistintos: TList<string>;
+begin
+    Result := nil;
+    TermosDistintos := TList<string>.Create;
+
+    for var Termo in TermosApi do
+        TermosDistintos.Add(Termo.Name);
+
+    try
+        Result := TList<string>.Create;
+
+        for var Termo in TermosDB do
+        begin
+            if TermosDistintos.Contains(Termo) then
+            	Result.Add(Termo);
+        end;
+    except
+        Result.Free;
+        raise Exception.Create('Erro ao comparar termos');
+    end;
+end;
+
 procedure TfrmTela_Principal.btnEnviarProdutosClick(Sender: TObject);
 var
     ProdutoDB: TProduto;
@@ -626,7 +644,9 @@ var
     CategoriaResponse: TWooCategoriaResponse;
     Atributos: TObjectList<TWooAtributoResponse>;
     ListaImagensRequest: TObjectList<TWooImagemRequest>;
-    TermosProduto: TDictionary<Integer, TArray<string>>;
+    TermosAPI: TObjectList<TObjectList<TWooTermoResponse>>;
+    TermosDB: TList<string>;
+    TermosProduto: TDictionary<Integer, TList<string>>;
 begin
 	with sqlProdutos do
 	begin
@@ -650,18 +670,58 @@ begin
         ListaImagensRequest := nil;
         Secao := nil;
         TermosProduto := nil;
+        TermosAPI := nil;
 
         try
-           if FieldByName('COD_ID_GRADE').IsNull then
+        	ProdutoDB := ProdutoQueryToProduto(sqlProdutos);
+
+            if FieldByName('COD_ID_GRADE').IsNull then
                 TipoProduto := 'simple'
             else
             begin
                 TipoProduto := 'variable';
-                Atributos := EnviarAtributos;
+                Atributos := BuscarAtributos;
+
+                if Atributos.Count <> Length(FTabelasVariacao) then
+                    raise Exception.CreateFmt(
+                        'Atributos e FTabelasVariação são de tamanhos diferentes!' + sLineBreak +
+                        'Atributos: %d. FTabelasVariação: %d.',
+                        [Atributos.Count, Length(FTabelasVariacao)]
+                    );
+
+                try
+                	TermosAPI := TObjectList<TObjectList<TWooTermoResponse>>.Create(True);
+
+                    for var I := 0 to Atributos.Count - 1 do
+                	begin
+                    	TermosAPI.Add(EnviarTermos(FTabelasVariacao[I], Atributos[I].Id));
+                	end;
+
+                    if Atributos.Count <> TermosAPI.Count then
+                    raise Exception.CreateFmt(
+                        'Atributos e TermosAPI são de tamanhos diferentes!' + sLineBreak +
+                        'Atributos: %d. TermosAPI: %d.',
+                        [Atributos.Count, TermosAPI.Count]
+                    );
+
+                	TermosProduto := TDictionary<Integer, TList<string>>.Create;
+
+                	for var I := 0 to Atributos.Count - 1 do
+                	begin
+                    	TermosDB := BuscarTermosProduto(
+                            ProdutoDB.CodIdEmpresa,
+                            ProdutoDb.CodIdGrade,
+                            ProdutoDB.CodIdProduto,
+                            FTabelasVariacao[I]
+                    	);
+
+                		TermosProduto.Add(Atributos[I].Id, CompararTermos(TermosAPI[I], TermosDB));
+                	end;
+                finally
+
+                end;
             end;
 
-            ProdutoDB := ProdutoQueryToProduto(sqlProdutos);
-            TermosProduto := BuscarTermosProduto(ProdutoDB.CodIdEmpresa, ProdutoDb.CodIdGrade, ProdutoDB.CodIdProduto, Atributos);
             ListaImagensRequest := RetornarImagensRequest(ProdutoDB.CodIdProduto);
             Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDB.CodIdSecao);
 
@@ -692,6 +752,7 @@ begin
             ProdutoDB.Free;
             Atributos.Free;
             TermosProduto.Free;
+            TermosAPI.Free;
         end;
 	end;
 end;

@@ -8,7 +8,7 @@ uses
 
 	function ProdutoToWooProdutoRequest(Produto: TProduto; TipoProduto: string;
     	 CategoriaId: Integer; ListaImagensProduto: TObjectList<TWooImagemRequest>;
-         TermosProduto: TDictionary<Integer, TArray<string>>): TWooProdutoRequest;
+         TermosProduto: TDictionary<Integer, TList<string>>): TWooProdutoRequest;
 	function ProdutoQueryToProduto(Query: TUniQuery): TProduto;
     function ProdutoImagemQueryToProdutoImagem(Query: TUniQuery): TProdutoImagem;
     function WPImagemResponseToWooImagemRequest(ImagemResponse: TWPImagemResponse): TWooImagemRequest;
@@ -20,11 +20,11 @@ function ProdutoToWooProdutoRequest(
     TipoProduto: string;
     CategoriaId: Integer;
     ListaImagensProduto: TObjectList<TWooImagemRequest>;
-    TermosProduto: TDictionary<Integer, TArray<string>>
+    TermosProduto: TDictionary<Integer, TList<string>>
 ): TWooProdutoRequest;
 var
     ProdutoCategoria: TWooProdutoCategoriaRequest;
-    Termo: TPair<Integer, TArray<string>>;
+    Termo: TPair<Integer, TList<string>>;
     Atributo: TWooAtributosProdutoRequest;
 begin
     ProdutoCategoria := TWooProdutoCategoriaRequest.Create;
@@ -51,7 +51,7 @@ begin
         	begin
                 Atributo := TWooAtributosProdutoRequest.Create;
                 Atributo.Id := Termo.Key;
-                Atributo.Options := Termo.Value;
+                Atributo.Options := Termo.Value.ToArray;
                 Result.AdicionarAtributo(Atributo);
         	end;
         finally

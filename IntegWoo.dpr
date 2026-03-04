@@ -31,7 +31,8 @@ uses
   ContentPrinter in 'utils\ContentPrinter.pas',
   ProdutoGrade in 'models\ProdutoGrade.pas',
   ProdutoImagem in 'models\ProdutoImagem.pas',
-  Variacao in 'models\Variacao.pas';
+  Variacao in 'models\Variacao.pas',
+  WooTermoResponse in 'rest-client\woocommerce-api\WooTermoResponse.pas';
 
 {$R *.res}
 
