@@ -4,7 +4,7 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages,
-  System.SysUtils, System.Variants, System.Classes, System.IOUtils,
+  System.SysUtils, System.Variants, System.Classes, System.IOUtils, System.NetEncoding,
   System.Generics.Collections, System.JSON, System.IniFiles, System.Threading,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Buttons, Vcl.ExtCtrls,
   Data.DB, Uni, UniProvider, MySQLUniProvider, DBAccess, MemData, MemDS,
@@ -285,8 +285,6 @@ begin
 
         if (not Assigned(JSONArray)) or (JSONArray.Count = 0) then
     	begin
-//            JSONResposta.Free;
-//            JSONArray.Free;
             Result := CriarAtributos;
 
             if not Assigned(Result) then
@@ -295,11 +293,13 @@ begin
     	end;
 
         try
+        	Result := TObjectList<TWooAtributoResponse>.Create(True);
+
         	for var Response in JSONArray do
             	Result.Add(TJson.JsonToObject<TWooAtributoResponse>(Response.ToJSON));
         except
-           Result.Free;
-           raise Exception.Create('Erro ao adicionar atributos a lista!');
+        	Result.Free;
+            	raise Exception.Create('Erro ao adicionar atributos a lista!');
         end;
      finally
         JSONResposta.Free;
@@ -403,7 +403,12 @@ begin
     JSONResposta := nil;
 
     try
-        JSONResposta := ChamadaAPIWooCommerce('products/categories', 'GET', 'Categorias retornadas com sucesso!');
+        JSONResposta := ChamadaAPIWooCommerce(
+            'products/categories?search=' + TNetEncoding.URL.Encode(Categoria),
+            'GET',
+            'Categorias retornadas com sucesso!'
+        );
+
     	CategoriasJSONArray := ChecarERetornarJSONArray(JSONResposta);
 
         for var CategoriaJSON in CategoriasJSONArray do
@@ -412,7 +417,7 @@ begin
 
             if RemoverEspacos(Categoria) = RemoverEspacos(CategoriaRetornada) then
             begin
-               Result := TJson.JsonToObject<TWooCategoriaResponse>(CategoriaJSON as TJSONObject);
+               Result := TJson.JsonToObject<TWooCategoriaResponse>(CategoriaJSON.ToJSON);
                Break;
             end;
         end;
@@ -618,20 +623,24 @@ begin
     Result := nil;
     TermosDistintos := TList<string>.Create;
 
-    for var Termo in TermosApi do
-        TermosDistintos.Add(Termo.Name);
-
     try
-        Result := TList<string>.Create;
+    	for var Termo in TermosApi do
+        	TermosDistintos.Add(Termo.Name);
 
-        for var Termo in TermosDB do
-        begin
-            if TermosDistintos.Contains(Termo) then
-            	Result.Add(Termo);
-        end;
-    except
-        Result.Free;
-        raise Exception.Create('Erro ao comparar termos');
+    	try
+        	Result := TList<string>.Create;
+
+        	for var Termo in TermosDB do
+        	begin
+            	if TermosDistintos.Contains(Termo) then
+            		Result.Add(Termo);
+        	end;
+    	except
+        	Result.Free;
+        	raise Exception.Create('Erro ao comparar termos');
+    end;
+    finally
+       TermosDistintos.Free;
     end;
 end;
 
@@ -646,7 +655,7 @@ var
     ListaImagensRequest: TObjectList<TWooImagemRequest>;
     TermosAPI: TObjectList<TObjectList<TWooTermoResponse>>;
     TermosDB: TList<string>;
-    TermosProduto: TDictionary<Integer, TList<string>>;
+    TermosProduto: TObjectDictionary<Integer, TList<string>>;
 begin
 	with sqlProdutos do
 	begin
@@ -671,6 +680,7 @@ begin
         Secao := nil;
         TermosProduto := nil;
         TermosAPI := nil;
+        TermosDB := nil;
 
         try
         	ProdutoDB := ProdutoQueryToProduto(sqlProdutos);
@@ -704,7 +714,7 @@ begin
                         [Atributos.Count, TermosAPI.Count]
                     );
 
-                	TermosProduto := TDictionary<Integer, TList<string>>.Create;
+                    TermosProduto := TObjectDictionary<Integer, TList<string>>.Create([doOwnsValues]);
 
                 	for var I := 0 to Atributos.Count - 1 do
                 	begin
@@ -715,7 +725,14 @@ begin
                             FTabelasVariacao[I]
                     	);
 
-                		TermosProduto.Add(Atributos[I].Id, CompararTermos(TermosAPI[I], TermosDB));
+                        try
+                        	TermosProduto.Add(
+                                Atributos[I].Id,
+                                CompararTermos(TermosAPI[I], TermosDB)
+                            );
+                        finally
+                            TermosDB.Free;
+                        end;
                 	end;
                 finally
 

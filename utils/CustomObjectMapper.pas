@@ -8,7 +8,7 @@ uses
 
 	function ProdutoToWooProdutoRequest(Produto: TProduto; TipoProduto: string;
     	 CategoriaId: Integer; ListaImagensProduto: TObjectList<TWooImagemRequest>;
-         TermosProduto: TDictionary<Integer, TList<string>>): TWooProdutoRequest;
+         TermosProduto: TObjectDictionary<Integer, TList<string>>): TWooProdutoRequest;
 	function ProdutoQueryToProduto(Query: TUniQuery): TProduto;
     function ProdutoImagemQueryToProdutoImagem(Query: TUniQuery): TProdutoImagem;
     function WPImagemResponseToWooImagemRequest(ImagemResponse: TWPImagemResponse): TWooImagemRequest;
@@ -20,7 +20,7 @@ function ProdutoToWooProdutoRequest(
     TipoProduto: string;
     CategoriaId: Integer;
     ListaImagensProduto: TObjectList<TWooImagemRequest>;
-    TermosProduto: TDictionary<Integer, TList<string>>
+    TermosProduto: TObjectDictionary<Integer, TList<string>>
 ): TWooProdutoRequest;
 var
     ProdutoCategoria: TWooProdutoCategoriaRequest;
@@ -32,7 +32,6 @@ begin
 
     Result := TWooProdutoRequest.Create;
     Result.Name := Produto.DscCompleta;
-    Result.ShortDescription := Produto.DscAbreviada;
     Result.Sku := Produto.CodProduto.ToString;
     Result.RegularPrice := Produto.NumPrecoVarejo.ToString;
     Result.PType := TipoProduto;
