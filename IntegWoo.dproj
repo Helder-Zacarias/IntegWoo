@@ -148,7 +148,6 @@
         <DCCReference Include="rest-client\woocommerce-api\WooAtributosProdutoRequest.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\WooAtributoProduto.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\WooAtributoDaVariacao.pas"/>
-        <DCCReference Include="rest-client\woocommerce-api\WooVariacaoDoProduto.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\WooAtributoRequest.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\WooTermoAtributoRequest.pas"/>
         <DCCReference Include="views\Tela_Cadastro_Atributo.pas">
@@ -171,6 +170,9 @@
         <DCCReference Include="models\ProdutoImagem.pas"/>
         <DCCReference Include="models\Variacao.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\WooTermoResponse.pas"/>
+        <DCCReference Include="rest-client\woocommerce-api\WooVariacaoProdutoResponse.pas"/>
+        <DCCReference Include="rest-client\woocommerce-api\WooAtributoVariacaoProduto.pas"/>
+        <DCCReference Include="rest-client\woocommerce-api\WooVariacaoProdutoRequest.pas"/>
         <None Include="bin\config.ini"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

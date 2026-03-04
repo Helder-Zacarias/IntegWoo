@@ -12,11 +12,12 @@ uses
   AppConfig, Tela_Envio_Produto, Tela_Cadastro_Atributo,
   FileWriter, TrimTexto, ContentPrinter, CustomObjectMapper,
   Produto, ProdutoGrade, ProdutoImagem, Secao, Variacao,
-  WooProdutoRequest, WooProdutoResponse, WPImagemResponse, WooImagemRequest,
-  WooCategoriaRequest, WooAtributoRequest, WooTermoAtributoRequest,
-  WooAtributoResponse, WooCreateCategoriaRequest, WooCategoriaResponse,
-  WooProdutoCategoriaRequest, WooImagemResponse,
-  WooAtributosProdutoRequest, WooTermoResponse;
+  WooProdutoRequest, WooProdutoResponse,
+  WPImagemResponse, WooImagemRequest, WooImagemResponse,
+  WooCreateCategoriaRequest, WooCategoriaRequest, WooCategoriaResponse, WooProdutoCategoriaRequest,
+  WooAtributoRequest, WooAtributoResponse,
+  WooTermoAtributoRequest, WooTermoResponse,
+  WooVariacaoProdutoResponse, WooVariacaoProdutoRequest;
 
 type
   TfrmTela_Principal = class(TForm)
@@ -53,6 +54,7 @@ type
     function BuscarTermosProduto(CodIdEmpresa: Integer; CodIdGrade: Integer;
     	CodIdProduto: Integer; TabelaVariacao: string): TList<string>;
     function BuscarTermosNaApi(AtributoID: Integer): TObjectList<TWooTermoResponse>;
+    function GetVariacoesDoProduto(ProdutoID: Integer): TObjectList<TWooVariacaoProdutoResponse>;
   private
     FSQLProdutosBase: string;
   	FSQLImagensBase: string;
@@ -76,7 +78,7 @@ procedure TfrmTela_Principal.FormCreate(Sender: TObject);
 begin
 	FSQLProdutosBase := sqlProdutos.SQL.Text;
     FSQLImagensBase := sqlImagens.SQL.Text;
-    FCodIdProduto := 4832699;
+    FCodIdProduto := 4832698;
     FTabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
 end;
 
@@ -413,6 +415,36 @@ begin
     end;
 end;
 
+function TfrmTela_Principal.GetVariacoesDoProduto(ProdutoID: Integer): TObjectList<TWooVariacaoProdutoResponse>;
+var
+    JSONResposta: TJSONValue;
+    VariacoesProdutoArray: TJSONArray;
+begin
+    Result := nil;
+    JSONResposta := nil;
+
+    try
+    	JSONResposta := ChamadaAPIWooCommerce(
+            'products/' + ProdutoID.ToString + '/variations',
+            'GET',
+            'Variações do produto ' +  ProdutoID.ToString + ' retornadas com sucesso'
+    	);
+
+    	VariacoesProdutoArray := ChecarERetornarJSONArray(JSONResposta);
+        Result := TObjectList<TWooVariacaoProdutoResponse>.Create(True);
+
+        try
+        	for var VariacaoResponse in VariacoesProdutoArray do
+            	Result.Add(TJson.JsonToObject<TWooVariacaoProdutoResponse>(VariacaoResponse.ToJSON));
+        except
+           Result.Free;
+           raise;
+        end;
+    finally
+       JSONResposta.Free;
+    end;
+end;
+
 function TfrmTela_Principal.BuscarSecaoNoBanco(
     CodIdEmpresa: Integer;
 	CodIdSecao: Integer
@@ -655,7 +687,11 @@ begin
 
     try
     	JSONResposta := ChamadaAPIWooCommerce('products', 'POST', 'Produto cadastrado com sucesso', JSONString);
-    	SalvarConteudoEmArquivo('C:\Users\HELDER\Desktop\RESPONSE-DELPHI\WOOCOMMERCE-PAYLOADS\PRODUTO-JSON.TXT ', JSONResposta.ToJSON);
+
+    	SalvarConteudoEmArquivo(
+            TPath.Combine(TPath.GetDocumentsPath, 'produto-response-after-created.txt'),
+            JSONResposta.ToJSON
+        );
     finally
        JSONResposta.Free;
     end;
@@ -813,7 +849,6 @@ begin
         	WooProdutoRequest.Free;
             CategoriaResponse.Free;
             Secao.Free;
-            ListaImagensRequest.Free;
             ProdutoDB.Free;
             Atributos.Free;
             TermosProduto.Free;

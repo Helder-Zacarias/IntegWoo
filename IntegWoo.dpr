@@ -16,7 +16,6 @@ uses
   WooAtributosProdutoRequest in 'rest-client\woocommerce-api\WooAtributosProdutoRequest.pas',
   WooAtributoProduto in 'rest-client\woocommerce-api\WooAtributoProduto.pas',
   WooAtributoDaVariacao in 'rest-client\woocommerce-api\WooAtributoDaVariacao.pas',
-  WooVariacaoDoProduto in 'rest-client\woocommerce-api\WooVariacaoDoProduto.pas',
   WooAtributoRequest in 'rest-client\woocommerce-api\WooAtributoRequest.pas',
   WooTermoAtributoRequest in 'rest-client\woocommerce-api\WooTermoAtributoRequest.pas',
   Tela_Cadastro_Atributo in 'views\Tela_Cadastro_Atributo.pas' {frmTela_Cadastro_Atributo},
@@ -32,7 +31,10 @@ uses
   ProdutoGrade in 'models\ProdutoGrade.pas',
   ProdutoImagem in 'models\ProdutoImagem.pas',
   Variacao in 'models\Variacao.pas',
-  WooTermoResponse in 'rest-client\woocommerce-api\WooTermoResponse.pas';
+  WooTermoResponse in 'rest-client\woocommerce-api\WooTermoResponse.pas',
+  WooVariacaoProdutoResponse in 'rest-client\woocommerce-api\WooVariacaoProdutoResponse.pas',
+  WooAtributoVariacaoProduto in 'rest-client\woocommerce-api\WooAtributoVariacaoProduto.pas',
+  WooVariacaoProdutoRequest in 'rest-client\woocommerce-api\WooVariacaoProdutoRequest.pas';
 
 {$R *.res}
 

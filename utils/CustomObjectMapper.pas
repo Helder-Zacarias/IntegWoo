@@ -2,9 +2,10 @@ unit CustomObjectMapper;
 
 interface
 uses
-	System.SysUtils, System.Generics.Collections, Uni,
-    Produto, ProdutoImagem, WooProdutoRequest,
-    WooProdutoCategoriaRequest, WooImagemRequest, WPImagemResponse, WooAtributosProdutoRequest, WooAtributoResponse, Vcl.Dialogs;
+	System.SysUtils, System.Generics.Collections, Vcl.Dialogs, Uni,
+    Produto, ProdutoImagem,
+    WooProdutoRequest, WooImagemRequest, WPImagemResponse,
+    WooProdutoCategoriaRequest,  WooAtributosProdutoRequest, WooAtributoResponse;
 
 	function ProdutoToWooProdutoRequest(Produto: TProduto; TipoProduto: string;
     	 CategoriaId: Integer; ListaImagensProduto: TObjectList<TWooImagemRequest>;
