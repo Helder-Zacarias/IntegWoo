@@ -38,7 +38,7 @@ type
     	MensagemAposRetorno: string = ''; Body: string = ''): TJSONValue;
     function DownloadImage(ImageUrl: string = ''): TMemoryStream;
 	function EnviarImagem(ListaImagens: TObjectList<TProdutoImagem>): TObjectList<TWPImagemResponse>;
-    procedure EnviarProduto(Produto: TWooProdutoRequest);
+    function EnviarProduto(Produto: TWooProdutoRequest): TWooProdutoResponse;
     function CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
     function EnviarTermos(TabelaVariacao: string; AtributoId: Integer): TObjectList<TWooTermoResponse>;
     function VerificarExistenciaDaCategoria(Categoria: string): TWooCategoriaResponse;
@@ -55,6 +55,7 @@ type
     	CodIdProduto: Integer; TabelaVariacao: string): TList<string>;
     function BuscarTermosNaApi(AtributoID: Integer): TObjectList<TWooTermoResponse>;
     function GetVariacoesDoProduto(ProdutoID: Integer): TObjectList<TWooVariacaoProdutoResponse>;
+    procedure CriarVariacoesDoProduto(Produto: TWooProdutoResponse);
   private
     FSQLProdutosBase: string;
   	FSQLImagensBase: string;
@@ -445,6 +446,17 @@ begin
     end;
 end;
 
+procedure TfrmTela_Principal.CriarVariacoesDoProduto(Produto: TWooProdutoResponse);
+begin
+    for var Atributo in Produto.Attributes do
+    begin
+        ShowMessage(
+        	'id: ' + Atributo.Id.ToString + sLineBreak +
+            'name: ' + Atributo.Name
+        );
+    end;
+end;
+
 function TfrmTela_Principal.BuscarSecaoNoBanco(
     CodIdEmpresa: Integer;
 	CodIdSecao: Integer
@@ -677,13 +689,14 @@ begin
     end;
 end;
 
-procedure TfrmTela_Principal.EnviarProduto(Produto: TWooProdutoRequest);
+function TfrmTela_Principal.EnviarProduto(Produto: TWooProdutoRequest): TWooProdutoResponse;
 var
     JSONString: string;
     JSONResposta: TJSONValue;
 begin
 	JSONResposta := nil;
     JSONString := TJSON.ObjectToJsonString(Produto);
+    Result := nil;
 
     try
     	JSONResposta := ChamadaAPIWooCommerce('products', 'POST', 'Produto cadastrado com sucesso', JSONString);
@@ -692,6 +705,8 @@ begin
             TPath.Combine(TPath.GetDocumentsPath, 'produto-response-after-created.txt'),
             JSONResposta.ToJSON
         );
+
+        Result := TJson.JsonToObject<TWooProdutoResponse>(JSONResposta.ToJSON);
     finally
        JSONResposta.Free;
     end;
@@ -740,6 +755,7 @@ var
     TermosAPI: TObjectList<TObjectList<TWooTermoResponse>>;
     TermosDB: TList<string>;
     TermosProduto: TObjectDictionary<Integer, TList<string>>;
+    WooProdutoResponse: TWooProdutoResponse;
 begin
 	with sqlProdutos do
 	begin
@@ -765,6 +781,7 @@ begin
         TermosProduto := nil;
         TermosAPI := nil;
         TermosDB := nil;
+        WooProdutoResponse := nil;
 
         try
         	ProdutoDB := ProdutoQueryToProduto(sqlProdutos);
@@ -844,8 +861,12 @@ begin
                 ListaImagensRequest,
                 TermosProduto);
 
-        	EnviarProduto(WooProdutoRequest);
+        	WooProdutoResponse := EnviarProduto(WooProdutoRequest);
+
+            if WooProdutoResponse.PType = 'variable' then
+            	CriarVariacoesDoProduto(WooProdutoResponse);
         finally
+        	WooProdutoResponse.Free;
         	WooProdutoRequest.Free;
             CategoriaResponse.Free;
             Secao.Free;

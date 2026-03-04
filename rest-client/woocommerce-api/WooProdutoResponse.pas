@@ -4,7 +4,8 @@ interface
 
 uses
     REST.Json.Types,
-    WooImagemResponse;
+    WooImagemResponse,
+    WooAtributoProduto;
 type
     TWooProdutoResponse = class
     private
@@ -16,6 +17,7 @@ type
         FSku: string;
         FRegular_Price: string;
         FImages: TArray<TWooImagemResponse>;
+        FAttributes: TArray<TWooAtributoProduto>;
     published
      	[JSONName('name')]
         property Name: string read FName write FName;
@@ -38,8 +40,11 @@ type
         [JSONName('regular_price')]
         property RegularPrice: string read FRegular_Price write FRegular_Price;
 
-        [JsonName('images')]
+        [JSONName('images')]
         property Images: TArray<TWooImagemResponse> read FImages write FImages;
+
+        [JSONName('attributes')]
+        property Attributes: TArray<TWooAtributoProduto> read FAttributes write FAttributes;
     end;
 implementation
 
