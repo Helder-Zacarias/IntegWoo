@@ -52,6 +52,7 @@ type
     function CompararTermos(TermosAPI: TObjectList<TWooTermoResponse>; TermosDB: TList<string>): TList<string>;
     function BuscarTermosProduto(CodIdEmpresa: Integer; CodIdGrade: Integer;
     	CodIdProduto: Integer; TabelaVariacao: string): TList<string>;
+    function BuscarTermosNaApi(AtributoID: Integer): TObjectList<TWooTermoResponse>;
   private
     FSQLProdutosBase: string;
   	FSQLImagensBase: string;
@@ -306,6 +307,37 @@ begin
      end;
 end;
 
+function TfrmTela_Principal.BuscarTermosNaApi(AtributoID: Integer): TObjectList<TWooTermoResponse>;
+var
+    JSONResposta: TJSONValue;
+    ListaTermosAPI: TJSONArray;
+begin
+    Result := TObjectList<TWooTermoResponse>.Create(True);
+	JSONResposta := nil;
+
+    try
+    	try
+        	JSONResposta := ChamadaAPIWooCommerce(
+                'products/attributes/'
+                    + AtributoId.ToString
+                    + '/terms?per_page=100',
+                'GET',
+                'Termos do atributo ' + AtributoId.ToString + ' retornados com sucesso!'
+            );
+
+            ListaTermosAPI := ChecarERetornarJSONArray(JSONResposta);
+
+        	for var TermoAPI in ListaTermosAPI do
+            	Result.Add(TJson.JsonToObject<TWooTermoResponse>(TermoAPI.ToJSON));
+        except
+        	Result.Free;
+            raise;
+        end;
+    finally
+       JSONResposta.Free;
+    end;
+end;
+
 function TfrmTela_Principal.EnviarTermos(
 	TabelaVariacao: string;
 	AtributoId: Integer
@@ -315,52 +347,68 @@ var
     SQLText: string;
     JSONResposta: TJSONValue;
     Termo: TWooTermoAtributoRequest;
+    TermosAPI: TList<string>;
 begin
     SQLText := 'SELECT DISTINCT DSC_VARIACAO FROM ' + TabelaVariacao + ' LIMIT 5';
     SelectVariacaoQuery := CriarQuery;
     Result := nil;
+    TermosApi := nil;
 
     try
-        Result := TObjectList<TWooTermoResponse>.Create(True);
+        try
+            Result := BuscarTermosNaAPI(AtributoID);
+            TermosAPI := TList<String>.Create;
 
-        SelectVariacaoQuery.SQL.Text := SQLText;
-        SelectVariacaoQuery.Open;
-        
-        SelectVariacaoQuery.SaveToXML(TPath.Combine(
-        	TPath.GetDocumentsPath, 
-        	TabelaVariacao + '_descricao.xml')
-        );
+            if Assigned(Result) then
+            begin
+                for var TermoResposta in Result do
+                  TermosAPI.Add(TermoResposta.Name);
+            end
+            else
+               Result := TObjectList<TWooTermoResponse>.Create(True);
 
-        while not SelectVariacaoQuery.EoF do
-        begin
-        	JSONResposta := nil;
-            Termo := nil;
-            
-            try
-                Termo := TWooTermoAtributoRequest.Create;
-            	Termo.Name := SelectVariacaoQuery.FieldByName('DSC_VARIACAO').AsString;
+            SelectVariacaoQuery.SQL.Text := SQLText;
+            SelectVariacaoQuery.Open;
 
-                JSONResposta := ChamadaAPIWooCommerce(
-                    '/products/attributes/' + AtributoId.ToString + '/terms',
-                    'POST',
-                    'Termo criado com sucesso!',
-                    TJson.ObjectToJsonString(Termo)
-                );
+        	SelectVariacaoQuery.SaveToXML(TPath.Combine(
+                TPath.GetDocumentsPath,
+                TabelaVariacao + '_descricao.xml')
+        	);
 
+            while not SelectVariacaoQuery.EoF do
+        	begin
                 try
-                	Result.Add(TJson.JsonToObject<TWooTermoResponse>(JSONResposta.ToJson));
-                except
-                    Result.Free;
-                    raise Exception.Create('Erro na criação do termo!');
-                end;
+                	JSONResposta := nil;
 
-                SelectVariacaoQuery.Next;
-            finally
-                JSONResposta.Free;
-                Termo.Free;
+                    Termo := TWooTermoAtributoRequest.Create;
+                    Termo.Name := SelectVariacaoQuery.FieldByName('DSC_VARIACAO').AsString;
+
+                    if (Assigned(TermosAPI)) and (TermosAPI.Contains(Termo.Name)) then
+                    begin
+                        SelectVariacaoQuery.Next;
+                        continue;
+                    end;
+
+                    JSONResposta := ChamadaAPIWooCommerce(
+                        '/products/attributes/' + AtributoId.ToString + '/terms',
+                        'POST',
+                        'Termo criado com sucesso!',
+                        TJson.ObjectToJsonString(Termo)
+                    );
+
+                    Result.Add(TJson.JsonToObject<TWooTermoResponse>(JSONResposta.ToJson));
+                    SelectVariacaoQuery.Next;
+                finally
+                	JSONResposta.Free;
+                    Termo.Free;
+                end;
             end;
+        except
+          	Result.Free;
+            raise;
         end;
     finally
+    	TermosAPI.Free;
     	SelectVariacaoQuery.Free;
     end;
 end;
