@@ -481,6 +481,7 @@ begin
             AtributoGradeDois.Option := Produto.Attributes[1].Options[TermoGradeDois];
 
             Variacao := TWooVariacaoProdutoRequest.Create;
+            Variacao.RegularPrice := Produto.RegularPrice;
             Variacao.AdicionarAtributo(AtributoGradeUm);
             Variacao.AdicionarAtributo(AtributoGradeDois);
 
@@ -497,7 +498,7 @@ begin
         RespostaAPI := ChamadaAPIWooCommerce(
             'products/' + Produto.Id.ToString + '/variations/batch',
             'POST',
-            'Variações do produto' + Produto.Name + 'criada com sucesso'
+            'Variações do produto ' + Produto.Name + ' criada com sucesso'
             ,
             TJson.ObjectToJsonString(BatchRequest)
         );

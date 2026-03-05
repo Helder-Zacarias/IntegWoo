@@ -52,6 +52,8 @@ begin
                 Atributo := TWooAtributosProdutoRequest.Create;
                 Atributo.Id := Termo.Key;
                 Atributo.Options := Termo.Value.ToArray;
+                Atributo.Visible := True;
+                Atributo.Variation := True;
                 Result.AdicionarAtributo(Atributo);
         	end;
         finally
