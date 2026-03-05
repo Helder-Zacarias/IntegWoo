@@ -48,6 +48,15 @@ object frmTela_Principal: TfrmTela_Principal
       TabOrder = 1
       OnClick = btnEnviarProdutosClick
     end
+    object btnBuscarPrecoVariacoes: TButton
+      Left = 0
+      Top = 224
+      Width = 155
+      Height = 33
+      Caption = 'Pre'#231'o Varia'#231#245'es - Teste'
+      TabOrder = 2
+      OnClick = btnBuscarVariacoesClick
+    end
   end
   object MySQL: TMySQLUniProvider
     Left = 392

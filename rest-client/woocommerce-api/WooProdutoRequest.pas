@@ -19,7 +19,6 @@ type
         FSku: string;
         FManage_stock: Boolean;
         FStock_quantity: Integer;
-        FStock_status: string;
         FImages: TArray<TWooImagemRequest>;
         FCategories: TArray<TWooProdutoCategoriaRequest>;
         FAttributes: TArray<TWooAtributosProdutoRequest>;
@@ -54,9 +53,6 @@ type
         [JSONName('stock_quantity')]
         property StockQuantity: Integer read FStock_quantity write FStock_quantity;
 
-        [JSONName('stock_status')]
-        property StockStatus: string read FStock_status write FStock_status;
-
         [JSONName('images')]
         property Images: TArray<TWooImagemRequest> read FImages write FImages;
 
@@ -70,9 +66,6 @@ implementation
     constructor TWooProdutoRequest.Create;
     begin
       inherited;
-      FManage_stock := True;
-      FStock_quantity := 100;
-      FStock_status := 'instock';
 
       SetLength(FImages, 0);
       SetLength(FCategories, 0);

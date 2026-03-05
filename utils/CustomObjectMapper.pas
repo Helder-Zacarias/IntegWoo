@@ -41,6 +41,8 @@ begin
 
     Result.PType := TipoProduto;
     Result.AdicionarCategoria(ProdutoCategoria);
+    Result.ManageStock := True;
+    Result.StockQuantity := 100;
 
     if Assigned(ListaImagensProduto) then
     begin

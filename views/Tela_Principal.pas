@@ -30,6 +30,7 @@ type
     btnHamburguer: TButton;
     panelSide: TPanel;
     btnEnviarProdutosMandala: TBitBtn;
+    btnBuscarPrecoVariacoes: TButton;
     procedure DatabaseConnectionLost(Sender: TObject; Component: TComponent;
       ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
     procedure btnHamburguerClick(Sender: TObject);
@@ -56,6 +57,8 @@ type
     function BuscarTermosNaApi(AtributoID: Integer): TObjectList<TWooTermoResponse>;
     function GetVariacoesDoProduto(ProdutoID: Integer): TObjectList<TWooVariacaoProdutoResponse>;
     procedure CriarVariacoesDoProduto(Produto: TWooProdutoResponse);
+    procedure BuscarPrecoDeVariacoesDeProduto(CodIdLoja: Integer; CodIdProduto: Integer);
+    procedure btnBuscarVariacoesClick(Sender: TObject);
   private
     FSQLProdutosBase: string;
   	FSQLImagensBase: string;
@@ -79,7 +82,7 @@ procedure TfrmTela_Principal.FormCreate(Sender: TObject);
 begin
 	FSQLProdutosBase := sqlProdutos.SQL.Text;
     FSQLImagensBase := sqlImagens.SQL.Text;
-    FCodIdProduto := 3743291;
+    FCodIdProduto := 4832698;
     FTabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
 end;
 
@@ -353,7 +356,7 @@ var
     Termo: TWooTermoAtributoRequest;
     TermosAPI: TList<string>;
 begin
-    SQLText := 'SELECT DISTINCT DSC_VARIACAO FROM ' + TabelaVariacao + ' LIMIT 5';
+    SQLText := 'SELECT DISTINCT * FROM ' + TabelaVariacao + ' LIMIT 5';
     SelectVariacaoQuery := CriarQuery;
     Result := nil;
     TermosApi := nil;
@@ -510,6 +513,62 @@ begin
     finally
         BatchRequest.Free;
     end;
+end;
+
+procedure TfrmTela_Principal.BuscarPrecoDeVariacoesDeProduto(CodIdLoja: Integer; CodIdProduto: Integer);
+var
+	Query: TUniQuery;
+    IdLoja: Integer;
+begin
+    Query := CriarQuery;
+
+    try
+    	with Query do
+    	begin
+            SQL.Add('SELECT');
+            SQL.Add('   PG.COD_ID_PRD_GRD,');
+            SQL.Add('   PG.COD_ID_EMPRESA,');
+            SQL.Add('   PG.COD_ID_PRODUTO,');
+            SQL.Add('   PG.COD_PRODUTO,');
+            SQL.Add('   PG.COD_EAN_GTIN,');
+            SQL.Add('   TRIM(CONCAT(P.DSC_COMPLETA, '' '', COALESCE(V1.DSC_VARIACAO,  ''''), '' '', COALESCE(V2.DSC_SIGLA, ''''))) AS DSC_PRODUTO,');
+            SQL.Add('   COALESCE(PG.NUM_PRECO_UNITARIO, S.NUM_PRECO_VAREJO) AS NUM_PRECO_UNITARIO,');
+            SQL.Add('   PG.NUM_ESTOQUE_INICIAL + SUM(COALESCE(E.NUM_QUANTIDADE, 0)) AS NUM_ESTOQUE');
+            SQL.Add('FROM');
+            SQL.Add('   db_sgci.produtos_grades PG');
+            SQL.Add('LEFT JOIN db_sgci.produtos P ON');
+            SQL.Add('   P.COD_ID_PRODUTO = PG.COD_ID_PRODUTO');
+            SQL.Add('LEFT JOIN db_sgci.precos S ON');
+            SQL.Add('   S.COD_ID_EMPRESA = P.COD_ID_EMPRESA AND');
+            SQL.Add('   S.COD_ID_LOJA    = ' + CodIdLoja.ToString + ' AND');
+            SQL.Add('   S.COD_ID_PRODUTO = P.COD_ID_PRODUTO');
+            SQL.Add('INNER JOIN db_sgci.grades_variacao_1 V1 ON');
+            SQL.Add('   V1.COD_ID_VARIACAO = PG.COD_ID_VAR_1 AND');
+            SQL.Add('   V1.NUM_STATUS      = 1');
+            SQL.Add('INNER JOIN db_sgci.grades_variacao_2 V2 ON');
+            SQL.Add('   V2.COD_ID_VARIACAO = PG.COD_ID_VAR_2 AND');
+            SQL.Add('   V2.NUM_STATUS      = 1');
+            SQL.Add('LEFT JOIN db_sgci.estoques_grades E ON');
+            SQL.Add('   E.COD_ID_PRD_GRD        = PG.COD_ID_PRD_GRD AND');
+            SQL.Add('   COALESCE(E.NUM_INDC, 0) = 0');
+            SQL.Add('WHERE');
+            SQL.Add('   PG.COD_ID_PRODUTO = :COD_ID_PRODUTO');
+            SQL.Add('GROUP BY');
+            SQL.Add('   PG.COD_ID_PRD_GRD');
+            SQL.Add('ORDER BY');
+            SQL.Add('   V1.DSC_VARIACAO DESC,');
+            SQL.Add('   V2.DSC_VARIACAO DESC');
+
+            ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
+            Open;
+
+            SaveToXML(TPath.Combine(TPath.GetDocumentsPath, 'variacoes-preco-unitario.xml'));
+    	end;
+    finally
+        Query.Free;
+    end;
+
+
 end;
 
 function TfrmTela_Principal.BuscarSecaoNoBanco(
@@ -768,6 +827,11 @@ begin
     finally
        TermosDistintos.Free;
     end;
+end;
+
+procedure TfrmTela_Principal.btnBuscarVariacoesClick(Sender: TObject);
+begin
+    BuscarPrecoDeVariacoesDeProduto(90, FCodIdProduto);
 end;
 
 procedure TfrmTela_Principal.btnEnviarProdutosClick(Sender: TObject);
