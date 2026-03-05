@@ -45,7 +45,6 @@ type
     function VerificarExistenciaDaCategoria(Categoria: string): TWooCategoriaResponse;
     function BuscarAtributos: TObjectList<TWooAtributoResponse>;
     function BuscarSecaoNoBanco(CodIdEmpresa: Integer; CodIdSecao: Integer): TSecao;
-    function BuscarImagemProdutoNoBanco(CodIdEmpresa: Integer; CodIdProduto: Integer): TObjectList<TProdutoImagem>;
     function CriarQuery: TUniQuery;
     function RetornarImagensRequest(CodIdProduto: Integer): TObjectList<TWooImagemRequest>;
     function ChecarERetornarJSONArray(JSONResponse: TJSONValue): TJSONArray;
@@ -80,7 +79,7 @@ procedure TfrmTela_Principal.FormCreate(Sender: TObject);
 begin
 	FSQLProdutosBase := sqlProdutos.SQL.Text;
     FSQLImagensBase := sqlImagens.SQL.Text;
-    FCodIdProduto := 4832699;
+    FCodIdProduto := 3743291;
     FTabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
 end;
 
@@ -460,6 +459,7 @@ var
     IndiceVariacaoes: Integer;
     RespostaAPI: TJSONValue;
 begin
+    ShowMessage('Preço do produto: ' + Produto.RegularPrice);
     SetLength(
     	Variacoes,
     	Length(Produto.Attributes[0].Options) *
@@ -597,45 +597,6 @@ begin
     end;
 end;
 
-function TfrmTela_Principal.BuscarImagemProdutoNoBanco(
-    CodIdEmpresa: Integer;
-    CodIdProduto: Integer
-): TObjectList<TProdutoImagem>;
-var
-    Query: TUniQuery;
-    ProdutoImagem: TProdutoImagem;
-begin
-	Result := nil;
-    Query := CriarQuery;
-
-    try
-    	Result := TObjectList<TProdutoImagem>.Create(True);
-        
-        try
-        	Query.SQL.Text := 'SELECT pi.COD_ID_IMAGEM, pi.COD_ID_EMPRESA, pi.COD_ID_PRODUTO, pi.URL_IMAGEM ' + sLineBreak +
-                'FROM db_sgci.produtos_imagens pi ' + sLineBreak +
-                'WHERE COD_ID_EMPRESA = :COD_ID_EMPRESA AND ' + sLineBreak +
-                'COD_ID_PRODUTO = :COD_ID_PRODUTO';
-
-            Query.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
-            Query.ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
-            Query.Open;
-
-            while not Query.Eof do
-            begin
-                ProdutoImagem := ProdutoImagemQueryToProdutoImagem(Query);
-                Result.Add(ProdutoImagem);
-                Query.Next;
-            end;
-        except
-        	Result.Free;
-            raise Exception.Create('Erro ao buscar imagens no banco!');
-        end;
-    finally
-    	Query.Free;
-    end;
-end;
-
 function TfrmTela_Principal.DownloadImage(ImageUrl: string = ''): TMemoryStream;
 var
 	Response: IResponse;
@@ -661,8 +622,10 @@ var
     ListaImagensResponse: TObjectList<TWPImagemResponse>;
     ListaImagensRequest: TObjectList<TWooImagemRequest>;
     CodIdEmpresa: Integer;
+    ProdutoImagem: TProdutoImagem;
 begin
     Result := nil;
+    ListaImagens := nil;
 
 	sqlImagens.Close;
     sqlImagens.SQL.Text := FSQLImagensBase;
@@ -673,17 +636,26 @@ begin
     sqlImagens.ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
     sqlImagens.Open;
 
-    if sqlImagens.IsEmpty then
-    	Exit(nil);
-
-    CodIdEmpresa := sqlImagens.FieldByName('COD_ID_EMPRESA').AsInteger;
-
-    ListaImagens := BuscarImagemProdutoNoBanco(CodIdEmpresa, CodIdProduto);
-
     try
-    	ListaImagensResponse := EnviarImagem(ListaImagens);
+        ListaImagens := TObjectList<TProdutoImagem>.Create(True);
+
+    	while not sqlImagens.Eof do
+    	begin
+        	if not Assigned(sqlImagens.FieldByName('URL_IMAGEM')) or (sqlImagens.FieldByName('URL_IMAGEM').IsNull) then
+            begin
+            	sqlImagens.Next;
+                continue;
+            end;
+
+            ProdutoImagem := ProdutoImagemQueryToProdutoImagem(sqlImagens);
+            ListaImagens.Add(ProdutoImagem);
+            sqlImagens.Next;
+        end;
+
+        ListaImagensResponse := nil;
 
         try
+        	ListaImagensResponse := EnviarImagem(ListaImagens);
         	ListaImagensRequest := TObjectList<TWooImagemRequest>.Create(True);
 
             try
@@ -699,7 +671,7 @@ begin
         	ListaImagensResponse.Free;
         end;
     finally
-    	ListaImagens.Free;
+       ListaImagens.Free;
     end;
 end;
 
@@ -740,7 +712,7 @@ begin
     	end;
     except
     	Result.Free;
-        raise Exception.Create('Erro ao enviar imagem para o WooCommerce');
+        raise;
     end;
 end;
 
@@ -900,7 +872,7 @@ begin
 
             if not Assigned(Secao) then
             	raise Exception.Create('Seção não encontrda no banco!');
-            
+
             CategoriaResponse := VerificarExistenciaDaCategoria(Secao.DscSecao);
 
             if not Assigned(CategoriaResponse) then

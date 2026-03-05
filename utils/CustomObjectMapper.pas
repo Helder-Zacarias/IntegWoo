@@ -34,7 +34,11 @@ begin
     Result := TWooProdutoRequest.Create;
     Result.Name := Produto.DscCompleta;
     Result.Sku := Produto.CodProduto.ToString;
-    Result.RegularPrice := Produto.NumPrecoVarejo.ToString;
+    if Produto.NumPrecoVarejo = 0 then
+        Result.RegularPrice := IntToStr(999)
+    else
+    	Result.RegularPrice := Produto.NumPrecoVarejo.ToString;
+
     Result.PType := TipoProduto;
     Result.AdicionarCategoria(ProdutoCategoria);
 

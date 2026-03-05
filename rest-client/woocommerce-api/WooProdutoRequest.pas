@@ -70,7 +70,7 @@ implementation
     constructor TWooProdutoRequest.Create;
     begin
       inherited;
-      FManage_stock := true;
+      FManage_stock := True;
       FStock_quantity := 100;
       FStock_status := 'instock';
 
