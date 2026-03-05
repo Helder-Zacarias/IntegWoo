@@ -34,7 +34,8 @@ uses
   WooTermoResponse in 'rest-client\woocommerce-api\WooTermoResponse.pas',
   WooVariacaoProdutoResponse in 'rest-client\woocommerce-api\WooVariacaoProdutoResponse.pas',
   WooAtributoVariacaoProduto in 'rest-client\woocommerce-api\WooAtributoVariacaoProduto.pas',
-  WooVariacaoProdutoRequest in 'rest-client\woocommerce-api\WooVariacaoProdutoRequest.pas';
+  WooVariacaoProdutoRequest in 'rest-client\woocommerce-api\WooVariacaoProdutoRequest.pas',
+  WooVariacaoProdutoBatchRequest in 'rest-client\woocommerce-api\WooVariacaoProdutoBatchRequest.pas';
 
 {$R *.res}
 

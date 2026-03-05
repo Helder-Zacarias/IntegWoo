@@ -173,6 +173,7 @@
         <DCCReference Include="rest-client\woocommerce-api\WooVariacaoProdutoResponse.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\WooAtributoVariacaoProduto.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\WooVariacaoProdutoRequest.pas"/>
+        <DCCReference Include="rest-client\woocommerce-api\WooVariacaoProdutoBatchRequest.pas"/>
         <None Include="bin\config.ini"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

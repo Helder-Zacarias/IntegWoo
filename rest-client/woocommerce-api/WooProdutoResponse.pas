@@ -9,6 +9,7 @@ uses
 type
     TWooProdutoResponse = class
     private
+    	FId: Integer;
     	FName: string;
         FSlug: string;
         FType: string;
@@ -19,6 +20,9 @@ type
         FImages: TArray<TWooImagemResponse>;
         FAttributes: TArray<TWooAtributoProduto>;
     published
+        [JSONNmae('id')]
+        property Id: Integer read FId write FId;
+
      	[JSONName('name')]
         property Name: string read FName write FName;
 

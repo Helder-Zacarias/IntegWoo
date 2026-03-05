@@ -17,7 +17,8 @@ uses
   WooCreateCategoriaRequest, WooCategoriaRequest, WooCategoriaResponse, WooProdutoCategoriaRequest,
   WooAtributoRequest, WooAtributoResponse,
   WooTermoAtributoRequest, WooTermoResponse,
-  WooVariacaoProdutoResponse, WooVariacaoProdutoRequest;
+  WooVariacaoProdutoResponse, WooVariacaoProdutoRequest, WooAtributoDaVariacao,
+  WooAtributoProduto, WooVariacaoProdutoBatchRequest;
 
 type
   TfrmTela_Principal = class(TForm)
@@ -79,7 +80,7 @@ procedure TfrmTela_Principal.FormCreate(Sender: TObject);
 begin
 	FSQLProdutosBase := sqlProdutos.SQL.Text;
     FSQLImagensBase := sqlImagens.SQL.Text;
-    FCodIdProduto := 4832698;
+    FCodIdProduto := 4832699;
     FTabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
 end;
 
@@ -113,6 +114,7 @@ begin
     Request := TRequest.New
         .BaseURL(TAppConfig.WooApiUrl)
         .Resource(Resource)
+        .Timeout(180000)
         .AddHeader('Content-Type', 'application/json', [poDoNotEncode])
         .BasicAuthentication(TAppConfig.ConsumerKey, TAppConfig.ConsumerSecret);
 
@@ -447,13 +449,65 @@ begin
 end;
 
 procedure TfrmTela_Principal.CriarVariacoesDoProduto(Produto: TWooProdutoResponse);
+var
+    Variacoes: TArray<TWooVariacaoProdutoRequest>;
+    Variacao: TWooVariacaoProdutoRequest;
+    AtributoGradeUm: TWooAtributoDaVariacao;
+    AtributoGradeDois: TWooAtributoDaVariacao;
+    TermoGradeUm: Integer;
+    TermoGradeDois: Integer;
+    BatchRequest: TWooVariacaoProdutoBatchRequest;
+    IndiceVariacaoes: Integer;
+    RespostaAPI: TJSONValue;
 begin
-    for var Atributo in Produto.Attributes do
+    SetLength(
+    	Variacoes,
+    	Length(Produto.Attributes[0].Options) *
+        Length(Produto.Attributes[1].Options)
+    );
+
+    IndiceVariacaoes := 0;
+
+    for TermoGradeUm := 0 to High(Produto.Attributes[0].Options) do
     begin
-        ShowMessage(
-        	'id: ' + Atributo.Id.ToString + sLineBreak +
-            'name: ' + Atributo.Name
+        for TermoGradeDois := 0 to High(Produto.Attributes[1].Options) do
+        begin
+        	AtributoGradeUm := TWooAtributoDaVariacao.Create;
+            AtributoGradeUm.Id := Produto.Attributes[0].Id;
+        	AtributoGradeUm.Option := Produto.Attributes[0].Options[TermoGradeUm];
+
+            AtributoGradeDois := TWooAtributoDaVariacao.Create;
+            AtributoGradeDois.Id := Produto.Attributes[1].Id;
+            AtributoGradeDois.Option := Produto.Attributes[1].Options[TermoGradeDois];
+
+            Variacao := TWooVariacaoProdutoRequest.Create;
+            Variacao.AdicionarAtributo(AtributoGradeUm);
+            Variacao.AdicionarAtributo(AtributoGradeDois);
+
+            Variacoes[IndiceVariacaoes] := Variacao;
+            Inc(IndiceVariacaoes);
+        end;
+    end;
+
+    BatchRequest := TWooVariacaoProdutoBatchRequest.Create;
+
+    try
+    	BatchRequest.Variacoes := Variacoes;
+
+        RespostaAPI := ChamadaAPIWooCommerce(
+            'products/' + Produto.Id.ToString + '/variations/batch',
+            'POST',
+            'Variações do produto' + Produto.Name + 'criada com sucesso'
+            ,
+            TJson.ObjectToJsonString(BatchRequest)
         );
+
+        SalvarConteudoEmArquivo(
+            TPath.Combine(TPath.GetDocumentsPath, 'variacoes-criadas-api.txt'),
+            RespostaAPI.ToJSON
+        );
+    finally
+        BatchRequest.Free;
     end;
 end;
 
