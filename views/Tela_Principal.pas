@@ -31,6 +31,7 @@ type
     panelSide: TPanel;
     btnEnviarProdutosMandala: TBitBtn;
     btnBuscarPrecoVariacoes: TButton;
+    btnBuscarProdutosGrade: TButton;
     procedure DatabaseConnectionLost(Sender: TObject; Component: TComponent;
       ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
     procedure btnHamburguerClick(Sender: TObject);
@@ -43,7 +44,7 @@ type
     function EnviarProduto(Produto: TWooProdutoRequest): TWooProdutoResponse;
     function CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
     function EnviarTermos(TabelaVariacao: string; AtributoId: Integer): TObjectList<TWooTermoResponse>;
-    function VerificarExistenciaDaCategoria(Categoria: string): TWooCategoriaResponse;
+    function BuscarCategorias(Secao: TSecao): TWooCategoriaResponse;
     function BuscarAtributos: TObjectList<TWooAtributoResponse>;
     function BuscarSecaoNoBanco(CodIdEmpresa: Integer; CodIdSecao: Integer): TSecao;
     function CriarQuery: TUniQuery;
@@ -59,11 +60,13 @@ type
     procedure CriarVariacoesDoProduto(Produto: TWooProdutoResponse);
     procedure BuscarPrecoDeVariacoesDeProduto(CodIdLoja: Integer; CodIdProduto: Integer);
     procedure btnBuscarVariacoesClick(Sender: TObject);
+    procedure btnBuscarProdutosGradeClick(Sender: TObject);
   private
     FSQLProdutosBase: string;
   	FSQLImagensBase: string;
     FCodIdProduto: Integer;
     FTabelasVariacao: TArray<string>;
+    FFolderPath: string;
     { Private declarations }
   public
     { Public declarations }
@@ -84,6 +87,7 @@ begin
     FSQLImagensBase := sqlImagens.SQL.Text;
     FCodIdProduto := 4832698;
     FTabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
+    FFolderPath := TPath.Combine(TPath.GetDocumentsPath, 'Ecommerce');
 end;
 
 procedure TfrmTela_Principal.btnHamburguerClick(Sender: TObject);
@@ -155,9 +159,6 @@ end;
 
 function TfrmTela_Principal.ChecarERetornarJSONArray(JSONResponse: TJSONValue): TJSONArray;
 begin
-	if not Assigned(JSONResponse) then
-        raise Exception.Create('JSONResponse é nulo!');
-
 	if not (JSONResponse is TJSONArray) then
     	raise Exception.CreateFmt('Foi recebido %s ao invés de TJSONArray!', [JSONResponse.ClassName]);
 
@@ -177,7 +178,7 @@ begin
     			JSONResposta := ChamadaAPIWooCommerce('products', 'GET');
 
                 if not Assigned(JSONResposta) then
-                    raise Exception.Create('Nenhuma Resposta da API do WOooComemrce!');
+                    raise Exception.Create('Nenhuma Resposta da API do WooComemrce!');
 
                 TThread.Queue(
                     nil,
@@ -201,6 +202,7 @@ function TfrmTela_Principal.BuscarTermosProduto(
 ): TList<string>;
 var
     SelectGradesQuery: TUniQuery;
+//    ProdutoGrade: TProdutoGrade;
 begin
     Result := nil;
 
@@ -208,8 +210,7 @@ begin
         Result := TList<string>.Create;
 
     	SelectGradesQuery := CriarQuery;
-        SelectGradesQuery.Close;
-        SelectGradesQuery.SQL.Text := 'SELECT DISTINCT ' + TabelaVariacao + '.DSC_VARIACAO ' + sLineBreak +
+        SelectGradesQuery.SQL.Text := 'SELECT DISTINCT *' + sLineBreak +
         	'FROM db_sgci.produtos_grades pg ' + sLineBreak +
             'JOIN ' + TabelaVariacao + ' ON pg.COD_ID_GRADE = ' + TabelaVariacao + '.COD_ID_GRADE ' + sLineBreak +
             'WHERE pg.COD_ID_EMPRESA = :COD_ID_EMPRESA AND ' + sLineBreak +
@@ -219,22 +220,29 @@ begin
         SelectGradesQuery.ParamByName('COD_ID_GRADE').AsInteger := CodIdGrade;
         SelectGradesQuery.ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
         SelectGradesQuery.Open;
+        SelectGradesQuery.SaveToXML(FFolderPath + 'BUSCA-TERMOS.XML');
+
+//        ProdutoGrade := TProdutoGrade.Create;
+//        ProdutoGrade.NumPrecoUnitario := SelectGradesQuery.FieldByName('NUM_PRECO_UNITARIO').AsCurrency;
+//        ProdutoGrade.NumEstoque := SelectGradesQuery.FieldByName('NUM_ESTOQUE').AsInteger;
+//        ProdutoGrade.VariacaoUm.DscVariacao := SelectGradesQuery.FieldByName('DSC_VARIACAO').AsString;
+//        ProdutoGrade.VariacaoUm.CodIdVariacao := SelectGradesQuery.FieldByName('COD_ID_VARIACAO_1').AsInteger;
 
         try
         	while not SelectGradesQuery.Eof do
             begin
             	Result.Add(SelectGradesQuery.FieldByName('DSC_VARIACAO').AsString);
-                SalvarConteudoEmArquivo(
-                	TPath.Combine(TPath.GetDocumentsPath, 'termos-distintos-variacao-' + TabelaVariacao + '.txt'),
-                	SelectGradesQuery.FieldByName('DSC_VARIACAO').AsString
-                );
+//                SalvarConteudoEmArquivo(
+//                	TPath.Combine(FFolderPath, 'termos-distintos-variacao-' + TabelaVariacao + '.txt'),
+//                	SelectGradesQuery.FieldByName('DSC_VARIACAO').AsString + ' --- '+ SelectGradesQuery.FieldByName('NUM_PRECO_UNITARIO').AsString
+//                );
                 SelectGradesQuery.Next;
             end;
 
             SelectGradesQuery.Close;
             except
             	Result.Free;
-                raise Exception.Create('Erro na criação da lista de termos');
+                raise;
             end;
     finally
         SelectGradesQuery.Free;
@@ -307,7 +315,7 @@ begin
             	Result.Add(TJson.JsonToObject<TWooAtributoResponse>(Response.ToJSON));
         except
         	Result.Free;
-            	raise Exception.Create('Erro ao adicionar atributos a lista!');
+            raise;
         end;
      finally
         JSONResposta.Free;
@@ -328,8 +336,7 @@ begin
                 'products/attributes/'
                     + AtributoId.ToString
                     + '/terms?per_page=100',
-                'GET',
-                'Termos do atributo ' + AtributoId.ToString + ' retornados com sucesso!'
+                'GET'
             );
 
             ListaTermosAPI := ChecarERetornarJSONArray(JSONResposta);
@@ -378,7 +385,7 @@ begin
             SelectVariacaoQuery.Open;
 
         	SelectVariacaoQuery.SaveToXML(TPath.Combine(
-                TPath.GetDocumentsPath,
+                FFolderPath,
                 TabelaVariacao + '_descricao.xml')
         	);
 
@@ -462,7 +469,6 @@ var
     IndiceVariacaoes: Integer;
     RespostaAPI: TJSONValue;
 begin
-    ShowMessage('Preço do produto: ' + Produto.RegularPrice);
     SetLength(
     	Variacoes,
     	Length(Produto.Attributes[0].Options) *
@@ -507,7 +513,7 @@ begin
         );
 
         SalvarConteudoEmArquivo(
-            TPath.Combine(TPath.GetDocumentsPath, 'variacoes-criadas-api.txt'),
+            TPath.Combine(FFolderPath, 'variacoes-criadas-api.txt'),
             RespostaAPI.ToJSON
         );
     finally
@@ -531,6 +537,8 @@ begin
             SQL.Add('   PG.COD_ID_PRODUTO,');
             SQL.Add('   PG.COD_PRODUTO,');
             SQL.Add('   PG.COD_EAN_GTIN,');
+            SQL.Add('   PG.COD_ID_VAR_1,');
+            SQL.Add('   PG.COD_ID_VAR_2,');
             SQL.Add('   TRIM(CONCAT(P.DSC_COMPLETA, '' '', COALESCE(V1.DSC_VARIACAO,  ''''), '' '', COALESCE(V2.DSC_SIGLA, ''''))) AS DSC_PRODUTO,');
             SQL.Add('   COALESCE(PG.NUM_PRECO_UNITARIO, S.NUM_PRECO_VAREJO) AS NUM_PRECO_UNITARIO,');
             SQL.Add('   PG.NUM_ESTOQUE_INICIAL + SUM(COALESCE(E.NUM_QUANTIDADE, 0)) AS NUM_ESTOQUE');
@@ -562,12 +570,11 @@ begin
             ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
             Open;
 
-            SaveToXML(TPath.Combine(TPath.GetDocumentsPath, 'variacoes-preco-unitario.xml'));
+            SaveToXML(TPath.Combine(FFolderPath, 'variacoes-preco-unitario.xml'));
     	end;
     finally
         Query.Free;
     end;
-
 
 end;
 
@@ -588,25 +595,27 @@ begin
         SelectSecaoQuery.ParamByName('COD_ID_SECAO').AsInteger := CodIdSecao;
     	SelectSecaoQuery.Open;
 
-        if not SelectSecaoQuery.IsEmpty then
-        begin
-        	Result := TSecao.Create;
-            Result.CodIdSecao := SelectSecaoQuery.FieldByName('COD_ID_SECAO').AsInteger;
-            Result.DscSecao := SelectSecaoQuery.FieldByName('DSC_SECAO').AsString;
-        end;
+        if SelectSecaoQuery.IsEmpty then
+        	raise Exception.Create('Seção não encontrda no banco!');
+
+        Result := TSecao.Create;
+        Result.CodIdSecao := SelectSecaoQuery.FieldByName('COD_ID_SECAO').AsInteger;
+        Result.DscSecao := SelectSecaoQuery.FieldByName('DSC_SECAO').AsString;
     finally
        SelectSecaoQuery.Free;
     end;
 end;
 
-function TfrmTela_Principal.VerificarExistenciaDaCategoria(Categoria: string): TWooCategoriaResponse;
+function TfrmTela_Principal.BuscarCategorias(Secao: TSecao): TWooCategoriaResponse;
 var
 	JSONResposta: TJSONValue;
     CategoriasJSONArray: TJSONArray;
     CategoriaRetornada: string;
+    Categoria: string;
 begin
 	Result := nil;
     JSONResposta := nil;
+    Categoria := Secao.DscSecao;
 
     try
         JSONResposta := ChamadaAPIWooCommerce(
@@ -616,6 +625,9 @@ begin
         );
 
     	CategoriasJSONArray := ChecarERetornarJSONArray(JSONResposta);
+
+        if (CategoriasJSONArray = nil) or (CategoriasJSONArray.Count = 0) then
+            Exit(CriarCategoria(Secao)) ;
 
         for var CategoriaJSON in CategoriasJSONArray do
         begin
@@ -647,7 +659,13 @@ begin
     	CategoriaRequest := TWooCategoriaRequest.Create;
         CategoriaRequest.Name := Secao.DscSecao;
     	RequestPayload := TJson.ObjectToJsonString(CategoriaRequest);
-        JSONResposta := ChamadaAPIWooCommerce('products/categories', 'POST', 'Categoria criada com sucesso!', RequestPayload);
+        JSONResposta := ChamadaAPIWooCommerce(
+            'products/categories',
+            'POST',
+            'Categoria criada com sucesso!',
+            RequestPayload
+        );
+
         Result := TJson.JsonToObject<TWooCategoriaResponse>(JSONResposta as TJSONObject);
 
     finally
@@ -788,7 +806,7 @@ begin
     	JSONResposta := ChamadaAPIWooCommerce('products', 'POST', 'Produto cadastrado com sucesso', JSONString);
 
     	SalvarConteudoEmArquivo(
-            TPath.Combine(TPath.GetDocumentsPath, 'produto-response-after-created.txt'),
+            TPath.Combine(FFolderPath, 'produto-response-after-created.txt'),
             JSONResposta.ToJSON
         );
 
@@ -822,10 +840,25 @@ begin
         	end;
     	except
         	Result.Free;
-        	raise Exception.Create('Erro ao comparar termos');
+        	raise;
     end;
     finally
        TermosDistintos.Free;
+    end;
+end;
+
+procedure TfrmTela_Principal.btnBuscarProdutosGradeClick(Sender: TObject);
+var
+	Query: TuniQuery;
+begin
+    Query := CriarQuery;
+
+    try
+        Query.SQL.Text := 'SELECT * FROM db_sgci.produtos_grades WHERE COD_ID_EMPRESA = 2433 AND COD_ID_PRODUTO = 4832698';
+        Query.Open;
+        Query.SaveToXML(FFolderPath + 'produtos-grade.xml');
+    finally
+        Query.Free;
     end;
 end;
 
@@ -861,7 +894,7 @@ begin
         Open;
 
         if sqlProdutos.IsEmpty then
-        	Exit;
+        	raise Exception.Create('Nenhum produto retornado pelo banco!');
 
         ProdutoDB := nil;
         WooProdutoRequest := nil;
@@ -933,17 +966,7 @@ begin
 
             ListaImagensRequest := RetornarImagensRequest(ProdutoDB.CodIdProduto);
             Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDB.CodIdSecao);
-
-            if not Assigned(Secao) then
-            	raise Exception.Create('Seção não encontrda no banco!');
-
-            CategoriaResponse := VerificarExistenciaDaCategoria(Secao.DscSecao);
-
-            if not Assigned(CategoriaResponse) then
-                CategoriaResponse := CriarCategoria(Secao);
-
-            if not Assigned(CategoriaResponse) then
-                raise Exception.Create('Categoria inválida retornada pela API');
+            CategoriaResponse := BuscarCategorias(Secao);
 
         	WooProdutoRequest := ProdutoToWooProdutoRequest(
                 ProdutoDB,
