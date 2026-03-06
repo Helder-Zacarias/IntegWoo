@@ -31,7 +31,6 @@ type
     panelSide: TPanel;
     btnEnviarProdutosMandala: TBitBtn;
     btnBuscarPrecoVariacoes: TButton;
-    btnBuscarProdutosGrade: TButton;
     procedure DatabaseConnectionLost(Sender: TObject; Component: TComponent;
       ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
     procedure btnHamburguerClick(Sender: TObject);
@@ -43,7 +42,8 @@ type
 	function EnviarImagem(ListaImagens: TObjectList<TProdutoImagem>): TObjectList<TWPImagemResponse>;
     function EnviarProduto(Produto: TWooProdutoRequest): TWooProdutoResponse;
     function CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
-    function EnviarTermos(TabelaVariacao: string; AtributoId: Integer): TObjectList<TWooTermoResponse>;
+    function EnviarTermos(TabelaVariacao: string; AtributoId: Integer;
+    	ProdutosGrade: TObjectList<TProdutoGrade>): TObjectList<TWooTermoResponse>;
     function BuscarCategorias(Secao: TSecao): TWooCategoriaResponse;
     function BuscarAtributos: TObjectList<TWooAtributoResponse>;
     function BuscarSecaoNoBanco(CodIdEmpresa: Integer; CodIdSecao: Integer): TSecao;
@@ -58,9 +58,9 @@ type
     function BuscarTermosNaApi(AtributoID: Integer): TObjectList<TWooTermoResponse>;
     function GetVariacoesDoProduto(ProdutoID: Integer): TObjectList<TWooVariacaoProdutoResponse>;
     procedure CriarVariacoesDoProduto(Produto: TWooProdutoResponse);
-    procedure BuscarPrecoDeVariacoesDeProduto(CodIdLoja: Integer; CodIdProduto: Integer);
+    function BuscarProdutosGrade(CodIdEmpresa: Integer; CodIdLoja: Integer;
+    	CodIdProduto: Integer): TObjectList<TProdutoGrade>;
     procedure btnBuscarVariacoesClick(Sender: TObject);
-    procedure btnBuscarProdutosGradeClick(Sender: TObject);
   private
     FSQLProdutosBase: string;
   	FSQLImagensBase: string;
@@ -354,7 +354,8 @@ end;
 
 function TfrmTela_Principal.EnviarTermos(
 	TabelaVariacao: string;
-	AtributoId: Integer
+	AtributoId: Integer;
+    ProdutosGrade: TObjectList<TProdutoGrade>
 ): TObjectList<TWooTermoResponse>;
 var
 	SelectVariacaoQuery: TUniQuery;
@@ -363,8 +364,6 @@ var
     Termo: TWooTermoAtributoRequest;
     TermosAPI: TList<string>;
 begin
-    SQLText := 'SELECT DISTINCT * FROM ' + TabelaVariacao + ' LIMIT 5';
-    SelectVariacaoQuery := CriarQuery;
     Result := nil;
     TermosApi := nil;
 
@@ -381,16 +380,8 @@ begin
             else
                Result := TObjectList<TWooTermoResponse>.Create(True);
 
-            SelectVariacaoQuery.SQL.Text := SQLText;
-            SelectVariacaoQuery.Open;
-
-        	SelectVariacaoQuery.SaveToXML(TPath.Combine(
-                FFolderPath,
-                TabelaVariacao + '_descricao.xml')
-        	);
-
-            while not SelectVariacaoQuery.EoF do
-        	begin
+            for var ProdutoGrade in ProdutosGrade do
+            begin
                 try
                 	JSONResposta := nil;
 
@@ -399,7 +390,6 @@ begin
 
                     if (Assigned(TermosAPI)) and (TermosAPI.Contains(Termo.Name)) then
                     begin
-                        SelectVariacaoQuery.Next;
                         continue;
                     end;
 
@@ -411,7 +401,7 @@ begin
                     );
 
                     Result.Add(TJson.JsonToObject<TWooTermoResponse>(JSONResposta.ToJson));
-                    SelectVariacaoQuery.Next;
+
                 finally
                 	JSONResposta.Free;
                     Termo.Free;
@@ -521,12 +511,20 @@ begin
     end;
 end;
 
-procedure TfrmTela_Principal.BuscarPrecoDeVariacoesDeProduto(CodIdLoja: Integer; CodIdProduto: Integer);
+function TfrmTela_Principal.BuscarProdutosGrade(
+    CodIdEmpresa: Integer;
+    CodIdLoja: Integer;
+	CodIdProduto: Integer
+): TObjectList<TProdutoGrade>;
 var
 	Query: TUniQuery;
     IdLoja: Integer;
+    ProdutoGrade: TProdutoGrade;
+    JSONArray: TJSONArray;
 begin
     Query := CriarQuery;
+    Result := nil;
+    JSONArray := TJSONArray.Create;
 
     try
     	with Query do
@@ -539,6 +537,8 @@ begin
             SQL.Add('   PG.COD_EAN_GTIN,');
             SQL.Add('   PG.COD_ID_VAR_1,');
             SQL.Add('   PG.COD_ID_VAR_2,');
+            SQL.Add('   V1.DSC_VARIACAO,');
+            SQL.Add('   V2.DSC_VARIACAO,');
             SQL.Add('   TRIM(CONCAT(P.DSC_COMPLETA, '' '', COALESCE(V1.DSC_VARIACAO,  ''''), '' '', COALESCE(V2.DSC_SIGLA, ''''))) AS DSC_PRODUTO,');
             SQL.Add('   COALESCE(PG.NUM_PRECO_UNITARIO, S.NUM_PRECO_VAREJO) AS NUM_PRECO_UNITARIO,');
             SQL.Add('   PG.NUM_ESTOQUE_INICIAL + SUM(COALESCE(E.NUM_QUANTIDADE, 0)) AS NUM_ESTOQUE');
@@ -548,7 +548,7 @@ begin
             SQL.Add('   P.COD_ID_PRODUTO = PG.COD_ID_PRODUTO');
             SQL.Add('LEFT JOIN db_sgci.precos S ON');
             SQL.Add('   S.COD_ID_EMPRESA = P.COD_ID_EMPRESA AND');
-            SQL.Add('   S.COD_ID_LOJA    = ' + CodIdLoja.ToString + ' AND');
+            SQL.Add('   S.COD_ID_LOJA    = :COD_ID_LOJA AND');
             SQL.Add('   S.COD_ID_PRODUTO = P.COD_ID_PRODUTO');
             SQL.Add('INNER JOIN db_sgci.grades_variacao_1 V1 ON');
             SQL.Add('   V1.COD_ID_VARIACAO = PG.COD_ID_VAR_1 AND');
@@ -560,6 +560,7 @@ begin
             SQL.Add('   E.COD_ID_PRD_GRD        = PG.COD_ID_PRD_GRD AND');
             SQL.Add('   COALESCE(E.NUM_INDC, 0) = 0');
             SQL.Add('WHERE');
+            SQL.Add('   PG.COD_ID_EMPRESA = :COD_ID_EMPRESA AND');
             SQL.Add('   PG.COD_ID_PRODUTO = :COD_ID_PRODUTO');
             SQL.Add('GROUP BY');
             SQL.Add('   PG.COD_ID_PRD_GRD');
@@ -567,12 +568,40 @@ begin
             SQL.Add('   V1.DSC_VARIACAO DESC,');
             SQL.Add('   V2.DSC_VARIACAO DESC');
 
+            ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
+            ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
             ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
             Open;
 
             SaveToXML(TPath.Combine(FFolderPath, 'variacoes-preco-unitario.xml'));
+
+            Result := TObjectList<TProdutoGrade>.Create(True);
+
+            try
+            	while not Eof do
+            	begin
+                    ProdutoGrade := TProdutoGrade.Create;
+                    ProdutoGrade.NumPrecoUnitario := FieldByName('NUM_PRECO_UNITARIO').AsCurrency;
+                    ProdutoGrade.NumEstoque := FieldByName('NUM_ESTOQUE').AsInteger;
+
+                    ProdutoGrade.VariacaoUm.CodIdVariacao := FieldByName('COD_ID_VAR_1').AsInteger;
+                    ProdutoGrade.VariacaoUm.DscVariacao := FieldByName('DSC_VARIACAO').AsString;
+
+                    ProdutoGrade.VariacaoDois.CodIdVariacao := FieldByName('COD_ID_VAR_2').AsInteger;
+                    ProdutoGrade.VariacaoDois.DscVariacao := FieldByName('DSC_VARIACAO_1').AsString;
+                    JSONArray.AddElement(TJson.ObjectToJsonObject(ProdutoGrade));
+                    Next;
+            	end;
+
+                SalvarConteudoEmArquivo(FFolderPath + 'array-produtos-grade.txt', JSONArray.ToString);
+
+            except
+                Result.Free;
+                raise;
+            end;
     	end;
     finally
+     	JSONArray.Free;
         Query.Free;
     end;
 
@@ -847,24 +876,9 @@ begin
     end;
 end;
 
-procedure TfrmTela_Principal.btnBuscarProdutosGradeClick(Sender: TObject);
-var
-	Query: TuniQuery;
-begin
-    Query := CriarQuery;
-
-    try
-        Query.SQL.Text := 'SELECT * FROM db_sgci.produtos_grades WHERE COD_ID_EMPRESA = 2433 AND COD_ID_PRODUTO = 4832698';
-        Query.Open;
-        Query.SaveToXML(FFolderPath + 'produtos-grade.xml');
-    finally
-        Query.Free;
-    end;
-end;
-
 procedure TfrmTela_Principal.btnBuscarVariacoesClick(Sender: TObject);
 begin
-    BuscarPrecoDeVariacoesDeProduto(90, FCodIdProduto);
+    BuscarProdutosGrade(2433, 90, FCodIdProduto);
 end;
 
 procedure TfrmTela_Principal.btnEnviarProdutosClick(Sender: TObject);
@@ -880,6 +894,7 @@ var
     TermosDB: TList<string>;
     TermosProduto: TObjectDictionary<Integer, TList<string>>;
     WooProdutoResponse: TWooProdutoResponse;
+    ProdutosGrade: TObjectList<TProdutoGrade>;
 begin
 	with sqlProdutos do
 	begin
@@ -925,11 +940,21 @@ begin
                     );
 
                 try
+                	ProdutosGrade := BuscarProdutosGrade(
+                        ProdutoDB.CodIdEmpresa,
+                        ProdutoDB.CodIdEmpresa,
+                        ProdutoDB.CodIdProduto
+                    );
+
                 	TermosAPI := TObjectList<TObjectList<TWooTermoResponse>>.Create(True);
 
                     for var I := 0 to Atributos.Count - 1 do
                 	begin
-                    	TermosAPI.Add(EnviarTermos(FTabelasVariacao[I], Atributos[I].Id));
+                    	TermosAPI.Add(EnviarTermos(
+                            FTabelasVariacao[I],
+                            Atributos[I].Id,
+                            ProdutosGrade
+                        ));
                 	end;
 
                     if Atributos.Count <> TermosAPI.Count then

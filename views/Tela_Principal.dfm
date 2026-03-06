@@ -57,15 +57,6 @@ object frmTela_Principal: TfrmTela_Principal
       TabOrder = 2
       OnClick = btnBuscarVariacoesClick
     end
-    object btnBuscarProdutosGrade: TButton
-      Left = 0
-      Top = 263
-      Width = 155
-      Height = 33
-      Caption = 'Produtos Grade'
-      TabOrder = 3
-      OnClick = btnBuscarProdutosGradeClick
-    end
   end
   object MySQL: TMySQLUniProvider
     Left = 392
