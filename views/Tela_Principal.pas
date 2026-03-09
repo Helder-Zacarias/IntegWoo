@@ -42,7 +42,7 @@ type
 	function EnviarImagem(ListaImagens: TObjectList<TProdutoImagem>): TObjectList<TWPImagemResponse>;
     function EnviarProduto(Produto: TWooProdutoRequest): TWooProdutoResponse;
     function CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
-    function EnviarTermos(TabelaVariacao: string; AtributoId: Integer;
+    function EnviarTermos(Atributos: TObjectList<TWooAtributoResponse>;
     	ProdutosGrade: TObjectList<TProdutoGrade>): TObjectList<TWooTermoResponse>;
     function BuscarCategorias(Secao: TSecao): TWooCategoriaResponse;
     function BuscarAtributos: TObjectList<TWooAtributoResponse>;
@@ -55,11 +55,11 @@ type
     function CompararTermos(TermosAPI: TObjectList<TWooTermoResponse>; TermosDB: TList<string>): TList<string>;
     function BuscarTermosProduto(CodIdEmpresa: Integer; CodIdGrade: Integer;
     	CodIdProduto: Integer; TabelaVariacao: string): TList<string>;
-    function BuscarTermosNaApi(AtributoID: Integer): TObjectList<TWooTermoResponse>;
+    function BuscarTermosNaApi(AtributoID: Integer): TList<string>;
     function GetVariacoesDoProduto(ProdutoID: Integer): TObjectList<TWooVariacaoProdutoResponse>;
     procedure CriarVariacoesDoProduto(Produto: TWooProdutoResponse);
-    function BuscarProdutosGrade(CodIdEmpresa: Integer; CodIdLoja: Integer;
-    	CodIdProduto: Integer): TObjectList<TProdutoGrade>;
+    function BuscarProdutosGrade(CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdProduto: Integer;
+    TermosVariacaoUm: TList<string>; TermosVariacaoDois: TList<string>): TObjectList<TProdutoGrade>;
     procedure btnBuscarVariacoesClick(Sender: TObject);
   private
     FSQLProdutosBase: string;
@@ -322,12 +322,12 @@ begin
      end;
 end;
 
-function TfrmTela_Principal.BuscarTermosNaApi(AtributoID: Integer): TObjectList<TWooTermoResponse>;
+function TfrmTela_Principal.BuscarTermosNaApi(AtributoID: Integer): TList<string>;
 var
     JSONResposta: TJSONValue;
     ListaTermosAPI: TJSONArray;
 begin
-    Result := TObjectList<TWooTermoResponse>.Create(True);
+    Result := TList<string>.Create;
 	JSONResposta := nil;
 
     try
@@ -342,7 +342,7 @@ begin
             ListaTermosAPI := ChecarERetornarJSONArray(JSONResposta);
 
         	for var TermoAPI in ListaTermosAPI do
-            	Result.Add(TJson.JsonToObject<TWooTermoResponse>(TermoAPI.ToJSON));
+            	Result.Add(TermoAPI.GetValue<string>('name'));
         except
         	Result.Free;
             raise;
@@ -353,13 +353,10 @@ begin
 end;
 
 function TfrmTela_Principal.EnviarTermos(
-	TabelaVariacao: string;
-	AtributoId: Integer;
+	Atributos: TObjectList<TWooAtributoResponse>;
     ProdutosGrade: TObjectList<TProdutoGrade>
 ): TObjectList<TWooTermoResponse>;
 var
-	SelectVariacaoQuery: TUniQuery;
-    SQLText: string;
     JSONResposta: TJSONValue;
     Termo: TWooTermoAtributoRequest;
     TermosAPI: TList<string>;
@@ -369,16 +366,25 @@ begin
 
     try
         try
-            Result := BuscarTermosNaAPI(AtributoID);
-            TermosAPI := TList<String>.Create;
-
-            if Assigned(Result) then
+            for var ProdutoGrade in ProdutosGrade do
             begin
-                for var TermoResposta in Result do
-                  TermosAPI.Add(TermoResposta.Name);
-            end
-            else
-               Result := TObjectList<TWooTermoResponse>.Create(True);
+                try
+                	JSONResposta := nil;
+
+                    Termo := TWooTermoAtributoRequest.Create;
+                    Termo.Name := ProdutoGrade.VariacaoUm.DscVariacao;
+
+                    JSONResposta := ChamadaAPIWooCommerce(
+                        '/products/attributes/' + Atributos[0].Id.ToString + '/terms',
+                        'POST',
+                        'Termo criado com sucesso!',
+                        TJson.ObjectToJsonString(Termo)
+                    );
+                finally
+                	JSONResposta.Free;
+                    Termo.Free;
+                end;
+            end;
 
             for var ProdutoGrade in ProdutosGrade do
             begin
@@ -386,22 +392,14 @@ begin
                 	JSONResposta := nil;
 
                     Termo := TWooTermoAtributoRequest.Create;
-                    Termo.Name := SelectVariacaoQuery.FieldByName('DSC_VARIACAO').AsString;
-
-                    if (Assigned(TermosAPI)) and (TermosAPI.Contains(Termo.Name)) then
-                    begin
-                        continue;
-                    end;
+                    Termo.Name := ProdutoGrade.VariacaoDois.DscVariacao;
 
                     JSONResposta := ChamadaAPIWooCommerce(
-                        '/products/attributes/' + AtributoId.ToString + '/terms',
+                        '/products/attributes/' + Atributos[1].Id.ToString + '/terms',
                         'POST',
                         'Termo criado com sucesso!',
                         TJson.ObjectToJsonString(Termo)
                     );
-
-                    Result.Add(TJson.JsonToObject<TWooTermoResponse>(JSONResposta.ToJson));
-
                 finally
                 	JSONResposta.Free;
                     Termo.Free;
@@ -413,7 +411,6 @@ begin
         end;
     finally
     	TermosAPI.Free;
-    	SelectVariacaoQuery.Free;
     end;
 end;
 
@@ -456,7 +453,7 @@ var
     TermoGradeUm: Integer;
     TermoGradeDois: Integer;
     BatchRequest: TWooVariacaoProdutoBatchRequest;
-    IndiceVariacaoes: Integer;
+    IndiceVariacoes: Integer;
     RespostaAPI: TJSONValue;
 begin
     SetLength(
@@ -465,7 +462,7 @@ begin
         Length(Produto.Attributes[1].Options)
     );
 
-    IndiceVariacaoes := 0;
+    IndiceVariacoes := 0;
 
     for TermoGradeUm := 0 to High(Produto.Attributes[0].Options) do
     begin
@@ -484,8 +481,8 @@ begin
             Variacao.AdicionarAtributo(AtributoGradeUm);
             Variacao.AdicionarAtributo(AtributoGradeDois);
 
-            Variacoes[IndiceVariacaoes] := Variacao;
-            Inc(IndiceVariacaoes);
+            Variacoes[IndiceVariacoes] := Variacao;
+            Inc(IndiceVariacoes);
         end;
     end;
 
@@ -514,7 +511,9 @@ end;
 function TfrmTela_Principal.BuscarProdutosGrade(
     CodIdEmpresa: Integer;
     CodIdLoja: Integer;
-	CodIdProduto: Integer
+	CodIdProduto: Integer;
+    TermosVariacaoUm: TList<string>;
+    TermosVariacaoDois: TList<string>
 ): TObjectList<TProdutoGrade>;
 var
 	Query: TUniQuery;
@@ -580,6 +579,14 @@ begin
             try
             	while not Eof do
             	begin
+                	if (not TermosVariacaoUm.Contains(FieldByName('DSC_VARIACAO').AsString))
+                    	or (not TermosVariacaoDois.Contains(FieldByName('DSC_VARIACAO_1').AsString))
+                    then
+                    begin
+                       Next;
+                       Continue;
+                    end;
+
                     ProdutoGrade := TProdutoGrade.Create;
                     ProdutoGrade.NumPrecoUnitario := FieldByName('NUM_PRECO_UNITARIO').AsCurrency;
                     ProdutoGrade.NumEstoque := FieldByName('NUM_ESTOQUE').AsInteger;
@@ -589,6 +596,7 @@ begin
 
                     ProdutoGrade.VariacaoDois.CodIdVariacao := FieldByName('COD_ID_VAR_2').AsInteger;
                     ProdutoGrade.VariacaoDois.DscVariacao := FieldByName('DSC_VARIACAO_1').AsString;
+                    Result.Add(ProdutoGrade);
                     JSONArray.AddElement(TJson.ObjectToJsonObject(ProdutoGrade));
                     Next;
             	end;
@@ -892,7 +900,7 @@ var
     ListaImagensRequest: TObjectList<TWooImagemRequest>;
     TermosAPI: TObjectList<TObjectList<TWooTermoResponse>>;
     TermosDB: TList<string>;
-    TermosProduto: TObjectDictionary<Integer, TList<string>>;
+    TermosProduto: TObjectList<TWooTermoResponse>
     WooProdutoResponse: TWooProdutoResponse;
     ProdutosGrade: TObjectList<TProdutoGrade>;
 begin
@@ -940,50 +948,18 @@ begin
                     );
 
                 try
+//                  Devo primerio buscar todos os termos cadastrados de cada atributo salvo no woocommerce, para
+//                  possa fazer a filtragem dos produtos grade que posso enviar ao woocommerce
+
                 	ProdutosGrade := BuscarProdutosGrade(
                         ProdutoDB.CodIdEmpresa,
                         ProdutoDB.CodIdEmpresa,
-                        ProdutoDB.CodIdProduto
+                        ProdutoDB.CodIdProduto,
+                        BuscarTermosNaApi(Atributos[0].Id),
+                        BuscarTermosNaApi(Atributos[1].Id)
                     );
 
-                	TermosAPI := TObjectList<TObjectList<TWooTermoResponse>>.Create(True);
-
-                    for var I := 0 to Atributos.Count - 1 do
-                	begin
-                    	TermosAPI.Add(EnviarTermos(
-                            FTabelasVariacao[I],
-                            Atributos[I].Id,
-                            ProdutosGrade
-                        ));
-                	end;
-
-                    if Atributos.Count <> TermosAPI.Count then
-                    raise Exception.CreateFmt(
-                        'Atributos e TermosAPI são de tamanhos diferentes!' + sLineBreak +
-                        'Atributos: %d. TermosAPI: %d.',
-                        [Atributos.Count, TermosAPI.Count]
-                    );
-
-                    TermosProduto := TObjectDictionary<Integer, TList<string>>.Create([doOwnsValues]);
-
-                	for var I := 0 to Atributos.Count - 1 do
-                	begin
-                    	TermosDB := BuscarTermosProduto(
-                            ProdutoDB.CodIdEmpresa,
-                            ProdutoDb.CodIdGrade,
-                            ProdutoDB.CodIdProduto,
-                            FTabelasVariacao[I]
-                    	);
-
-                        try
-                        	TermosProduto.Add(
-                                Atributos[I].Id,
-                                CompararTermos(TermosAPI[I], TermosDB)
-                            );
-                        finally
-                            TermosDB.Free;
-                        end;
-                	end;
+                    TermosProduto := EnviarTermos(Atributos, ProdutosGrade);
                 finally
 
                 end;
