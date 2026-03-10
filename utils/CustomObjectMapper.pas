@@ -2,14 +2,14 @@ unit CustomObjectMapper;
 
 interface
 uses
-	System.SysUtils, System.Generics.Collections, Vcl.Dialogs, Uni,
+	System.SysUtils, System.IOUtils, System.Generics.Collections, Vcl.Dialogs, Uni,
     Produto, ProdutoImagem,
     WooProdutoRequest, WooImagemRequest, WPImagemResponse,
-    WooProdutoCategoriaRequest,  WooAtributosProdutoRequest, WooAtributoResponse;
+    WooProdutoCategoriaRequest,  WooAtributosProdutoRequest, WooAtributoResponse, WooTermoResponse, FileWriter;
 
 	function ProdutoToWooProdutoRequest(Produto: TProduto; TipoProduto: string;
     	 CategoriaId: Integer; ListaImagensProduto: TObjectList<TWooImagemRequest>;
-         TermosProduto: TObjectDictionary<Integer, TList<string>>): TWooProdutoRequest;
+         TermosProduto: TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>): TWooProdutoRequest;
 	function ProdutoQueryToProduto(Query: TUniQuery): TProduto;
     function ProdutoImagemQueryToProdutoImagem(Query: TUniQuery): TProdutoImagem;
     function WPImagemResponseToWooImagemRequest(ImagemResponse: TWPImagemResponse): TWooImagemRequest;
@@ -21,12 +21,13 @@ function ProdutoToWooProdutoRequest(
     TipoProduto: string;
     CategoriaId: Integer;
     ListaImagensProduto: TObjectList<TWooImagemRequest>;
-    TermosProduto: TObjectDictionary<Integer, TList<string>>
+    TermosProduto: TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>
 ): TWooProdutoRequest;
 var
     ProdutoCategoria: TWooProdutoCategoriaRequest;
-    Termo: TPair<Integer, TList<string>>;
+    Termo: TWooTermoResponse;
     Atributo: TWooAtributosProdutoRequest;
+	Pair: TPair<Integer, TObjectList<TWooTermoResponse>>;
 begin
     ProdutoCategoria := TWooProdutoCategoriaRequest.Create;
     ProdutoCategoria.Id := CategoriaId;
@@ -34,10 +35,7 @@ begin
     Result := TWooProdutoRequest.Create;
     Result.Name := Produto.DscCompleta;
     Result.Sku := Produto.CodProduto.ToString;
-    if Produto.NumPrecoVarejo = 0 then
-        Result.RegularPrice := IntToStr(999)
-    else
-    	Result.RegularPrice := Produto.NumPrecoVarejo.ToString;
+    Result.RegularPrice := Produto.NumPrecoVarejo.ToString;
 
     Result.PType := TipoProduto;
     Result.AdicionarCategoria(ProdutoCategoria);
@@ -53,17 +51,31 @@ begin
     if Assigned(TermosProduto) then
     begin
         try
-        	for Termo in TermosProduto do
-        	begin
+            for Pair in TermosProduto do
+  			begin
                 Atributo := TWooAtributosProdutoRequest.Create;
-                Atributo.Id := Termo.Key;
-                Atributo.Options := Termo.Value.ToArray;
+                Atributo.Id := Pair.Key;
                 Atributo.Visible := True;
                 Atributo.Variation := True;
+
+                 ShowMessage(
+                	'Atributo Id: ' + Atributo.Id.ToString + sLineBreak +
+                    'Visible: ' + Atributo.Visible.ToString + sLineBreak +
+                    'Variation: ' + Atributo.Variation.ToString
+                );
+
+                for Termo in Pair.Value do
+                begin
+                    ShowMessage('Termo: ' + Termo.Name);
+                    Atributo.AdicionarTermo(Termo.Name);
+                end;
+
                 Result.AdicionarAtributo(Atributo);
-        	end;
+  			end;
         finally
         end;
+
+
     end;
 end;
 

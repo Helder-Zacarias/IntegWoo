@@ -30,7 +30,6 @@ type
     btnHamburguer: TButton;
     panelSide: TPanel;
     btnEnviarProdutosMandala: TBitBtn;
-    btnBuscarPrecoVariacoes: TButton;
     procedure DatabaseConnectionLost(Sender: TObject; Component: TComponent;
       ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
     procedure btnHamburguerClick(Sender: TObject);
@@ -42,8 +41,8 @@ type
 	function EnviarImagem(ListaImagens: TObjectList<TProdutoImagem>): TObjectList<TWPImagemResponse>;
     function EnviarProduto(Produto: TWooProdutoRequest): TWooProdutoResponse;
     function CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
-    function EnviarTermos(Atributos: TObjectList<TWooAtributoResponse>;
-    	ProdutosGrade: TObjectList<TProdutoGrade>): TObjectList<TWooTermoResponse>;
+    function EnviarTermos(Atributos: TObjectList<TWooAtributoResponse>; ProdutosGrade: TObjectList<TProdutoGrade>)
+    	: TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
     function BuscarCategorias(Secao: TSecao): TWooCategoriaResponse;
     function BuscarAtributos: TObjectList<TWooAtributoResponse>;
     function BuscarSecaoNoBanco(CodIdEmpresa: Integer; CodIdSecao: Integer): TSecao;
@@ -52,15 +51,17 @@ type
     function ChecarERetornarJSONArray(JSONResponse: TJSONValue): TJSONArray;
     procedure FormCreate(Sender: TObject);
     function CriarAtributos: TObjectList<TWooAtributoResponse>;
-    function CompararTermos(TermosAPI: TObjectList<TWooTermoResponse>; TermosDB: TList<string>): TList<string>;
-    function BuscarTermosProduto(CodIdEmpresa: Integer; CodIdGrade: Integer;
-    	CodIdProduto: Integer; TabelaVariacao: string): TList<string>;
-    function BuscarTermosNaApi(AtributoID: Integer): TList<string>;
+    function BuscarTermosNaApi(AtributoID: Integer): TObjectList<TWooTermoResponse>;
     function GetVariacoesDoProduto(ProdutoID: Integer): TObjectList<TWooVariacaoProdutoResponse>;
     procedure CriarVariacoesDoProduto(Produto: TWooProdutoResponse);
-    function BuscarProdutosGrade(CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdProduto: Integer;
-    TermosVariacaoUm: TList<string>; TermosVariacaoDois: TList<string>): TObjectList<TProdutoGrade>;
-    procedure btnBuscarVariacoesClick(Sender: TObject);
+    function BuscarProdutosGrade(CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdProduto: Integer
+    ): TObjectList<TProdutoGrade>;
+    function PostarTermoNaAPI(AtributoId: Integer; Termo: TWooTermoAtributoRequest): TWooTermoResponse;
+    function FiltrarTermosRepetidos(Variacoes: TList<string>): TList<string>;
+    function GerarListasDeVariacoesDosProdutosGrade(Atributos: TObjectList<TWooAtributoResponse>;
+    	ProdutosGrade: TObjectList<TProdutoGrade>): TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
+    function GerarListaDeStringsDosTermosDaAPI(TermosAPI: TObjectList<TWooTermoResponse>):
+    	TList<string>;
   private
     FSQLProdutosBase: string;
   	FSQLImagensBase: string;
@@ -85,7 +86,7 @@ procedure TfrmTela_Principal.FormCreate(Sender: TObject);
 begin
 	FSQLProdutosBase := sqlProdutos.SQL.Text;
     FSQLImagensBase := sqlImagens.SQL.Text;
-    FCodIdProduto := 4832698;
+    FCodIdProduto := 4832699;
     FTabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
     FFolderPath := TPath.Combine(TPath.GetDocumentsPath, 'Ecommerce');
 end;
@@ -194,61 +195,6 @@ begin
     );
 end;
 
-function TfrmTela_Principal.BuscarTermosProduto(
-    CodIdEmpresa: Integer;
-    CodIdGrade: Integer;
-    CodIdProduto: Integer;
-    TabelaVariacao: string
-): TList<string>;
-var
-    SelectGradesQuery: TUniQuery;
-//    ProdutoGrade: TProdutoGrade;
-begin
-    Result := nil;
-
-    try
-        Result := TList<string>.Create;
-
-    	SelectGradesQuery := CriarQuery;
-        SelectGradesQuery.SQL.Text := 'SELECT DISTINCT *' + sLineBreak +
-        	'FROM db_sgci.produtos_grades pg ' + sLineBreak +
-            'JOIN ' + TabelaVariacao + ' ON pg.COD_ID_GRADE = ' + TabelaVariacao + '.COD_ID_GRADE ' + sLineBreak +
-            'WHERE pg.COD_ID_EMPRESA = :COD_ID_EMPRESA AND ' + sLineBreak +
-            'pg.COD_ID_GRADE = :COD_ID_GRADE AND ' + sLineBreak +
-            'pg.COD_ID_PRODUTO = :COD_ID_PRODUTO';
-        SelectGradesQuery.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
-        SelectGradesQuery.ParamByName('COD_ID_GRADE').AsInteger := CodIdGrade;
-        SelectGradesQuery.ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
-        SelectGradesQuery.Open;
-        SelectGradesQuery.SaveToXML(FFolderPath + 'BUSCA-TERMOS.XML');
-
-//        ProdutoGrade := TProdutoGrade.Create;
-//        ProdutoGrade.NumPrecoUnitario := SelectGradesQuery.FieldByName('NUM_PRECO_UNITARIO').AsCurrency;
-//        ProdutoGrade.NumEstoque := SelectGradesQuery.FieldByName('NUM_ESTOQUE').AsInteger;
-//        ProdutoGrade.VariacaoUm.DscVariacao := SelectGradesQuery.FieldByName('DSC_VARIACAO').AsString;
-//        ProdutoGrade.VariacaoUm.CodIdVariacao := SelectGradesQuery.FieldByName('COD_ID_VARIACAO_1').AsInteger;
-
-        try
-        	while not SelectGradesQuery.Eof do
-            begin
-            	Result.Add(SelectGradesQuery.FieldByName('DSC_VARIACAO').AsString);
-//                SalvarConteudoEmArquivo(
-//                	TPath.Combine(FFolderPath, 'termos-distintos-variacao-' + TabelaVariacao + '.txt'),
-//                	SelectGradesQuery.FieldByName('DSC_VARIACAO').AsString + ' --- '+ SelectGradesQuery.FieldByName('NUM_PRECO_UNITARIO').AsString
-//                );
-                SelectGradesQuery.Next;
-            end;
-
-            SelectGradesQuery.Close;
-            except
-            	Result.Free;
-                raise;
-            end;
-    finally
-        SelectGradesQuery.Free;
-    end;
-end;
-
 function TfrmTela_Principal.CriarAtributos: TObjectList<TWooAtributoResponse>;
 var
 	Atributos: TArray<TWooAtributoRequest>;
@@ -322,12 +268,12 @@ begin
      end;
 end;
 
-function TfrmTela_Principal.BuscarTermosNaApi(AtributoID: Integer): TList<string>;
+function TfrmTela_Principal.BuscarTermosNaApi(AtributoID: Integer): TObjectList<TWooTermoResponse>;
 var
     JSONResposta: TJSONValue;
     ListaTermosAPI: TJSONArray;
 begin
-    Result := TList<string>.Create;
+    Result := TObjectList<TWooTermoResponse>.Create(True);
 	JSONResposta := nil;
 
     try
@@ -342,7 +288,7 @@ begin
             ListaTermosAPI := ChecarERetornarJSONArray(JSONResposta);
 
         	for var TermoAPI in ListaTermosAPI do
-            	Result.Add(TermoAPI.GetValue<string>('name'));
+            	Result.Add(TJson.JsonToObject<TWooTermoResponse>(TermoAPI.ToJSON));
         except
         	Result.Free;
             raise;
@@ -352,66 +298,118 @@ begin
     end;
 end;
 
+function TfrmTela_Principal.PostarTermoNaAPI(AtributoId: Integer; Termo: TWooTermoAtributoRequest): TWooTermoResponse;
+var
+	JSONResposta: TJSONValue;
+begin
+    try
+    	JSONResposta := ChamadaAPIWooCommerce(
+            '/products/attributes/' + AtributoId.ToString + '/terms',
+            'POST',
+            'Termo criado com sucesso!',
+            TJson.ObjectToJsonString(Termo)
+    	);
+
+        Result := TJson.JsonToObject<TWooTermoResponse>(JSONResposta.ToJSON);
+    finally
+        JSONResposta.Free;
+    end;
+end;
+
+function TfrmTela_Principal.FiltrarTermosRepetidos(
+	Variacoes: TList<string>
+): TList<string>;
+var
+    TermosDistintos: TStringList;
+begin
+    Result := TList<string>.Create;
+    TermosDistintos := TStringList.Create;
+    TermosDistintos.Sorted := True;
+    TermosDistintos.Duplicates := dupIgnore;
+
+    for var Variacao in Variacoes do
+    	TermosDistintos.Add(Variacao);
+
+    for var Termo in TermosDistintos do
+        Result.Add(Termo);
+end;
+
+function TfrmTela_Principal.GerarListaDeStringsDosTermosDaAPI(
+	TermosAPI: TObjectList<TWooTermoResponse>
+): TList<string>;
+begin
+    for var Termo in TermosAPI do
+        Result.Add(Termo.Name);
+end;
+
+function TfrmTela_Principal.GerarListasDeVariacoesDosProdutosGrade(
+	Atributos: TObjectList<TWooAtributoResponse>;
+    ProdutosGrade: TObjectList<TProdutoGrade>
+): TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
+var
+    VariacoesUm: TList<string>;
+    VariacoesDois: TList<string>;
+    ListaVariacoesUm: TList<string>;
+    ListaVariacoesDois: TList<string>;
+    ListaResponseUm: TObjectList<TWooTermoResponse>;
+    TermosUm: TobjectList<TWooTermoResponse>;
+    TermosDois: TObjectList<TWooTermoResponse>;
+begin
+    Result := TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>.Create([doOwnsValues]);
+    TermosUm := BuscarTermosNaApi(Atributos[0].Id);
+    TermosDois := BuscarTermosNaApi(Atributos[1].Id);
+
+    VariacoesUm := TList<string>.Create;
+    VariacoesDois := TList<string>.Create;
+
+    for var Produto in ProdutosGrade do
+    begin
+        VariacoesUm.Add(Produto.VariacaoUm.DscVariacao);
+        VariacoesDois.Add(Produto.VariacaoDois.DscVariacao);
+    end;
+
+    VariacoesUm := FiltrarTermosRepetidos(VariacoesUm);
+    VariacoesDois := FiltrarTermosRepetidos(VariacoesDois);
+    ListaVariacoesUm := GerarListaDeStringsDosTermosDaAPI(TermosUm);
+    ListaVariacoesDois := GerarListaDeStringsDosTermosDaAPI(TermosDois);
+
+    for var Variacao in VariacoesUm do
+    begin
+        var Termo := TWooTermoAtributoRequest.Create;
+        Termo.Name:= Variacao;
+
+        if not ListaVariacoesUm.Contains(Termo.Name) then
+        	TermosUm.Add(PostarTermoNaAPI(Atributos[0].Id, Termo));
+    end;
+
+    for var Variacao in VariacoesDois do
+    begin
+        var Termo := TWooTermoAtributoRequest.Create;
+        Termo.Name:= Variacao;
+
+        if not ListaVariacoesDois.Contains(Termo.Name) then
+        	TermosDois.Add(PostarTermoNaAPI(Atributos[1].Id, Termo));
+    end;
+
+    Result.Add(Atributos[0].Id, TermosUm);
+    Result.Add(Atributos[1].Id, TermosDois)
+end;
+
 function TfrmTela_Principal.EnviarTermos(
 	Atributos: TObjectList<TWooAtributoResponse>;
     ProdutosGrade: TObjectList<TProdutoGrade>
-): TObjectList<TWooTermoResponse>;
+): TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
 var
-    JSONResposta: TJSONValue;
-    Termo: TWooTermoAtributoRequest;
-    TermosAPI: TList<string>;
+    TermosA1: TObjectList<TWooTermoResponse>;
+    TermosA2: TObjectList<TWooTermoResponse>;
 begin
-    Result := nil;
-    TermosApi := nil;
+	TermosA1 := BuscarTermosNaApi(Atributos[0].Id);
+    TermosA2 := BuscarTermosNaApi(Atributos[1].Id);
 
-    try
-        try
-            for var ProdutoGrade in ProdutosGrade do
-            begin
-                try
-                	JSONResposta := nil;
-
-                    Termo := TWooTermoAtributoRequest.Create;
-                    Termo.Name := ProdutoGrade.VariacaoUm.DscVariacao;
-
-                    JSONResposta := ChamadaAPIWooCommerce(
-                        '/products/attributes/' + Atributos[0].Id.ToString + '/terms',
-                        'POST',
-                        'Termo criado com sucesso!',
-                        TJson.ObjectToJsonString(Termo)
-                    );
-                finally
-                	JSONResposta.Free;
-                    Termo.Free;
-                end;
-            end;
-
-            for var ProdutoGrade in ProdutosGrade do
-            begin
-                try
-                	JSONResposta := nil;
-
-                    Termo := TWooTermoAtributoRequest.Create;
-                    Termo.Name := ProdutoGrade.VariacaoDois.DscVariacao;
-
-                    JSONResposta := ChamadaAPIWooCommerce(
-                        '/products/attributes/' + Atributos[1].Id.ToString + '/terms',
-                        'POST',
-                        'Termo criado com sucesso!',
-                        TJson.ObjectToJsonString(Termo)
-                    );
-                finally
-                	JSONResposta.Free;
-                    Termo.Free;
-                end;
-            end;
-        except
-          	Result.Free;
-            raise;
-        end;
-    finally
-    	TermosAPI.Free;
-    end;
+    Result := GerarListasDeVariacoesDosProdutosGrade(
+        Atributos,
+        ProdutosGrade
+    );
 end;
 
 function TfrmTela_Principal.GetVariacoesDoProduto(ProdutoID: Integer): TObjectList<TWooVariacaoProdutoResponse>;
@@ -511,9 +509,7 @@ end;
 function TfrmTela_Principal.BuscarProdutosGrade(
     CodIdEmpresa: Integer;
     CodIdLoja: Integer;
-	CodIdProduto: Integer;
-    TermosVariacaoUm: TList<string>;
-    TermosVariacaoDois: TList<string>
+	CodIdProduto: Integer
 ): TObjectList<TProdutoGrade>;
 var
 	Query: TUniQuery;
@@ -579,14 +575,6 @@ begin
             try
             	while not Eof do
             	begin
-                	if (not TermosVariacaoUm.Contains(FieldByName('DSC_VARIACAO').AsString))
-                    	or (not TermosVariacaoDois.Contains(FieldByName('DSC_VARIACAO_1').AsString))
-                    then
-                    begin
-                       Next;
-                       Continue;
-                    end;
-
                     ProdutoGrade := TProdutoGrade.Create;
                     ProdutoGrade.NumPrecoUnitario := FieldByName('NUM_PRECO_UNITARIO').AsCurrency;
                     ProdutoGrade.NumEstoque := FieldByName('NUM_ESTOQUE').AsInteger;
@@ -853,42 +841,6 @@ begin
     end;
 end;
 
-function TfrmTela_Principal.CompararTermos(
-	TermosAPI: TObjectList<TWooTermoResponse>;
-	TermosDB: TList<string>
-) : TList<string>;
-var
-    TermosDistintos: TList<string>;
-begin
-    Result := nil;
-    TermosDistintos := TList<string>.Create;
-
-    try
-    	for var Termo in TermosApi do
-        	TermosDistintos.Add(Termo.Name);
-
-    	try
-        	Result := TList<string>.Create;
-
-        	for var Termo in TermosDB do
-        	begin
-            	if TermosDistintos.Contains(Termo) then
-            		Result.Add(Termo);
-        	end;
-    	except
-        	Result.Free;
-        	raise;
-    end;
-    finally
-       TermosDistintos.Free;
-    end;
-end;
-
-procedure TfrmTela_Principal.btnBuscarVariacoesClick(Sender: TObject);
-begin
-    BuscarProdutosGrade(2433, 90, FCodIdProduto);
-end;
-
 procedure TfrmTela_Principal.btnEnviarProdutosClick(Sender: TObject);
 var
     ProdutoDB: TProduto;
@@ -900,9 +852,11 @@ var
     ListaImagensRequest: TObjectList<TWooImagemRequest>;
     TermosAPI: TObjectList<TObjectList<TWooTermoResponse>>;
     TermosDB: TList<string>;
-    TermosProduto: TObjectList<TWooTermoResponse>
+    TermosProduto: TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
     WooProdutoResponse: TWooProdutoResponse;
     ProdutosGrade: TObjectList<TProdutoGrade>;
+    TermosvariacaoUm: TObjectList<TWooTermoResponse>;
+    TermosVariacaoDois: TObjectList<TWooTermoResponse>;
 begin
 	with sqlProdutos do
 	begin
@@ -929,6 +883,8 @@ begin
         TermosAPI := nil;
         TermosDB := nil;
         WooProdutoResponse := nil;
+        TermosVariacaoUm := nil;
+        TermosVariacaoDois := nil;
 
         try
         	ProdutoDB := ProdutoQueryToProduto(sqlProdutos);
@@ -948,15 +904,10 @@ begin
                     );
 
                 try
-//                  Devo primerio buscar todos os termos cadastrados de cada atributo salvo no woocommerce, para
-//                  possa fazer a filtragem dos produtos grade que posso enviar ao woocommerce
-
                 	ProdutosGrade := BuscarProdutosGrade(
                         ProdutoDB.CodIdEmpresa,
                         ProdutoDB.CodIdEmpresa,
-                        ProdutoDB.CodIdProduto,
-                        BuscarTermosNaApi(Atributos[0].Id),
-                        BuscarTermosNaApi(Atributos[1].Id)
+                        ProdutoDB.CodIdProduto
                     );
 
                     TermosProduto := EnviarTermos(Atributos, ProdutosGrade);
@@ -975,6 +926,11 @@ begin
                 CategoriaResponse.Id,
                 ListaImagensRequest,
                 TermosProduto);
+
+        	SalvarConteudoEmArquivo(
+                TPath.Combine(TPath.GetDocumentsPath, 'produto-request-object.txt.'),
+                TJson.ObjectToJsonString(WooProdutoRequest)
+            );
 
         	WooProdutoResponse := EnviarProduto(WooProdutoRequest);
 
