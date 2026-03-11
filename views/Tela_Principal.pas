@@ -62,7 +62,7 @@ type
     	ProdutosGrade: TObjectList<TProdutoGrade>): TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
     function GerarListaDeStringsDosTermosDaAPI(TermosAPI: TObjectList<TWooTermoResponse>):
     	TList<string>;
-    function GerarSKUVariacao(DscProduto: string; SkuProdutoPai: string; NumeroVariacao: Integer): string;
+    function GerarSKUVariacao(DscProduto: string; VariacaoUm: string; VariacaoDois: string): string;
   private
     FSQLProdutosBase: string;
   	FSQLImagensBase: string;
@@ -445,14 +445,14 @@ end;
 
 function TfrmTela_Principal.GerarSKUVariacao(
     DscProduto: string;
-    SkuProdutoPai: string;
-    NumeroVariacao: Integer
+    VariacaoUm: string;
+    VariacaoDois: string
 ): string;
 begin
 	Result := SubstituirEspacosPorTraco(
         DscProduto + ' ' +
-        SKUProdutoPai +  ' ' +
-        NumeroVariacao.ToString
+        VariacaoUm +  ' ' +
+        VariacaoDois
     );
 end;
 
@@ -482,15 +482,18 @@ begin
                 ProdutoResponse.Attributes[0].Id,
                 Variacao.VariacaoUm.DscVariacao
             );
+
             VariacaoProdutoRequest.AdicionarAtributo(
                 ProdutoResponse.Attributes[1].Id,
                 Variacao.VariacaoDois.DscVariacao
             );
+
             VariacaoProdutoRequest.Sku := GerarSKUVariacao(
                 ProdutoResponse.Name,
-                ProdutoResponse.Sku,
-                NumeroVariacao
+                Variacao.VariacaoUm.DscVariacao,
+                Variacao.VariacaoDois.DscVariacao
             );
+
             BatchRequest.AdicionarVariacao(VariacaoProdutoRequest);
             VariacaoProdutoRequest := nil;
             Inc(NumeroVariacao);
@@ -593,6 +596,11 @@ begin
                     ProdutoGrade.VariacaoDois.CodIdVariacao := FieldByName('COD_ID_VAR_2').AsInteger;
                     ProdutoGrade.VariacaoDois.DscVariacao := FieldByName('DSC_VARIACAO_1').AsString;
                     Result.Add(ProdutoGrade);
+
+                    ShowMessage(
+                    	'NUM_PRECO_UNITARIO: ' + FieldByName('NUM_PRECO_UNITARIO').AsCurrency.ToString +
+                        'NUM_ESTOQUE: ' + ProdutoGrade.NumEstoque.ToString
+                    );
                     JSONArray.AddElement(TJson.ObjectToJsonObject(ProdutoGrade));
                     Next;
             	end;
@@ -900,7 +908,7 @@ begin
         try
         	ProdutoDB := ProdutoQueryToProduto(sqlProdutos);
 
-            if FieldByName('COD_ID_GRADE').IsNull then
+            if FieldByName('NUM_TIPO_PRODUTO').AsInteger <> 5 then
                 TipoProduto := 'simple'
             else
             begin

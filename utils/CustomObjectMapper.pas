@@ -35,12 +35,14 @@ begin
     Result := TWooProdutoRequest.Create;
     Result.Name := Produto.DscCompleta;
     Result.Sku := Produto.CodProduto.ToString;
-    Result.RegularPrice := Produto.NumPrecoVarejo.ToString;
-
     Result.PType := TipoProduto;
     Result.AdicionarCategoria(ProdutoCategoria);
-    Result.ManageStock := True;
-    Result.StockQuantity := 100;
+
+    if Produto.NumTipoProduto <> 5 then
+    begin
+        Result.RegularPrice := FormatFloat('0.00', Produto.NumPrecoVarejo, TFormatSettings.Invariant);
+        Result.StockQuantity := Produto.NumEstqAtual;
+    end;
 
     if Assigned(ListaImagensProduto) then
     begin
@@ -78,14 +80,14 @@ begin
 
     Result.CodIdProduto := Query.FieldByName('COD_ID_PRODUTO').AsInteger;
     Result.CodIdEmpresa := Query.FieldByName('COD_ID_EMPRESA').AsInteger;
+    Result.CodIdLoja :=Query.FieldByName('COD_ID_LOJA').AsInteger;
     Result.CodProduto := Query.FieldByName('COD_PRODUTO').AsLargeInt;
     Result.CodIdGrade := Query.FieldByName('COD_ID_GRADE').AsInteger;
     Result.CodIdSecao := Query.FieldByName('COD_ID_SECAO').AsInteger;
-    Result.NumPrecoVarejo := Query.FieldByName('NUM_PRECO_VAREJO').AsCurrency;
     Result.DscCompleta := Query.FieldByName('DSC_COMPLETA').AsString;
-    Result.DscAbreviada := Query.FieldByName('DSC_ABREVIADA').AsString;
-    Result.DscObservacoes := Query.FieldByName('DSC_OBSERVACOES').AsString;
-    Result.DscDetalhes := Query.FieldByName('DSC_DETALHES').AsString;
+    Result.NumPrecoVarejo := Query.FieldByName('NUM_PRECO_VAREJO').AsCurrency;
+    Result.NumTipoProduto := Query.FieldByName('NUM_TIPO_PRODUTO').AsInteger;
+    Result.NumEstqAtual := Query.FieldByName('NUM_ESTQ_ATUAL').AsInteger;
 end;
 
 function ProdutoImagemQueryToProdutoImagem(Query: TUniQuery): TProdutoImagem;

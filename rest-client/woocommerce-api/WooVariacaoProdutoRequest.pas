@@ -9,6 +9,7 @@ type
    TWooVariacaoProdutoRequest = class
    private
         FRegular_price: string;
+        FManage_stock: Boolean;
         FStock_quantity: Integer;
         FSku: string;
         FAttributes: TArray<TWooAtributoDaVariacao>;
@@ -19,6 +20,9 @@ type
    published
         [JSONName('regular_price')]
         property RegularPrice: string read FRegular_price write FRegular_price;
+
+        [JSONName('manage_stock')]
+        property ManageStock: Boolean read FManage_stock write FManage_stock;
 
         [JSONName('stock_quantity')]
         property StockQuantity: Integer read FStock_quantity write FStock_quantity;
@@ -33,6 +37,7 @@ implementation
 	constructor TWooVariacaoProdutoRequest.Create;
     begin
         inherited;
+        FManage_stock := True;
     	SetLength(FAttributes, 0);
     end;
 
