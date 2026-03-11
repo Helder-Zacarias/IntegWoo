@@ -53,7 +53,7 @@ type
     function CriarAtributos: TObjectList<TWooAtributoResponse>;
     function BuscarTermosNaApi(AtributoID: Integer): TObjectList<TWooTermoResponse>;
     function GetVariacoesDoProduto(ProdutoID: Integer): TObjectList<TWooVariacaoProdutoResponse>;
-    procedure CriarVariacoesDoProduto(Produto: TWooProdutoResponse);
+    procedure CriarVariacoesDoProduto(ProdutoResponse: TWooProdutoResponse; ProdutosGrade: TObjectList<TProdutoGrade>);
     function BuscarProdutosGrade(CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdProduto: Integer
     ): TObjectList<TProdutoGrade>;
     function PostarTermoNaAPI(AtributoId: Integer; Termo: TWooTermoAtributoRequest): TWooTermoResponse;
@@ -62,6 +62,7 @@ type
     	ProdutosGrade: TObjectList<TProdutoGrade>): TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
     function GerarListaDeStringsDosTermosDaAPI(TermosAPI: TObjectList<TWooTermoResponse>):
     	TList<string>;
+    function GerarSKUVariacao(DscProduto: string; SkuProdutoPai: string; NumeroVariacao: Integer): string;
   private
     FSQLProdutosBase: string;
   	FSQLImagensBase: string;
@@ -86,7 +87,7 @@ procedure TfrmTela_Principal.FormCreate(Sender: TObject);
 begin
 	FSQLProdutosBase := sqlProdutos.SQL.Text;
     FSQLImagensBase := sqlImagens.SQL.Text;
-    FCodIdProduto := 4832699;
+    FCodIdProduto := 4832698;
     FTabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
     FFolderPath := TPath.Combine(TPath.GetDocumentsPath, 'Ecommerce');
 end;
@@ -121,7 +122,7 @@ begin
     Request := TRequest.New
         .BaseURL(TAppConfig.WooApiUrl)
         .Resource(Resource)
-        .Timeout(180000)
+        .Timeout(1360000)
         .AddHeader('Content-Type', 'application/json', [poDoNotEncode])
         .BasicAuthentication(TAppConfig.ConsumerKey, TAppConfig.ConsumerSecret);
 
@@ -442,57 +443,63 @@ begin
     end;
 end;
 
-procedure TfrmTela_Principal.CriarVariacoesDoProduto(Produto: TWooProdutoResponse);
-var
-    Variacoes: TArray<TWooVariacaoProdutoRequest>;
-    Variacao: TWooVariacaoProdutoRequest;
-    AtributoGradeUm: TWooAtributoDaVariacao;
-    AtributoGradeDois: TWooAtributoDaVariacao;
-    TermoGradeUm: Integer;
-    TermoGradeDois: Integer;
-    BatchRequest: TWooVariacaoProdutoBatchRequest;
-    IndiceVariacoes: Integer;
-    RespostaAPI: TJSONValue;
+function TfrmTela_Principal.GerarSKUVariacao(
+    DscProduto: string;
+    SkuProdutoPai: string;
+    NumeroVariacao: Integer
+): string;
 begin
-    SetLength(
-    	Variacoes,
-    	Length(Produto.Attributes[0].Options) *
-        Length(Produto.Attributes[1].Options)
+	Result := SubstituirEspacosPorTraco(
+        DscProduto + ' ' +
+        SKUProdutoPai +  ' ' +
+        NumeroVariacao.ToString
     );
+end;
 
-    IndiceVariacoes := 0;
-
-    for TermoGradeUm := 0 to High(Produto.Attributes[0].Options) do
-    begin
-        for TermoGradeDois := 0 to High(Produto.Attributes[1].Options) do
-        begin
-        	AtributoGradeUm := TWooAtributoDaVariacao.Create;
-            AtributoGradeUm.Id := Produto.Attributes[0].Id;
-        	AtributoGradeUm.Option := Produto.Attributes[0].Options[TermoGradeUm];
-
-            AtributoGradeDois := TWooAtributoDaVariacao.Create;
-            AtributoGradeDois.Id := Produto.Attributes[1].Id;
-            AtributoGradeDois.Option := Produto.Attributes[1].Options[TermoGradeDois];
-
-            Variacao := TWooVariacaoProdutoRequest.Create;
-            Variacao.RegularPrice := Produto.RegularPrice;
-            Variacao.AdicionarAtributo(AtributoGradeUm);
-            Variacao.AdicionarAtributo(AtributoGradeDois);
-
-            Variacoes[IndiceVariacoes] := Variacao;
-            Inc(IndiceVariacoes);
-        end;
-    end;
-
-    BatchRequest := TWooVariacaoProdutoBatchRequest.Create;
+procedure TfrmTela_Principal.CriarVariacoesDoProduto(
+	ProdutoResponse: TWooProdutoResponse;
+	ProdutosGrade: TObjectList<TProdutoGrade>
+);
+var
+    VariacaoProdutoRequest: TWooVariacaoProdutoRequest;
+    BatchRequest: TWooVariacaoProdutoBatchRequest;
+    RespostaAPI: TJSONValue;
+    NumeroVariacao: Integer;
+begin
+	BatchRequest := nil;
+    RespostaAPI := nil;
+    NumeroVariacao := 1;
 
     try
-    	BatchRequest.Variacoes := Variacoes;
+        BatchRequest := TWooVariacaoProdutoBatchRequest.Create;
+
+        for var Variacao in ProdutosGrade do
+        begin
+        	VariacaoProdutoRequest := TWooVariacaoProdutoRequest.Create;
+            VariacaoProdutoRequest.RegularPrice := FormatFloat('0.00', Variacao.NumPrecoUnitario, TFormatSettings.Invariant);
+            VariacaoProdutoRequest.StockQuantity := Variacao.NumEstoque;
+            VariacaoProdutoRequest.AdicionarAtributo(
+                ProdutoResponse.Attributes[0].Id,
+                Variacao.VariacaoUm.DscVariacao
+            );
+            VariacaoProdutoRequest.AdicionarAtributo(
+                ProdutoResponse.Attributes[1].Id,
+                Variacao.VariacaoDois.DscVariacao
+            );
+            VariacaoProdutoRequest.Sku := GerarSKUVariacao(
+                ProdutoResponse.Name,
+                ProdutoResponse.Sku,
+                NumeroVariacao
+            );
+            BatchRequest.AdicionarVariacao(VariacaoProdutoRequest);
+            VariacaoProdutoRequest := nil;
+            Inc(NumeroVariacao);
+        end;
 
         RespostaAPI := ChamadaAPIWooCommerce(
-            'products/' + Produto.Id.ToString + '/variations/batch',
+            'products/' + ProdutoResponse.Id.ToString + '/variations/batch',
             'POST',
-            'Variações do produto ' + Produto.Name + ' criada com sucesso'
+            'Variações do produto ' + ProdutoResponse.Name + ' criadas com sucesso'
             ,
             TJson.ObjectToJsonString(BatchRequest)
         );
@@ -502,6 +509,7 @@ begin
             RespostaAPI.ToJSON
         );
     finally
+        RespostaAPI.Free;
         BatchRequest.Free;
     end;
 end;
@@ -714,7 +722,7 @@ begin
         Result.LoadFromStream(Response.ContentStream);
     except
        Result.Free;
-       raise Exception.Create('Error ao baixar a imagem!');
+       raise;
     end;
 end;
 
@@ -766,7 +774,8 @@ begin
             	Result := ListaImagensRequest;
             except
             	ListaImagensRequest.Free;
-                raise Exception.Create('Erro!');
+                Result.Free;
+                raise;
             end;
 
         finally
@@ -807,7 +816,6 @@ begin
 
             	ImagemResponse := TJson.JsonToObject<TWPImagemResponse>(iRes.Content);
             	Result.Add(ImagemResponse);
-            	ShowMessage('Upload de imagem bem sucedido');
         	finally
         		Stream.Free;
     		end;
@@ -824,18 +832,29 @@ var
     JSONResposta: TJSONValue;
 begin
 	JSONResposta := nil;
-    JSONString := TJSON.ObjectToJsonString(Produto);
     Result := nil;
 
     try
-    	JSONResposta := ChamadaAPIWooCommerce('products', 'POST', 'Produto cadastrado com sucesso', JSONString);
+        try
+        	JSONString := TJSON.ObjectToJsonString(Produto);
 
-    	SalvarConteudoEmArquivo(
-            TPath.Combine(FFolderPath, 'produto-response-after-created.txt'),
-            JSONResposta.ToJSON
-        );
+            JSONResposta := ChamadaAPIWooCommerce(
+                'products',
+                'POST',
+                'Produto cadastrado com sucesso',
+                JSONString
+            );
 
-        Result := TJson.JsonToObject<TWooProdutoResponse>(JSONResposta.ToJSON);
+            SalvarConteudoEmArquivo(
+                TPath.Combine(FFolderPath, 'produto-response-after-created.txt'),
+                JSONResposta.ToJSON
+            );
+
+            Result := TJson.JsonToObject<TWooProdutoResponse>(JSONResposta.ToJSON);
+        except
+        	Result.Free;
+            raise;
+        end;
     finally
        JSONResposta.Free;
     end;
@@ -850,13 +869,9 @@ var
     CategoriaResponse: TWooCategoriaResponse;
     Atributos: TObjectList<TWooAtributoResponse>;
     ListaImagensRequest: TObjectList<TWooImagemRequest>;
-    TermosAPI: TObjectList<TObjectList<TWooTermoResponse>>;
-    TermosDB: TList<string>;
     TermosProduto: TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
     WooProdutoResponse: TWooProdutoResponse;
     ProdutosGrade: TObjectList<TProdutoGrade>;
-    TermosvariacaoUm: TObjectList<TWooTermoResponse>;
-    TermosVariacaoDois: TObjectList<TWooTermoResponse>;
 begin
 	with sqlProdutos do
 	begin
@@ -880,11 +895,7 @@ begin
         ListaImagensRequest := nil;
         Secao := nil;
         TermosProduto := nil;
-        TermosAPI := nil;
-        TermosDB := nil;
         WooProdutoResponse := nil;
-        TermosVariacaoUm := nil;
-        TermosVariacaoDois := nil;
 
         try
         	ProdutoDB := ProdutoQueryToProduto(sqlProdutos);
@@ -903,17 +914,14 @@ begin
                         [Atributos.Count, Length(FTabelasVariacao)]
                     );
 
-                try
-                	ProdutosGrade := BuscarProdutosGrade(
-                        ProdutoDB.CodIdEmpresa,
-                        ProdutoDB.CodIdEmpresa,
-                        ProdutoDB.CodIdProduto
-                    );
 
-                    TermosProduto := EnviarTermos(Atributos, ProdutosGrade);
-                finally
+                ProdutosGrade := BuscarProdutosGrade(
+                	ProdutoDB.CodIdEmpresa,
+                    ProdutoDB.CodIdEmpresa,
+                    ProdutoDB.CodIdProduto
+                );
 
-                end;
+                TermosProduto := EnviarTermos(Atributos, ProdutosGrade);
             end;
 
             ListaImagensRequest := RetornarImagensRequest(ProdutoDB.CodIdProduto);
@@ -925,7 +933,8 @@ begin
                 TipoProduto,
                 CategoriaResponse.Id,
                 ListaImagensRequest,
-                TermosProduto);
+                TermosProduto
+            );
 
         	SalvarConteudoEmArquivo(
                 TPath.Combine(TPath.GetDocumentsPath, 'produto-request-object.txt.'),
@@ -935,16 +944,19 @@ begin
         	WooProdutoResponse := EnviarProduto(WooProdutoRequest);
 
             if WooProdutoResponse.PType = 'variable' then
-            	CriarVariacoesDoProduto(WooProdutoResponse);
+            	CriarVariacoesDoProduto(
+                    WooProdutoResponse,
+                    ProdutosGrade
+                );
         finally
         	WooProdutoResponse.Free;
         	WooProdutoRequest.Free;
             CategoriaResponse.Free;
             Secao.Free;
-            ProdutoDB.Free;
-            Atributos.Free;
             TermosProduto.Free;
-            TermosAPI.Free;
+            ProdutosGrade.Free;
+            Atributos.Free;
+            ProdutoDB.Free;
         end;
 	end;
 end;

@@ -58,15 +58,8 @@ begin
                 Atributo.Visible := True;
                 Atributo.Variation := True;
 
-                 ShowMessage(
-                	'Atributo Id: ' + Atributo.Id.ToString + sLineBreak +
-                    'Visible: ' + Atributo.Visible.ToString + sLineBreak +
-                    'Variation: ' + Atributo.Variation.ToString
-                );
-
                 for Termo in Pair.Value do
                 begin
-                    ShowMessage('Termo: ' + Termo.Name);
                     Atributo.AdicionarTermo(Termo.Name);
                 end;
 
