@@ -102,7 +102,7 @@ end;
 function TfrmTela_Principal.CriarQuery: TUniQuery;
 begin
     if not Assigned(Database) then
-        raise Exception.Create('N„o h· conex„o com o banco!');
+        raise Exception.Create('N√£o h√° conex√£o com o banco!');
 
     Result := TUniQuery.Create(nil);
     Result.Connection := Database;
@@ -139,7 +139,7 @@ begin
     else if UpperCase(Metodo) = 'DELETE' then
          Response := Request.Delete
     else
-        raise Exception.CreateFmt('MÈtodo %s n„o suportado', [Metodo]);
+        raise Exception.CreateFmt('M√©todo %s n√£o suportado', [Metodo]);
 
      if (not Assigned(Response)) then
      	raise Exception.Create('Nehuma resposta do servidor!');
@@ -150,12 +150,12 @@ begin
         	ShowMessage(MensagemAposRetorno);
     end
     else
-        raise(Exception.Create('RequisiÁ„o falhou. ' + Response.StatusCode.ToString + ': ' + Response.Content));
+        raise(Exception.Create('Requisi√ß√£o falhou. ' + Response.StatusCode.ToString + ': ' + Response.Content));
 
     JSONResposta := TJSONObject.ParseJSONValue(Response.Content);
 
     if not Assigned(JSONResposta) then
-        raise Exception.Create('JSON Retornado È inv·lido!');
+        raise Exception.Create('JSON Retornado √© inv√°lido!');
 
     Result := JSONResposta;
 end;
@@ -163,7 +163,7 @@ end;
 function TfrmTela_Principal.ChecarERetornarJSONArray(JSONResponse: TJSONValue): TJSONArray;
 begin
 	if not (JSONResponse is TJSONArray) then
-    	raise Exception.CreateFmt('Foi recebido %s ao invÈs de TJSONArray!', [JSONResponse.ClassName]);
+    	raise Exception.CreateFmt('Foi recebido %s ao inv√©s de TJSONArray!', [JSONResponse.ClassName]);
 
     Result := JSONResponse as TJSONArray;
 end;
@@ -252,7 +252,7 @@ begin
             Result := CriarAtributos;
 
             if not Assigned(Result) then
-                raise Exception.Create('Erro na criaÁ„o de atributos');
+                raise Exception.Create('Erro na cria√ß√£o de atributos');
         	Exit(Result);
     	end;
 
@@ -361,9 +361,7 @@ function TfrmTela_Principal.GerarListasDeVariacoesDosProdutosGrade(
 ): TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
 var
     VariacoesUm: TList<string>;
-    VariacoesDois: TList<string>;
     ListaVariacoesUm: TList<string>;
-    ListaVariacoesDois: TList<string>;
     ListaResponseUm: TObjectList<TWooTermoResponse>;
     Termos: TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
 begin
@@ -379,18 +377,16 @@ begin
     end;
 
     VariacoesUm := TList<string>.Create;
-    VariacoesDois := TList<string>.Create;
 
     for var Produto in ProdutosGrade do
     begin
+
         VariacoesUm.Add(Produto.VariacaoUm.DscVariacao);
         VariacoesDois.Add(Produto.VariacaoDois.DscVariacao);
     end;
 
     VariacoesUm := FiltrarTermosRepetidos(VariacoesUm);
-    VariacoesDois := FiltrarTermosRepetidos(VariacoesDois);
     ListaVariacoesUm := GerarListaDeStringsDosTermosDaAPI(TermosUm);
-    ListaVariacoesDois := GerarListaDeStringsDosTermosDaAPI(TermosDois);
 
     for var Variacao in VariacoesUm do
     begin
@@ -399,15 +395,6 @@ begin
 
         if not ListaVariacoesUm.Contains(Termo.Name) then
         	TermosUm.Add(PostarTermoNaAPI(Atributos[0].Id, Termo));
-    end;
-
-    for var Variacao in VariacoesDois do
-    begin
-        var Termo := TWooTermoAtributoRequest.Create;
-        Termo.Name:= Variacao;
-
-        if not ListaVariacoesDois.Contains(Termo.Name) then
-        	TermosDois.Add(PostarTermoNaAPI(Atributos[1].Id, Termo));
     end;
 
     Result.Add(Atributos[0].Id, TermosUm);
@@ -426,7 +413,7 @@ begin
     	JSONResposta := ChamadaAPIWooCommerce(
             'products/' + ProdutoID.ToString + '/variations',
             'GET',
-            'VariaÁıes do produto ' +  ProdutoID.ToString + ' retornadas com sucesso'
+            'Varia√ß√µes do produto ' +  ProdutoID.ToString + ' retornadas com sucesso'
     	);
 
     	VariacoesProdutoArray := ChecarERetornarJSONArray(JSONResposta);
@@ -503,7 +490,7 @@ begin
         RespostaAPI := ChamadaAPIWooCommerce(
             'products/' + ProdutoResponse.Id.ToString + '/variations/batch',
             'POST',
-            'VariaÁıes do produto ' + ProdutoResponse.Name + ' criadas com sucesso'
+            'Varia√ß√µes do produto ' + ProdutoResponse.Name + ' criadas com sucesso'
             ,
             TJson.ObjectToJsonString(BatchRequest)
         );
@@ -649,7 +636,7 @@ begin
     	SelectSecaoQuery.Open;
 
         if SelectSecaoQuery.IsEmpty then
-        	raise Exception.Create('SeÁ„o n„o encontrda no banco!');
+        	raise Exception.Create('Se√ß√£o n√£o encontrda no banco!');
 
         Result := TSecao.Create;
         Result.CodIdSecao := SelectSecaoQuery.FieldByName('COD_ID_SECAO').AsInteger;
@@ -737,7 +724,7 @@ begin
     	Response := TRequest.New.BaseURL(ImageUrl).Accept('*/*').Get;
         
         if Response.StatusCode <> 200 then
-        	raise Exception.Create('RquisiÁ„o falhou: ' + Response.StatusText);
+        	raise Exception.Create('Rquisi√ß√£o falhou: ' + Response.StatusText);
 
         Result.LoadFromStream(Response.ContentStream);
     except
@@ -832,7 +819,7 @@ begin
                     .Post;
 
             	if not (iRes.StatusCode in [200, 201]) then
-                	raise Exception.Create('RequisiÁ„o falhou: ' + iRes.StatusCode.ToString + '. ' + iRes.Content);
+                	raise Exception.Create('Requisi√ß√£o falhou: ' + iRes.StatusCode.ToString + '. ' + iRes.Content);
 
             	ImagemResponse := TJson.JsonToObject<TWPImagemResponse>(iRes.Content);
             	Result.Add(ImagemResponse);
@@ -929,8 +916,8 @@ begin
 
                 if Atributos.Count <> Length(FTabelasVariacao) then
                     raise Exception.CreateFmt(
-                        'Atributos e FTabelasVariaÁ„o s„o de tamanhos diferentes!' + sLineBreak +
-                        'Atributos: %d. FTabelasVariaÁ„o: %d.',
+                        'Atributos e FTabelasVaria√ß√£o s√£o de tamanhos diferentes!' + sLineBreak +
+                        'Atributos: %d. FTabelasVaria√ß√£o: %d.',
                         [Atributos.Count, Length(FTabelasVariacao)]
                     );
 
