@@ -62,6 +62,7 @@ type
       ProdutosGrade: TObjectList<TProdutoGrade>): TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
     function GerarListaDeStringsDosTermosDaAPI(TermosAPI: TObjectList<TWooTermoResponse>):
       TList<string>;
+    function BuscarProdutoPorSKU(SKU: string): TWooProdutoResponse;
   private
     FSQLProdutosBase: string;
     FSQLImagensBase: string;
@@ -81,6 +82,38 @@ uses
   DataSet.Serialize;
 
 {$R *.dfm}
+
+function TfrmTela_Principal.BuscarProdutoPorSKU(SKU: string): TWooProdutoResponse;
+var
+    JSONResposta: TJSONValue;
+    Produtos: TArray<TWooProdutoResponse>;
+begin
+    try
+        JSONResposta := nil;
+        SetLength(Produtos, 0);
+
+        try
+        	JSONResposta := ChamadaAPIWooCommerce(Format('products?sku=%s', [SKU]), 'GET');
+
+    		if(JSONResposta is TJSONArray) then
+            begin
+                for var Value in JSONResposta AS TJSONArray do
+                begin
+                	SetLength(Produtos, Length(Produtos) + 1);
+                	Produtos[High(Produtos)] := TJson.JsonToObject<TWooProdutoResponse>(Value.toJSON);
+                    Result := Produtos[High(Produtos)];
+                end;
+            end;
+
+            SalvarConteudoEmArquivo(TPath.Combine(TPath.GetDocumentsPath, 'produto-por-sku.txt'), JSONResposta.ToJSON);
+        except
+            Result.Free;
+            raise;
+        end;
+    finally
+        JSONResposta.Free;
+    end;
+end;
 
 procedure TfrmTela_Principal.FormCreate(Sender: TObject);
 begin
@@ -506,7 +539,8 @@ function TfrmTela_Principal.BuscarProdutosGrade(
   CodIdEmpresa: Integer;
   CodIdLoja: Integer;
   CodIdProduto: Integer
-): TObjectList<TProdutoGrade>;
+
+  ): TObjectList<TProdutoGrade>;
 var
   Query: TUniQuery;
   ProdutoGrade: TProdutoGrade;
@@ -895,13 +929,6 @@ begin
       begin
         TipoProduto := 'variable';
         Atributos   := BuscarAtributos;
-
-        if Atributos.Count <> Length(FTabelasVariacao) then
-          raise Exception.CreateFmt(
-            'Atributos e FTabelasVariação são de tamanhos diferentes!' + sLineBreak +
-            'Atributos: %d. FTabelasVariação: %d.',
-            [Atributos.Count, Length(FTabelasVariacao)]
-          );
 
         ProdutosGrade := BuscarProdutosGrade(
           ProdutoDB.CodIdEmpresa,
