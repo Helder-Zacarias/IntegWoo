@@ -42,12 +42,15 @@ begin
     begin
         Result.RegularPrice := FormatFloat('0.00', Produto.NumPrecoVarejo, TFormatSettings.Invariant);
         Result.StockQuantity := Produto.NumEstqAtual;
+        ShowMessage('Produto Simples');
     end;
 
     if Assigned(ListaImagensProduto) then
     begin
       for var ImagemProduto in ListaImagensProduto do
     	Result.AdicionarImagem(ImagemProduto);
+
+        ShowMessage('Adicionou imagens');
     end;
 
     if Assigned(TermosProduto) then
@@ -69,9 +72,9 @@ begin
   			end;
         finally
         end;
-
-
     end;
+
+    ShowMessage('Atribuição do produto finalizada');
 end;
 
 function ProdutoQueryToProduto(Query: TUniQuery): TProduto;
@@ -87,7 +90,6 @@ begin
     Result.DscCompleta := Query.FieldByName('DSC_COMPLETA').AsString;
     Result.NumPrecoVarejo := Query.FieldByName('NUM_PRECO_VAREJO').AsCurrency;
     Result.NumTipoProduto := Query.FieldByName('NUM_TIPO_PRODUTO').AsInteger;
-    Result.NumEstqAtual := Query.FieldByName('NUM_ESTQ_ATUAL').AsInteger;
 end;
 
 function ProdutoImagemQueryToProdutoImagem(Query: TUniQuery): TProdutoImagem;

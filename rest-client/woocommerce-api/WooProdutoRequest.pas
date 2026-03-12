@@ -11,6 +11,7 @@ uses
 type
 	TWooProdutoRequest = class
     private
+    	FId: Integer;
     	FName: string;
         FType: string;
         FDescription: string;
@@ -18,7 +19,7 @@ type
         FRegular_price: string;
         FSku: string;
         FManage_stock: Boolean;
-        FStock_quantity: Integer;
+        FStock_quantity: Double;
         FImages: TArray<TWooImagemRequest>;
         FCategories: TArray<TWooProdutoCategoriaRequest>;
         FAttributes: TArray<TWooAtributosProdutoRequest>;
@@ -29,6 +30,9 @@ type
         procedure AdicionarAtributo(Atributo: TWooAtributosProdutoRequest);
         procedure AdicionarCategoria(Categoria: TWooProdutoCategoriaRequest);
     published
+        [JSONName('id')]
+        property Id: Integer read FId write FId;
+
         [JSONName('name')]
         property Name: string read FName write FName;
 
@@ -51,7 +55,7 @@ type
         property ManageStock: Boolean read FManage_stock write FManage_stock;
 
         [JSONName('stock_quantity')]
-        property StockQuantity: Integer read FStock_quantity write FStock_quantity;
+        property StockQuantity: Double read FStock_quantity write FStock_quantity;
 
         [JSONName('images')]
         property Images: TArray<TWooImagemRequest> read FImages write FImages;
