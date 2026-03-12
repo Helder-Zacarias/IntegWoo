@@ -36,13 +36,13 @@ type
     procedure butBuscarProdutosClick(Sender: TObject);
     procedure btnEnviarProdutosClick(Sender: TObject);
     function ChamadaAPIWooCommerce(Resource: string; Metodo: string;
-    	MensagemAposRetorno: string = ''; Body: string = ''): TJSONValue;
+      MensagemAposRetorno: string = ''; Body: string = ''): TJSONValue;
     function DownloadImage(ImageUrl: string = ''): TMemoryStream;
-	function EnviarImagem(ListaImagens: TObjectList<TProdutoImagem>): TObjectList<TWPImagemResponse>;
+    function EnviarImagem(ListaImagens: TObjectList<TProdutoImagem>): TObjectList<TWPImagemResponse>;
     function EnviarProduto(Produto: TWooProdutoRequest): TWooProdutoResponse;
     function CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
     function EnviarTermos(Atributos: TObjectList<TWooAtributoResponse>; ProdutosGrade: TObjectList<TProdutoGrade>)
-    	: TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
+      : TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
     function BuscarCategorias(Secao: TSecao): TWooCategoriaResponse;
     function BuscarAtributos: TObjectList<TWooAtributoResponse>;
     function BuscarSecaoNoBanco(CodIdEmpresa: Integer; CodIdSecao: Integer): TSecao;
@@ -59,14 +59,12 @@ type
     function PostarTermoNaAPI(AtributoId: Integer; Termo: TWooTermoAtributoRequest): TWooTermoResponse;
     function FiltrarTermosRepetidos(Variacoes: TList<string>): TList<string>;
     function GerarListasDeVariacoesDosProdutosGrade(Atributos: TObjectList<TWooAtributoResponse>;
-    	ProdutosGrade: TObjectList<TProdutoGrade>): TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
+      ProdutosGrade: TObjectList<TProdutoGrade>): TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
     function GerarListaDeStringsDosTermosDaAPI(TermosAPI: TObjectList<TWooTermoResponse>):
-    	TList<string>;
-    function GerarSKUVariacao(DscProduto: string; VariacaoUm: string; VariacaoDois: string): string;
-    function CriarProdutoGrade(Query: TUniQuery): TProdutoGrade;
+      TList<string>;
   private
     FSQLProdutosBase: string;
-  	FSQLImagensBase: string;
+    FSQLImagensBase: string;
     FCodIdProduto: Integer;
     FTabelasVariacao: TArray<string>;
     FFolderPath: string;
@@ -80,911 +78,879 @@ var
 
 implementation
 uses
-	DataSet.Serialize;
+  DataSet.Serialize;
 
 {$R *.dfm}
 
 procedure TfrmTela_Principal.FormCreate(Sender: TObject);
 begin
-	FSQLProdutosBase := sqlProdutos.SQL.Text;
-    FSQLImagensBase := sqlImagens.SQL.Text;
-    FCodIdProduto := 4832698;
-    FTabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
-    FFolderPath := TPath.Combine(TPath.GetDocumentsPath, 'Ecommerce');
+  FSQLProdutosBase := sqlProdutos.SQL.Text;
+  FSQLImagensBase  := sqlImagens.SQL.Text;
+  FCodIdProduto    := 4832831;
+  // Para adicionar uma 3ª variação no futuro, basta incluir aqui — o resto do código se adapta automaticamente
+  FTabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
+  FFolderPath      := TPath.Combine(TPath.GetDocumentsPath, 'Ecommerce');
 end;
 
 procedure TfrmTela_Principal.btnHamburguerClick(Sender: TObject);
 begin
-    panelSide.Visible := not panelSide.Visible;
-    btnHamburguer.BringToFront;
+  panelSide.Visible := not panelSide.Visible;
+  btnHamburguer.BringToFront;
 end;
 
 function TfrmTela_Principal.CriarQuery: TUniQuery;
 begin
-    if not Assigned(Database) then
-        raise Exception.Create('Não há conexão com o banco!');
+  if not Assigned(Database) then
+    raise Exception.Create('Não há conexão com o banco!');
 
-    Result := TUniQuery.Create(nil);
-    Result.Connection := Database;
+  Result := TUniQuery.Create(nil);
+  Result.Connection := Database;
 end;
 
 function TfrmTela_Principal.ChamadaAPIWooCommerce(
-    Resource: string;
-    Metodo: string;
-    MensagemAposRetorno: string = '';
-    Body: string = ''): TJSONValue;
+  Resource: string;
+  Metodo: string;
+  MensagemAposRetorno: string = '';
+  Body: string = ''): TJSONValue;
 var
-    Request: IRequest;
-    Response: IResponse;
-    JSONResposta: TJSONValue;
+  Request: IRequest;
+  Response: IResponse;
+  JSONResposta: TJSONValue;
 begin
-	Result := nil;
+  Result := nil;
 
-    Request := TRequest.New
-        .BaseURL(TAppConfig.WooApiUrl)
-        .Resource(Resource)
-        .Timeout(1360000)
-        .AddHeader('Content-Type', 'application/json', [poDoNotEncode])
-        .BasicAuthentication(TAppConfig.ConsumerKey, TAppConfig.ConsumerSecret);
+  Request := TRequest.New
+    .BaseURL(TAppConfig.WooApiUrl)
+    .Resource(Resource)
+    .Timeout(1360000)
+    .AddHeader('Content-Type', 'application/json', [poDoNotEncode])
+    .BasicAuthentication(TAppConfig.ConsumerKey, TAppConfig.ConsumerSecret);
 
-    if not Body.IsEmpty then
-    	Request.AddBody(Body);
+  if not Body.IsEmpty then
+    Request.AddBody(Body);
 
-    if  UpperCase(Metodo) = 'GET' then
-    	Response := Request.Get
-    else if UpperCase(Metodo) = 'POST' then
-        Response := Request.Post
-    else if UpperCase(Metodo) = 'PUT' then
-         Response := Request.Put
-    else if UpperCase(Metodo) = 'DELETE' then
-         Response := Request.Delete
-    else
-        raise Exception.CreateFmt('Método %s não suportado', [Metodo]);
+  if UpperCase(Metodo) = 'GET' then
+    Response := Request.Get
+  else if UpperCase(Metodo) = 'POST' then
+    Response := Request.Post
+  else if UpperCase(Metodo) = 'PUT' then
+    Response := Request.Put
+  else if UpperCase(Metodo) = 'DELETE' then
+    Response := Request.Delete
+  else
+    raise Exception.CreateFmt('Método %s não suportado', [Metodo]);
 
-     if (not Assigned(Response)) then
-     	raise Exception.Create('Nehuma resposta do servidor!');
+  if not Assigned(Response) then
+    raise Exception.Create('Nenhuma resposta do servidor!');
 
-    if Response.StatusCode in [200, 201] then
-    begin
-    	if (not MensagemAposRetorno.IsEmpty) then
-        	ShowMessage(MensagemAposRetorno);
-    end
-    else
-        raise(Exception.Create('Requisição falhou. ' + Response.StatusCode.ToString + ': ' + Response.Content));
+  if Response.StatusCode in [200, 201] then
+  begin
+    if not MensagemAposRetorno.IsEmpty then
+      ShowMessage(MensagemAposRetorno);
+  end
+  else
+    raise Exception.Create('Requisição falhou. ' + Response.StatusCode.ToString + ': ' + Response.Content);
 
-    JSONResposta := TJSONObject.ParseJSONValue(Response.Content);
+  JSONResposta := TJSONObject.ParseJSONValue(Response.Content);
 
-    if not Assigned(JSONResposta) then
-        raise Exception.Create('JSON Retornado é inválido!');
+  if not Assigned(JSONResposta) then
+    raise Exception.Create('JSON Retornado é inválido!');
 
-    Result := JSONResposta;
+  Result := JSONResposta;
 end;
 
 function TfrmTela_Principal.ChecarERetornarJSONArray(JSONResponse: TJSONValue): TJSONArray;
 begin
-	if not (JSONResponse is TJSONArray) then
-    	raise Exception.CreateFmt('Foi recebido %s ao invés de TJSONArray!', [JSONResponse.ClassName]);
+  if not (JSONResponse is TJSONArray) then
+    raise Exception.CreateFmt('Foi recebido %s ao invés de TJSONArray!', [JSONResponse.ClassName]);
 
-    Result := JSONResponse as TJSONArray;
+  Result := JSONResponse as TJSONArray;
 end;
 
 procedure TfrmTela_Principal.butBuscarProdutosClick(Sender: TObject);
 begin
-    TTask.Run(
-        procedure
-        var
-            JSONResposta: TJSONValue;
-        begin
-        	JSONResposta := nil;
+  TTask.Run(
+    procedure
+    var
+      JSONResposta: TJSONValue;
+    begin
+      JSONResposta := nil;
 
-            try
-    			JSONResposta := ChamadaAPIWooCommerce('products', 'GET');
+      try
+        JSONResposta := ChamadaAPIWooCommerce('products', 'GET');
 
-                if not Assigned(JSONResposta) then
-                    raise Exception.Create('Nenhuma Resposta da API do WooComemrce!');
+        if not Assigned(JSONResposta) then
+          raise Exception.Create('Nenhuma Resposta da API do WooCommerce!');
 
-                TThread.Queue(
-                    nil,
-                    procedure
-                    begin
-                        ShowMessage('Produtos retornados com sucesso!');
-                    end
-                );
-    		finally
-         		JSONResposta.Free;
-    		end;
-        end
-    );
+        TThread.Queue(
+          nil,
+          procedure
+          begin
+            ShowMessage('Produtos retornados com sucesso!');
+          end
+        );
+      finally
+        JSONResposta.Free;
+      end;
+    end
+  );
 end;
 
+// ============================================================
+// MUDANÇA 1: CriarAtributos agora é dinâmico — cria um atributo
+// para cada entrada em FTabelasVariacao, sem quantidade fixa.
+// ============================================================
 function TfrmTela_Principal.CriarAtributos: TObjectList<TWooAtributoResponse>;
 var
-	Atributos: TArray<TWooAtributoRequest>;
-    JSONResposta: TJSONValue;
+  Atributo: TWooAtributoRequest;
+  JSONResposta: TJSONValue;
 begin
-	Result := nil;
-	SetLength(Atributos, 2);
-	Atributos[0] := TWooAtributoRequest.Create;
-    Atributos[0].Name := 'Grade 1';
+  Result := TObjectList<TWooAtributoResponse>.Create(True);
 
-    Atributos[1] := TWooAtributoRequest.Create;
-    Atributos[1].Name := 'Grade 2';
-    
-    try
-        Result := TObjectList<TWooAtributoResponse>.Create(True);
+  try
+    for var I := 0 to High(FTabelasVariacao) do
+    begin
+      Atributo     := TWooAtributoRequest.Create;
+      Atributo.Name := 'Grade ' + IntToStr(I + 1);
+      JSONResposta  := nil;
 
-    	for var I := 0 to High(Atributos) do
-        begin
-        	JSONResposta := nil;
-            
-        	try
-            	JSONResposta := ChamadaAPIWooCommerce(
-                    'products/attributes', 'POST', 'Atributo criado com sucesso',
-                    TJson.ObjectToJsonString(Atributos[I])
-            	);
-                Result.Add(TJson.JsonToObject<TWooAtributoResponse>(JSONResposta.ToJSON)) ;
-            finally
-                JSONResposta.Free;
-            end;
-        end;
-    finally
-    	for var I := 0 to High(Atributos) do
-        	Atributos[I].Free;
+      try
+        JSONResposta := ChamadaAPIWooCommerce(
+          'products/attributes', 'POST', 'Atributo criado com sucesso',
+          TJson.ObjectToJsonString(Atributo)
+        );
+        Result.Add(TJson.JsonToObject<TWooAtributoResponse>(JSONResposta.ToJSON));
+      finally
+        JSONResposta.Free;
+        Atributo.Free;
+      end;
     end;
+  except
+    Result.Free;
+    raise;
+  end;
 end;
 
 function TfrmTela_Principal.BuscarAtributos: TObjectList<TWooAtributoResponse>;
 var
-    JSONResposta: TJSONValue;
-    JSONArray: TJSONArray;
-    Payload: string;
+  JSONResposta: TJSONValue;
+  JSONArray: TJSONArray;
 begin
-	Result := nil;
-    JSONResposta := nil;
-    JSONArray := nil;
+  Result       := nil;
+  JSONResposta := nil;
+  JSONArray    := nil;
 
-     try
-        JSONResposta := ChamadaAPIWooCommerce('products/attributes', 'GET', 'Atributos retornados com sucesso');
-        JSONArray := ChecarERetornarJSONArray(JSONResposta);
+  try
+    JSONResposta := ChamadaAPIWooCommerce('products/attributes', 'GET', 'Atributos retornados com sucesso');
+    JSONArray    := ChecarERetornarJSONArray(JSONResposta);
 
-        if (not Assigned(JSONArray)) or (JSONArray.Count = 0) then
-    	begin
-            Result := CriarAtributos;
+    if (not Assigned(JSONArray)) or (JSONArray.Count = 0) then
+    begin
+      Result := CriarAtributos;
 
-            if not Assigned(Result) then
-                raise Exception.Create('Erro na criação de atributos');
-        	Exit(Result);
-    	end;
+      if not Assigned(Result) then
+        raise Exception.Create('Erro na criação de atributos');
 
-        try
-        	Result := TObjectList<TWooAtributoResponse>.Create(True);
+      Exit(Result);
+    end;
 
-        	for var Response in JSONArray do
-            	Result.Add(TJson.JsonToObject<TWooAtributoResponse>(Response.ToJSON));
-        except
-        	Result.Free;
-            raise;
-        end;
-     finally
-        JSONResposta.Free;
-     end;
-end;
+    try
+      Result := TObjectList<TWooAtributoResponse>.Create(True);
 
-function TfrmTela_Principal.EnviarTermos(
-	Atributos: TObjectList<TWooAtributoResponse>;
-    ProdutosGrade: TObjectList<TProdutoGrade>
-): TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
-begin
-    Result := GerarListasDeVariacoesDosProdutosGrade(
-        Atributos,
-        ProdutosGrade
-    );
+      for var Response in JSONArray do
+        Result.Add(TJson.JsonToObject<TWooAtributoResponse>(Response.ToJSON));
+    except
+      Result.Free;
+      raise;
+    end;
+  finally
+    JSONResposta.Free;
+  end;
 end;
 
 function TfrmTela_Principal.BuscarTermosNaApi(AtributoID: Integer): TObjectList<TWooTermoResponse>;
 var
-    JSONResposta: TJSONValue;
-    ListaTermosAPI: TJSONArray;
+  JSONResposta: TJSONValue;
+  ListaTermosAPI: TJSONArray;
 begin
-    Result := TObjectList<TWooTermoResponse>.Create(True);
-	JSONResposta := nil;
+  Result       := TObjectList<TWooTermoResponse>.Create(True);
+  JSONResposta := nil;
 
+  try
     try
-    	try
-        	JSONResposta := ChamadaAPIWooCommerce(
-                'products/attributes/'
-                    + AtributoId.ToString
-                    + '/terms?per_page=100',
-                'GET'
-            );
+      JSONResposta := ChamadaAPIWooCommerce(
+        'products/attributes/' + AtributoId.ToString + '/terms?per_page=100',
+        'GET'
+      );
 
-            ListaTermosAPI := ChecarERetornarJSONArray(JSONResposta);
+      ListaTermosAPI := ChecarERetornarJSONArray(JSONResposta);
 
-        	for var TermoAPI in ListaTermosAPI do
-            	Result.Add(TJson.JsonToObject<TWooTermoResponse>(TermoAPI.ToJSON));
-        except
-        	Result.Free;
-            raise;
-        end;
-    finally
-       JSONResposta.Free;
+      for var TermoAPI in ListaTermosAPI do
+        Result.Add(TJson.JsonToObject<TWooTermoResponse>(TermoAPI.ToJSON));
+    except
+      Result.Free;
+      raise;
     end;
+  finally
+    JSONResposta.Free;
+  end;
 end;
 
 function TfrmTela_Principal.PostarTermoNaAPI(AtributoId: Integer; Termo: TWooTermoAtributoRequest): TWooTermoResponse;
 var
-	JSONResposta: TJSONValue;
+  JSONResposta: TJSONValue;
 begin
-    try
-    	JSONResposta := ChamadaAPIWooCommerce(
-            '/products/attributes/' + AtributoId.ToString + '/terms',
-            'POST',
-            'Termo criado com sucesso!',
-            TJson.ObjectToJsonString(Termo)
-    	);
+  try
+    JSONResposta := ChamadaAPIWooCommerce(
+      '/products/attributes/' + AtributoId.ToString + '/terms',
+      'POST',
+      'Termo criado com sucesso!',
+      TJson.ObjectToJsonString(Termo)
+    );
 
-        Result := TJson.JsonToObject<TWooTermoResponse>(JSONResposta.ToJSON);
-    finally
-        JSONResposta.Free;
-    end;
+    Result := TJson.JsonToObject<TWooTermoResponse>(JSONResposta.ToJSON);
+  finally
+    JSONResposta.Free;
+  end;
 end;
 
-function TfrmTela_Principal.FiltrarTermosRepetidos(
-	Variacoes: TList<string>
-): TList<string>;
+function TfrmTela_Principal.FiltrarTermosRepetidos(Variacoes: TList<string>): TList<string>;
 var
-    TermosDistintos: TStringList;
+  TermosDistintos: TStringList;
 begin
-    Result := TList<string>.Create;
-    TermosDistintos := TStringList.Create;
-    TermosDistintos.Sorted := True;
-    TermosDistintos.Duplicates := dupIgnore;
+  Result          := TList<string>.Create;
+  TermosDistintos := TStringList.Create;
+  TermosDistintos.Sorted     := True;
+  TermosDistintos.Duplicates := dupIgnore;
 
-    for var Variacao in Variacoes do
-    	TermosDistintos.Add(Variacao);
+  for var Variacao in Variacoes do
+    TermosDistintos.Add(Variacao);
 
-    for var Termo in TermosDistintos do
-        Result.Add(Termo);
+  for var Termo in TermosDistintos do
+    Result.Add(Termo);
 end;
 
 function TfrmTela_Principal.GerarListaDeStringsDosTermosDaAPI(
-	TermosAPI: TObjectList<TWooTermoResponse>
+  TermosAPI: TObjectList<TWooTermoResponse>
 ): TList<string>;
 begin
-    for var Termo in TermosAPI do
-        Result.Add(Termo.Name);
+  Result := TList<string>.Create;
+
+  for var Termo in TermosAPI do
+    Result.Add(Termo.Name);
 end;
 
+// ============================================================
+// MUDANÇA 2: GerarListasDeVariacoesDosProdutosGrade agora itera
+// sobre todos os atributos dinamicamente via loop, em vez de
+// acessar Atributos[0] e Atributos[1] de forma fixa.
+// Cada coluna de variação (I) é lida de Grade.Variacoes[I].
+// ============================================================
 function TfrmTela_Principal.GerarListasDeVariacoesDosProdutosGrade(
-	Atributos: TObjectList<TWooAtributoResponse>;
-    ProdutosGrade: TObjectList<TProdutoGrade>
+  Atributos: TObjectList<TWooAtributoResponse>;
+  ProdutosGrade: TObjectList<TProdutoGrade>
 ): TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
 var
-    VariacoesUm: TList<string>;
-    VariacoesDois: TList<string>;
-    ListaVariacoesUm: TList<string>;
-    ListaVariacoesDois: TList<string>;
-    ListaResponseUm: TObjectList<TWooTermoResponse>;
-    Termos: TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
+  I: Integer;
+  Variacoes: TList<string>;
+  TermosAPI: TObjectList<TWooTermoResponse>;
+  TermosExistentes: TList<string>;
+  Termo: TWooTermoAtributoRequest;
 begin
-    Result := TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>.Create([doOwnsValues]);
-    Termos := TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>.Create([doOwnsValues]);
+  Result := TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>.Create([doOwnsValues]);
 
-    for var Atributo in Atributos do
-    begin
-        Termos.Add(
-            Atributo.Id,
-            BuscarTermosNaApi(Atributo.Id)
-        );
+  for I := 0 to Atributos.Count - 1 do
+  begin
+    TermosAPI        := BuscarTermosNaApi(Atributos[I].Id);
+    TermosExistentes := GerarListaDeStringsDosTermosDaAPI(TermosAPI);
+
+    Variacoes := TList<string>.Create;
+    try
+      // Coleta a descrição da variação na posição I de cada produto
+      for var Grade in ProdutosGrade do
+        Variacoes.Add(Grade.Variacoes[I].DscVariacao);
+
+      Variacoes := FiltrarTermosRepetidos(Variacoes);
+
+      for var DscVariacao in Variacoes do
+      begin
+        if not TermosExistentes.Contains(DscVariacao) then
+        begin
+          Termo      := TWooTermoAtributoRequest.Create;
+          Termo.Name := DscVariacao;
+          TermosAPI.Add(PostarTermoNaAPI(Atributos[I].Id, Termo));
+        end;
+      end;
+
+      Result.Add(Atributos[I].Id, TermosAPI);
+    finally
+      TermosExistentes.Free;
+      Variacoes.Free;
     end;
+  end;
+end;
 
-    VariacoesUm := TList<string>.Create;
-    VariacoesDois := TList<string>.Create;
-
-    for var Produto in ProdutosGrade do
-    begin
-        VariacoesUm.Add(Produto.VariacaoUm.DscVariacao);
-        VariacoesDois.Add(Produto.VariacaoDois.DscVariacao);
-    end;
-
-    VariacoesUm := FiltrarTermosRepetidos(VariacoesUm);
-    VariacoesDois := FiltrarTermosRepetidos(VariacoesDois);
-    ListaVariacoesUm := GerarListaDeStringsDosTermosDaAPI(TermosUm);
-    ListaVariacoesDois := GerarListaDeStringsDosTermosDaAPI(TermosDois);
-
-    for var Variacao in VariacoesUm do
-    begin
-        var Termo := TWooTermoAtributoRequest.Create;
-        Termo.Name:= Variacao;
-
-        if not ListaVariacoesUm.Contains(Termo.Name) then
-        	TermosUm.Add(PostarTermoNaAPI(Atributos[0].Id, Termo));
-    end;
-
-    for var Variacao in VariacoesDois do
-    begin
-        var Termo := TWooTermoAtributoRequest.Create;
-        Termo.Name:= Variacao;
-
-        if not ListaVariacoesDois.Contains(Termo.Name) then
-        	TermosDois.Add(PostarTermoNaAPI(Atributos[1].Id, Termo));
-    end;
-
-    Result.Add(Atributos[0].Id, TermosUm);
-    Result.Add(Atributos[1].Id, TermosDois)
+function TfrmTela_Principal.EnviarTermos(
+  Atributos: TObjectList<TWooAtributoResponse>;
+  ProdutosGrade: TObjectList<TProdutoGrade>
+): TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
+begin
+  Result := GerarListasDeVariacoesDosProdutosGrade(Atributos, ProdutosGrade);
 end;
 
 function TfrmTela_Principal.GetVariacoesDoProduto(ProdutoID: Integer): TObjectList<TWooVariacaoProdutoResponse>;
 var
-    JSONResposta: TJSONValue;
-    VariacoesProdutoArray: TJSONArray;
+  JSONResposta: TJSONValue;
+  VariacoesProdutoArray: TJSONArray;
 begin
-    Result := nil;
-    JSONResposta := nil;
+  Result       := nil;
+  JSONResposta := nil;
+
+  try
+    JSONResposta := ChamadaAPIWooCommerce(
+      'products/' + ProdutoID.ToString + '/variations',
+      'GET',
+      'Variações do produto ' + ProdutoID.ToString + ' retornadas com sucesso'
+    );
+
+    VariacoesProdutoArray := ChecarERetornarJSONArray(JSONResposta);
+    Result := TObjectList<TWooVariacaoProdutoResponse>.Create(True);
 
     try
-    	JSONResposta := ChamadaAPIWooCommerce(
-            'products/' + ProdutoID.ToString + '/variations',
-            'GET',
-            'Variações do produto ' +  ProdutoID.ToString + ' retornadas com sucesso'
-    	);
-
-    	VariacoesProdutoArray := ChecarERetornarJSONArray(JSONResposta);
-        Result := TObjectList<TWooVariacaoProdutoResponse>.Create(True);
-
-        try
-        	for var VariacaoResponse in VariacoesProdutoArray do
-            	Result.Add(TJson.JsonToObject<TWooVariacaoProdutoResponse>(VariacaoResponse.ToJSON));
-        except
-           Result.Free;
-           raise;
-        end;
-    finally
-       JSONResposta.Free;
+      for var VariacaoResponse in VariacoesProdutoArray do
+        Result.Add(TJson.JsonToObject<TWooVariacaoProdutoResponse>(VariacaoResponse.ToJSON));
+    except
+      Result.Free;
+      raise;
     end;
+  finally
+    JSONResposta.Free;
+  end;
 end;
 
-function TfrmTela_Principal.GerarSKUVariacao(
-    DscProduto: string;
-    VariacaoUm: string;
-    VariacaoDois: string
-): string;
-begin
-	Result := SubstituirEspacosPorTraco(
-        DscProduto + ' ' +
-        VariacaoUm +  ' ' +
-        VariacaoDois
-    );
-end;
-
+// ============================================================
+// MUDANÇA 3: CriarVariacoesDoProduto substituiu os dois blocos
+// fixos de AdicionarAtributo e o GerarSKUVariacao(a, b) por
+// um loop sobre Grade.Variacoes, tornando-o compatível com
+// qualquer número de atributos. GerarSKUVariacao foi removido.
+// ============================================================
 procedure TfrmTela_Principal.CriarVariacoesDoProduto(
-	ProdutoResponse: TWooProdutoResponse;
-	ProdutosGrade: TObjectList<TProdutoGrade>
+  ProdutoResponse: TWooProdutoResponse;
+  ProdutosGrade: TObjectList<TProdutoGrade>
 );
 var
-    VariacaoProdutoRequest: TWooVariacaoProdutoRequest;
-    BatchRequest: TWooVariacaoProdutoBatchRequest;
-    RespostaAPI: TJSONValue;
-    NumeroVariacao: Integer;
+  BatchRequest: TWooVariacaoProdutoBatchRequest;
+  VariacaoProdutoRequest: TWooVariacaoProdutoRequest;
+  RespostaAPI: TJSONValue;
+  SKUPartes: TStringList;
 begin
-	BatchRequest := nil;
-    RespostaAPI := nil;
-    NumeroVariacao := 1;
+  BatchRequest := TWooVariacaoProdutoBatchRequest.Create;
+  RespostaAPI  := nil;
 
-    try
-        BatchRequest := TWooVariacaoProdutoBatchRequest.Create;
-
-        for var Variacao in ProdutosGrade do
-        begin
-        	VariacaoProdutoRequest := TWooVariacaoProdutoRequest.Create;
-            VariacaoProdutoRequest.RegularPrice := FormatFloat('0.00', Variacao.NumPrecoUnitario, TFormatSettings.Invariant);
-            VariacaoProdutoRequest.StockQuantity := Variacao.NumEstoque;
-            VariacaoProdutoRequest.AdicionarAtributo(
-                ProdutoResponse.Attributes[0].Id,
-                Variacao.VariacaoUm.DscVariacao
-            );
-
-            VariacaoProdutoRequest.AdicionarAtributo(
-                ProdutoResponse.Attributes[1].Id,
-                Variacao.VariacaoDois.DscVariacao
-            );
-
-            VariacaoProdutoRequest.Sku := GerarSKUVariacao(
-                ProdutoResponse.Name,
-                Variacao.VariacaoUm.DscVariacao,
-                Variacao.VariacaoDois.DscVariacao
-            );
-
-            BatchRequest.AdicionarVariacao(VariacaoProdutoRequest);
-            VariacaoProdutoRequest := nil;
-            Inc(NumeroVariacao);
-        end;
-
-        RespostaAPI := ChamadaAPIWooCommerce(
-            'products/' + ProdutoResponse.Id.ToString + '/variations/batch',
-            'POST',
-            'Variações do produto ' + ProdutoResponse.Name + ' criadas com sucesso'
-            ,
-            TJson.ObjectToJsonString(BatchRequest)
-        );
-
-        SalvarConteudoEmArquivo(
-            TPath.Combine(FFolderPath, 'variacoes-criadas-api.txt'),
-            RespostaAPI.ToJSON
-        );
-    finally
-        RespostaAPI.Free;
-        BatchRequest.Free;
-    end;
-end;
-
-function TfrmTela_Principal.CriarProdutoGrade(Query: TUniQuery): TProdutoGrade;
-begin
-    with Query do
+  try
+    for var Grade in ProdutosGrade do
     begin
-    	Result := TProdutoGrade.Create;
-        Result.NumPrecoUnitario := FieldByName('NUM_PRECO_UNITARIO').AsCurrency;
-        Result.NumEstoque := FieldByName('NUM_ESTOQUE').AsInteger;
+      VariacaoProdutoRequest := TWooVariacaoProdutoRequest.Create;
+      VariacaoProdutoRequest.RegularPrice  := FormatFloat('0.00', Grade.NumPrecoUnitario, TFormatSettings.Invariant);
+      VariacaoProdutoRequest.StockQuantity := Grade.NumEstoque;
 
-        if (not FieldByName('COD_ID_VAR_1').isNull) then
+      SKUPartes := TStringList.Create;
+      try
+        SKUPartes.Add(ProdutoResponse.Name);
+
+        // Itera sobre todas as variações do produto dinamicamente
+        for var I := 0 to Grade.Variacoes.Count - 1 do
         begin
-        	Result.AdicionarVariacao(
-                FieldByName('COD_ID_VAR_1').AsInteger,
-                FieldByName('DSC_VARIACAO').AsString
-            );
+          VariacaoProdutoRequest.AdicionarAtributo(
+            ProdutoResponse.Attributes[I].Id,
+            Grade.Variacoes[I].DscVariacao
+          );
+          SKUPartes.Add(Grade.Variacoes[I].DscVariacao);
         end;
 
-        if (not FieldByName('COD_ID_VAR_2').isNull) then
-        begin
-            Result.AdicionarVariacao(
-                FieldByName('COD_ID_VAR_2').AsInteger,
-                FieldByName('DSC_VARIACAO_1').AsString
-            );
-        end;
+        // SKU montado com todas as variações, independente da quantidade
+        VariacaoProdutoRequest.Sku := SubstituirEspacosPorTraco(
+          String.Join(' ', SKUPartes.ToStringArray)
+        );
+      finally
+        SKUPartes.Free;
+      end;
+
+      BatchRequest.AdicionarVariacao(VariacaoProdutoRequest);
     end;
+
+    RespostaAPI := ChamadaAPIWooCommerce(
+      'products/' + ProdutoResponse.Id.ToString + '/variations/batch',
+      'POST',
+      'Variações do produto ' + ProdutoResponse.Name + ' criadas com sucesso',
+      TJson.ObjectToJsonString(BatchRequest)
+    );
+
+    SalvarConteudoEmArquivo(
+      TPath.Combine(FFolderPath, 'variacoes-criadas-api.txt'),
+      RespostaAPI.ToJSON
+    );
+  finally
+    RespostaAPI.Free;
+    BatchRequest.Free;
+  end;
 end;
 
+// ============================================================
+// MUDANÇA 4: BuscarProdutosGrade agora gera o SQL dinamicamente
+// com base em FTabelasVariacao. Os JOINs, os campos SELECT e a
+// leitura dos campos do dataset são todos gerados por loop.
+// TProdutoGrade.Variacoes substitui VariacaoUm e VariacaoDois.
+// ============================================================
 function TfrmTela_Principal.BuscarProdutosGrade(
-    CodIdEmpresa: Integer;
-    CodIdLoja: Integer;
-	CodIdProduto: Integer
+  CodIdEmpresa: Integer;
+  CodIdLoja: Integer;
+  CodIdProduto: Integer
 ): TObjectList<TProdutoGrade>;
 var
-	Query: TUniQuery;
-    IdLoja: Integer;
-    ProdutoGrade: TProdutoGrade;
-    JSONArray: TJSONArray;
+  Query: TUniQuery;
+  ProdutoGrade: TProdutoGrade;
+  Variacao: TVariacao;
+  JSONArray: TJSONArray;
+  I: Integer;
+  AliasVar: string;
 begin
-    Query := CriarQuery;
-    Result := nil;
-    JSONArray := TJSONArray.Create;
+  Query     := CriarQuery;
+  Result    := nil;
+  JSONArray := TJSONArray.Create;
+
+  try
+    // SELECT fixo
+    Query.SQL.Add('SELECT');
+    Query.SQL.Add('   PG.COD_ID_PRD_GRD,');
+    Query.SQL.Add('   COALESCE(PG.NUM_PRECO_UNITARIO, S.NUM_PRECO_VAREJO) AS NUM_PRECO_UNITARIO,');
+    Query.SQL.Add('   PG.NUM_ESTOQUE_INICIAL + SUM(COALESCE(E.NUM_QUANTIDADE, 0)) AS NUM_ESTOQUE');
+
+    // SELECT dinâmico: uma linha por tabela de variação
+    for I := 0 to High(FTabelasVariacao) do
+    begin
+      AliasVar := 'V' + IntToStr(I + 1);
+      Query.SQL.Add(Format(', %s.COD_ID_VARIACAO AS COD_ID_VAR_%d', [AliasVar, I + 1]));
+      Query.SQL.Add(Format(', %s.DSC_VARIACAO   AS DSC_VAR_%d',     [AliasVar, I + 1]));
+    end;
+
+    // FROM e JOINs fixos
+    Query.SQL.Add('FROM db_sgci.produtos_grades PG');
+    Query.SQL.Add('LEFT JOIN db_sgci.produtos P ON P.COD_ID_PRODUTO = PG.COD_ID_PRODUTO');
+    Query.SQL.Add('LEFT JOIN db_sgci.precos S ON');
+    Query.SQL.Add('   S.COD_ID_EMPRESA = P.COD_ID_EMPRESA AND');
+    Query.SQL.Add('   S.COD_ID_LOJA    = :COD_ID_LOJA AND');
+    Query.SQL.Add('   S.COD_ID_PRODUTO = P.COD_ID_PRODUTO');
+
+    // JOINs dinâmicos: um por tabela de variação
+    for I := 0 to High(FTabelasVariacao) do
+    begin
+      AliasVar := 'V' + IntToStr(I + 1);
+      Query.SQL.Add(Format('INNER JOIN %s %s ON', [FTabelasVariacao[I], AliasVar]));
+      Query.SQL.Add(Format('   %s.COD_ID_VARIACAO = PG.COD_ID_VAR_%d AND', [AliasVar, I + 1]));
+      Query.SQL.Add(Format('   %s.NUM_STATUS = 1', [AliasVar]));
+    end;
+
+    // Resto do SQL fixo
+    Query.SQL.Add('LEFT JOIN db_sgci.estoques_grades E ON');
+    Query.SQL.Add('   E.COD_ID_PRD_GRD        = PG.COD_ID_PRD_GRD AND');
+    Query.SQL.Add('   COALESCE(E.NUM_INDC, 0) = 0');
+    Query.SQL.Add('WHERE');
+    Query.SQL.Add('   PG.COD_ID_EMPRESA = :COD_ID_EMPRESA AND');
+    Query.SQL.Add('   PG.COD_ID_PRODUTO = :COD_ID_PRODUTO');
+    Query.SQL.Add('GROUP BY PG.COD_ID_PRD_GRD');
+
+    Query.ParamByName('COD_ID_LOJA').AsInteger    := CodIdLoja;
+    Query.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
+    Query.ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
+    Query.Open;
+
+    Query.SaveToXML(TPath.Combine(FFolderPath, 'variacoes-preco-unitario.xml'));
+
+    Result := TObjectList<TProdutoGrade>.Create(True);
 
     try
-    	with Query do
-    	begin
-            SQL.Add('SELECT');
-            SQL.Add('   PG.COD_ID_PRD_GRD,');
-            SQL.Add('   PG.COD_ID_EMPRESA,');
-            SQL.Add('   PG.COD_ID_PRODUTO,');
-            SQL.Add('   PG.COD_PRODUTO,');
-            SQL.Add('   PG.COD_EAN_GTIN,');
-            SQL.Add('   PG.COD_ID_VAR_1,');
-            SQL.Add('   PG.COD_ID_VAR_2,');
-            SQL.Add('   V1.DSC_VARIACAO,');
-            SQL.Add('   V2.DSC_VARIACAO,');
-            SQL.Add('   TRIM(CONCAT(P.DSC_COMPLETA, '' '', COALESCE(V1.DSC_VARIACAO,  ''''), '' '', COALESCE(V2.DSC_SIGLA, ''''))) AS DSC_PRODUTO,');
-            SQL.Add('   COALESCE(PG.NUM_PRECO_UNITARIO, S.NUM_PRECO_VAREJO) AS NUM_PRECO_UNITARIO,');
-            SQL.Add('   PG.NUM_ESTOQUE_INICIAL + SUM(COALESCE(E.NUM_QUANTIDADE, 0)) AS NUM_ESTOQUE');
-            SQL.Add('FROM');
-            SQL.Add('   db_sgci.produtos_grades PG');
-            SQL.Add('LEFT JOIN db_sgci.produtos P ON');
-            SQL.Add('   P.COD_ID_PRODUTO = PG.COD_ID_PRODUTO');
-            SQL.Add('LEFT JOIN db_sgci.precos S ON');
-            SQL.Add('   S.COD_ID_EMPRESA = P.COD_ID_EMPRESA AND');
-            SQL.Add('   S.COD_ID_LOJA    = :COD_ID_LOJA AND');
-            SQL.Add('   S.COD_ID_PRODUTO = P.COD_ID_PRODUTO');
-            SQL.Add('INNER JOIN db_sgci.grades_variacao_1 V1 ON');
-            SQL.Add('   V1.COD_ID_VARIACAO = PG.COD_ID_VAR_1 AND');
-            SQL.Add('   V1.NUM_STATUS      = 1');
-            SQL.Add('INNER JOIN db_sgci.grades_variacao_2 V2 ON');
-            SQL.Add('   V2.COD_ID_VARIACAO = PG.COD_ID_VAR_2 AND');
-            SQL.Add('   V2.NUM_STATUS      = 1');
-            SQL.Add('LEFT JOIN db_sgci.estoques_grades E ON');
-            SQL.Add('   E.COD_ID_PRD_GRD        = PG.COD_ID_PRD_GRD AND');
-            SQL.Add('   COALESCE(E.NUM_INDC, 0) = 0');
-            SQL.Add('WHERE');
-            SQL.Add('   PG.COD_ID_EMPRESA = :COD_ID_EMPRESA AND');
-            SQL.Add('   PG.COD_ID_PRODUTO = :COD_ID_PRODUTO');
-            SQL.Add('GROUP BY');
-            SQL.Add('   PG.COD_ID_PRD_GRD');
-            SQL.Add('ORDER BY');
-            SQL.Add('   V1.DSC_VARIACAO DESC,');
-            SQL.Add('   V2.DSC_VARIACAO DESC');
+      while not Query.Eof do
+      begin
+        ProdutoGrade := TProdutoGrade.Create;
+        ProdutoGrade.NumPrecoUnitario := Query.FieldByName('NUM_PRECO_UNITARIO').AsCurrency;
+        ProdutoGrade.NumEstoque       := Query.FieldByName('NUM_ESTOQUE').AsInteger;
 
-            ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
-            ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
-            ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
-            Open;
+        // Leitura dinâmica: uma TVariacao por coluna, usando os aliases gerados no SELECT
+        for I := 0 to High(FTabelasVariacao) do
+        begin
+          Variacao               := TVariacao.Create;
+          Variacao.CodIdVariacao := Query.FieldByName(Format('COD_ID_VAR_%d', [I + 1])).AsInteger;
+          Variacao.DscVariacao   := Query.FieldByName(Format('DSC_VAR_%d',    [I + 1])).AsString;
+          ProdutoGrade.Variacoes.Add(Variacao);
+        end;
 
-            SaveToXML(TPath.Combine(FFolderPath, 'variacoes-preco-unitario.xml'));
+        JSONArray.AddElement(TJson.ObjectToJsonObject(ProdutoGrade));
+        Result.Add(ProdutoGrade);
+        Query.Next;
+      end;
 
-            Result := TObjectList<TProdutoGrade>.Create(True);
-
-            try
-            	while not Eof do
-            	begin
-                    Result.Add(CriarProdutoGrade(Query));
-                    JSONArray.AddElement(TJson.ObjectToJsonObject(ProdutoGrade));
-                    Next;
-            	end;
-
-                SalvarConteudoEmArquivo(FFolderPath + 'array-produtos-grade.txt', JSONArray.ToString);
-
-            except
-                Result.Free;
-                raise;
-            end;
-    	end;
-    finally
-     	JSONArray.Free;
-        Query.Free;
+      SalvarConteudoEmArquivo(FFolderPath + 'array-produtos-grade.txt', JSONArray.ToString);
+    except
+      Result.Free;
+      raise;
     end;
+  finally
+    JSONArray.Free;
+    Query.Free;
+  end;
 end;
 
 function TfrmTela_Principal.BuscarSecaoNoBanco(
-    CodIdEmpresa: Integer;
-	CodIdSecao: Integer
- ): TSecao;
+  CodIdEmpresa: Integer;
+  CodIdSecao: Integer
+): TSecao;
 var
-    SelectSecaoQuery: TUniQuery;
+  SelectSecaoQuery: TUniQuery;
 begin
-	Result := nil;
-	SelectSecaoQuery := CriarQuery;
+  Result           := nil;
+  SelectSecaoQuery := CriarQuery;
 
-    try
-    	SelectSecaoQuery.SQL.Text := 'SELECT * FROM db_sgci.secoes ' +sLineBreak +
-        	'WHERE COD_ID_EMPRESA = :COD_ID_EMPRESA AND COD_ID_SECAO = :COD_ID_SECAO LIMIT 10';
-        SelectSecaoQuery.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
-        SelectSecaoQuery.ParamByName('COD_ID_SECAO').AsInteger := CodIdSecao;
-    	SelectSecaoQuery.Open;
+  try
+    SelectSecaoQuery.SQL.Text := 'SELECT * FROM db_sgci.secoes ' + sLineBreak +
+      'WHERE COD_ID_EMPRESA = :COD_ID_EMPRESA AND COD_ID_SECAO = :COD_ID_SECAO LIMIT 10';
+    SelectSecaoQuery.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
+    SelectSecaoQuery.ParamByName('COD_ID_SECAO').AsInteger   := CodIdSecao;
+    SelectSecaoQuery.Open;
 
-        if SelectSecaoQuery.IsEmpty then
-        	raise Exception.Create('Seção não encontrda no banco!');
+    if SelectSecaoQuery.IsEmpty then
+      raise Exception.Create('Seção não encontrada no banco!');
 
-        Result := TSecao.Create;
-        Result.CodIdSecao := SelectSecaoQuery.FieldByName('COD_ID_SECAO').AsInteger;
-        Result.DscSecao := SelectSecaoQuery.FieldByName('DSC_SECAO').AsString;
-    finally
-       SelectSecaoQuery.Free;
-    end;
+    Result            := TSecao.Create;
+    Result.CodIdSecao := SelectSecaoQuery.FieldByName('COD_ID_SECAO').AsInteger;
+    Result.DscSecao   := SelectSecaoQuery.FieldByName('DSC_SECAO').AsString;
+  finally
+    SelectSecaoQuery.Free;
+  end;
 end;
 
 function TfrmTela_Principal.BuscarCategorias(Secao: TSecao): TWooCategoriaResponse;
 var
-	JSONResposta: TJSONValue;
-    CategoriasJSONArray: TJSONArray;
-    CategoriaRetornada: string;
-    Categoria: string;
+  JSONResposta: TJSONValue;
+  CategoriasJSONArray: TJSONArray;
+  CategoriaRetornada: string;
+  Categoria: string;
 begin
-	Result := nil;
-    JSONResposta := nil;
-    Categoria := Secao.DscSecao;
+  Result       := nil;
+  JSONResposta := nil;
+  Categoria    := Secao.DscSecao;
 
-    try
-        JSONResposta := ChamadaAPIWooCommerce(
-            'products/categories?search=' + TNetEncoding.URL.Encode(Categoria),
-            'GET',
-            'Categorias retornadas com sucesso!'
-        );
+  try
+    JSONResposta := ChamadaAPIWooCommerce(
+      'products/categories?search=' + TNetEncoding.URL.Encode(Categoria),
+      'GET',
+      'Categorias retornadas com sucesso!'
+    );
 
-    	CategoriasJSONArray := ChecarERetornarJSONArray(JSONResposta);
+    CategoriasJSONArray := ChecarERetornarJSONArray(JSONResposta);
 
-        if (CategoriasJSONArray = nil) or (CategoriasJSONArray.Count = 0) then
-            Exit(CriarCategoria(Secao)) ;
+    if (CategoriasJSONArray = nil) or (CategoriasJSONArray.Count = 0) then
+      Exit(CriarCategoria(Secao));
 
-        for var CategoriaJSON in CategoriasJSONArray do
-        begin
-            CategoriaRetornada := CategoriaJSON.GetValue<string>('name');
+    for var CategoriaJSON in CategoriasJSONArray do
+    begin
+      CategoriaRetornada := CategoriaJSON.GetValue<string>('name');
 
-            if RemoverEspacos(Categoria) = RemoverEspacos(CategoriaRetornada) then
-            begin
-               Result := TJson.JsonToObject<TWooCategoriaResponse>(CategoriaJSON.ToJSON);
-               Break;
-            end;
-        end;
-    finally
-        JSONResposta.Free;
+      if RemoverEspacos(Categoria) = RemoverEspacos(CategoriaRetornada) then
+      begin
+        Result := TJson.JsonToObject<TWooCategoriaResponse>(CategoriaJSON.ToJSON);
+        Break;
+      end;
     end;
-
+  finally
+    JSONResposta.Free;
+  end;
 end;
 
 function TfrmTela_Principal.CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
 var
-    RequestPayload: string;
-    JSONResposta: TJSONValue;
-    CategoriaRequest: TWooCategoriaRequest;
+  RequestPayload: string;
+  JSONResposta: TJSONValue;
+  CategoriaRequest: TWooCategoriaRequest;
 begin
-    Result := nil;
-    JSONResposta := nil;
-    CategoriaRequest := nil;
+  Result           := nil;
+  JSONResposta     := nil;
+  CategoriaRequest := nil;
 
-    try
-    	CategoriaRequest := TWooCategoriaRequest.Create;
-        CategoriaRequest.Name := Secao.DscSecao;
-    	RequestPayload := TJson.ObjectToJsonString(CategoriaRequest);
-        JSONResposta := ChamadaAPIWooCommerce(
-            'products/categories',
-            'POST',
-            'Categoria criada com sucesso!',
-            RequestPayload
-        );
+  try
+    CategoriaRequest      := TWooCategoriaRequest.Create;
+    CategoriaRequest.Name := Secao.DscSecao;
+    RequestPayload        := TJson.ObjectToJsonString(CategoriaRequest);
 
-        Result := TJson.JsonToObject<TWooCategoriaResponse>(JSONResposta as TJSONObject);
+    JSONResposta := ChamadaAPIWooCommerce(
+      'products/categories',
+      'POST',
+      'Categoria criada com sucesso!',
+      RequestPayload
+    );
 
-    finally
-    	JSONResposta.Free;
-        CategoriaRequest.Free;
-    end;
+    Result := TJson.JsonToObject<TWooCategoriaResponse>(JSONResposta as TJSONObject);
+  finally
+    JSONResposta.Free;
+    CategoriaRequest.Free;
+  end;
 end;
 
 function TfrmTela_Principal.DownloadImage(ImageUrl: string = ''): TMemoryStream;
 var
-	Response: IResponse;
+  Response: IResponse;
 begin
-	Result := TMemoryStream.Create;
+  Result := TMemoryStream.Create;
 
-    try
-    	Response := TRequest.New.BaseURL(ImageUrl).Accept('*/*').Get;
-        
-        if Response.StatusCode <> 200 then
-        	raise Exception.Create('Rquisição falhou: ' + Response.StatusText);
+  try
+    Response := TRequest.New.BaseURL(ImageUrl).Accept('*/*').Get;
 
-        Result.LoadFromStream(Response.ContentStream);
-    except
-       Result.Free;
-       raise;
-    end;
+    if Response.StatusCode <> 200 then
+      raise Exception.Create('Requisição falhou: ' + Response.StatusText);
+
+    Result.LoadFromStream(Response.ContentStream);
+  except
+    Result.Free;
+    raise;
+  end;
 end;
 
 function TfrmTela_Principal.RetornarImagensRequest(CodIdProduto: Integer): TObjectList<TWooImagemRequest>;
 var
-	ListaImagens: TObjectList<TProdutoImagem>;
-    ListaImagensResponse: TObjectList<TWPImagemResponse>;
-    ListaImagensRequest: TObjectList<TWooImagemRequest>;
-    CodIdEmpresa: Integer;
-    ProdutoImagem: TProdutoImagem;
+  ListaImagens: TObjectList<TProdutoImagem>;
+  ListaImagensResponse: TObjectList<TWPImagemResponse>;
+  ListaImagensRequest: TObjectList<TWooImagemRequest>;
+  ProdutoImagem: TProdutoImagem;
 begin
-    Result := nil;
-    ListaImagens := nil;
+  Result       := nil;
+  ListaImagens := nil;
 
-	sqlImagens.Close;
-    sqlImagens.SQL.Text := FSQLImagensBase;
+  sqlImagens.Close;
+  sqlImagens.SQL.Text := FSQLImagensBase;
 
-    if sqlImagens.SQL.Text.Contains(':COD_ID_PRODUTO') = False then
-    	sqlImagens.SQL.Add('AND COD_ID_PRODUTO = :COD_ID_PRODUTO');
+  if not sqlImagens.SQL.Text.Contains(':COD_ID_PRODUTO') then
+    sqlImagens.SQL.Add('AND COD_ID_PRODUTO = :COD_ID_PRODUTO');
 
-    sqlImagens.ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
-    sqlImagens.Open;
+  sqlImagens.ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
+  sqlImagens.Open;
+
+  try
+    ListaImagens := TObjectList<TProdutoImagem>.Create(True);
+
+    while not sqlImagens.Eof do
+    begin
+      if not Assigned(sqlImagens.FieldByName('URL_IMAGEM')) or sqlImagens.FieldByName('URL_IMAGEM').IsNull then
+      begin
+        sqlImagens.Next;
+        Continue;
+      end;
+
+      ProdutoImagem := ProdutoImagemQueryToProdutoImagem(sqlImagens);
+      ListaImagens.Add(ProdutoImagem);
+      sqlImagens.Next;
+    end;
+
+    ListaImagensResponse := nil;
 
     try
-        ListaImagens := TObjectList<TProdutoImagem>.Create(True);
+      ListaImagensResponse := EnviarImagem(ListaImagens);
+      ListaImagensRequest  := TObjectList<TWooImagemRequest>.Create(True);
 
-    	while not sqlImagens.Eof do
-    	begin
-        	if not Assigned(sqlImagens.FieldByName('URL_IMAGEM')) or (sqlImagens.FieldByName('URL_IMAGEM').IsNull) then
-            begin
-            	sqlImagens.Next;
-                continue;
-            end;
+      try
+        for var ImagemResponse in ListaImagensResponse do
+          ListaImagensRequest.Add(WPImagemResponseToWooImagemRequest(ImagemResponse));
 
-            ProdutoImagem := ProdutoImagemQueryToProdutoImagem(sqlImagens);
-            ListaImagens.Add(ProdutoImagem);
-            sqlImagens.Next;
-        end;
-
-        ListaImagensResponse := nil;
-
-        try
-        	ListaImagensResponse := EnviarImagem(ListaImagens);
-        	ListaImagensRequest := TObjectList<TWooImagemRequest>.Create(True);
-
-            try
-            	for var ImagemResponse in ListaImagensResponse do
-                	ListaImagensRequest.Add(WPImagemResponseToWooImagemRequest(ImagemResponse));
-            	Result := ListaImagensRequest;
-            except
-            	ListaImagensRequest.Free;
-                Result.Free;
-                raise;
-            end;
-
-        finally
-        	ListaImagensResponse.Free;
-        end;
+        Result := ListaImagensRequest;
+      except
+        ListaImagensRequest.Free;
+        Result.Free;
+        raise;
+      end;
     finally
-       ListaImagens.Free;
+      ListaImagensResponse.Free;
     end;
+  finally
+    ListaImagens.Free;
+  end;
 end;
 
 function TfrmTela_Principal.EnviarImagem(ListaImagens: TObjectList<TProdutoImagem>): TObjectList<TWPImagemResponse>;
 var
-	iRes: IResponse;
-    Stream: TMemoryStream;
-    ImagemProduto: TProdutoImagem;
-    ImagemResponse: TWPImagemResponse;
+  iRes: IResponse;
+  Stream: TMemoryStream;
+  ImagemProduto: TProdutoImagem;
+  ImagemResponse: TWPImagemResponse;
 begin
-    Result := TObjectList<TWPImagemResponse>.Create(True);
+  Result := TObjectList<TWPImagemResponse>.Create(True);
 
-    try
-    	for ImagemProduto in ListaImagens do
-    	begin
-    		Stream := DownloadImage(ImagemProduto.UrlImagem);
+  try
+    for ImagemProduto in ListaImagens do
+    begin
+      Stream := DownloadImage(ImagemProduto.UrlImagem);
 
-        	try
-        		Stream.Position := 0;
+      try
+        Stream.Position := 0;
 
-            	iRes := TRequest.New()
-                    .BaseURL(TAppConfig.WordPressApiUrl)
-                    .BasicAuthentication(TAppConfig.WPUser, TAppConfig.WPPassword)
-                    .AddHeader('Content-Type', 'image/png', [poDoNotEncode])
-                    .AddHeader('Content-Disposition', 'attachment; filename="imagem.png"', [poDoNotEncode])
-                    .AddBody(Stream, False)
-                    .Post;
+        iRes := TRequest.New()
+          .BaseURL(TAppConfig.WordPressApiUrl)
+          .BasicAuthentication(TAppConfig.WPUser, TAppConfig.WPPassword)
+          .AddHeader('Content-Type', 'image/png', [poDoNotEncode])
+          .AddHeader('Content-Disposition', 'attachment; filename="imagem.png"', [poDoNotEncode])
+          .AddBody(Stream, False)
+          .Post;
 
-            	if not (iRes.StatusCode in [200, 201]) then
-                	raise Exception.Create('Requisição falhou: ' + iRes.StatusCode.ToString + '. ' + iRes.Content);
+        if not (iRes.StatusCode in [200, 201]) then
+          raise Exception.Create('Requisição falhou: ' + iRes.StatusCode.ToString + '. ' + iRes.Content);
 
-            	ImagemResponse := TJson.JsonToObject<TWPImagemResponse>(iRes.Content);
-            	Result.Add(ImagemResponse);
-        	finally
-        		Stream.Free;
-    		end;
-    	end;
-    except
-    	Result.Free;
-        raise;
+        ImagemResponse := TJson.JsonToObject<TWPImagemResponse>(iRes.Content);
+        Result.Add(ImagemResponse);
+      finally
+        Stream.Free;
+      end;
     end;
+  except
+    Result.Free;
+    raise;
+  end;
 end;
 
 function TfrmTela_Principal.EnviarProduto(Produto: TWooProdutoRequest): TWooProdutoResponse;
 var
-    JSONString: string;
-    JSONResposta: TJSONValue;
+  JSONString: string;
+  JSONResposta: TJSONValue;
 begin
-	JSONResposta := nil;
-    Result := nil;
+  JSONResposta := nil;
+  Result       := nil;
 
+  try
     try
-        try
-        	JSONString := TJSON.ObjectToJsonString(Produto);
+      JSONString := TJson.ObjectToJsonString(Produto);
 
-            JSONResposta := ChamadaAPIWooCommerce(
-                'products',
-                'POST',
-                'Produto cadastrado com sucesso',
-                JSONString
-            );
+      JSONResposta := ChamadaAPIWooCommerce(
+        'products',
+        'POST',
+        'Produto cadastrado com sucesso',
+        JSONString
+      );
 
-            SalvarConteudoEmArquivo(
-                TPath.Combine(FFolderPath, 'produto-response-after-created.txt'),
-                JSONResposta.ToJSON
-            );
+      SalvarConteudoEmArquivo(
+        TPath.Combine(FFolderPath, 'produto-response-after-created.txt'),
+        JSONResposta.ToJSON
+      );
 
-            Result := TJson.JsonToObject<TWooProdutoResponse>(JSONResposta.ToJSON);
-        except
-        	Result.Free;
-            raise;
-        end;
-    finally
-       JSONResposta.Free;
+      Result := TJson.JsonToObject<TWooProdutoResponse>(JSONResposta.ToJSON);
+    except
+      Result.Free;
+      raise;
     end;
+  finally
+    JSONResposta.Free;
+  end;
 end;
 
 procedure TfrmTela_Principal.btnEnviarProdutosClick(Sender: TObject);
 var
-    ProdutoDB: TProduto;
-    WooProdutoRequest: TWooProdutoRequest;
-    TipoProduto: string;
-    Secao: TSecao;
-    CategoriaResponse: TWooCategoriaResponse;
-    Atributos: TObjectList<TWooAtributoResponse>;
-    ListaImagensRequest: TObjectList<TWooImagemRequest>;
-    TermosProduto: TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
-    WooProdutoResponse: TWooProdutoResponse;
-    ProdutosGrade: TObjectList<TProdutoGrade>;
+  ProdutoDB: TProduto;
+  WooProdutoRequest: TWooProdutoRequest;
+  TipoProduto: string;
+  Secao: TSecao;
+  CategoriaResponse: TWooCategoriaResponse;
+  Atributos: TObjectList<TWooAtributoResponse>;
+  ListaImagensRequest: TObjectList<TWooImagemRequest>;
+  TermosProduto: TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
+  WooProdutoResponse: TWooProdutoResponse;
+  ProdutosGrade: TObjectList<TProdutoGrade>;
 begin
-	with sqlProdutos do
-	begin
-        Close;
-        Connection:= Self.Database;
-        SQL.Text := FSQLProdutosBase;
+  with sqlProdutos do
+  begin
+    Close;
+    Connection := Self.Database;
+    SQL.Text   := FSQLProdutosBase;
 
-        if SQL.Text.Contains(':COD_ID_PRODUTO') = False then
-            SQL.Add('AND COD_ID_PRODUTO = :COD_ID_PRODUTO');
+    if not SQL.Text.Contains(':COD_ID_PRODUTO') then
+      SQL.Add('AND COD_ID_PRODUTO = :COD_ID_PRODUTO');
 
-        ParamByName('COD_ID_PRODUTO').AsInteger := FCodIdProduto;
-        Open;
+    ParamByName('COD_ID_PRODUTO').AsInteger := FCodIdProduto;
+    Open;
 
-        if sqlProdutos.IsEmpty then
-        	raise Exception.Create('Nenhum produto retornado pelo banco!');
+    if sqlProdutos.IsEmpty then
+      raise Exception.Create('Nenhum produto retornado pelo banco!');
 
-        ProdutoDB := nil;
-        WooProdutoRequest := nil;
-    	Atributos := nil;
-        CategoriaResponse := nil;
-        ListaImagensRequest := nil;
-        Secao := nil;
-        TermosProduto := nil;
-        WooProdutoResponse := nil;
+    ProdutoDB           := nil;
+    WooProdutoRequest   := nil;
+    Atributos           := nil;
+    CategoriaResponse   := nil;
+    ListaImagensRequest := nil;
+    Secao               := nil;
+    TermosProduto       := nil;
+    WooProdutoResponse  := nil;
+    ProdutosGrade       := nil;
 
-        try
-        	ProdutoDB := ProdutoQueryToProduto(sqlProdutos);
+    try
+      ProdutoDB := ProdutoQueryToProduto(sqlProdutos);
 
-            if FieldByName('NUM_TIPO_PRODUTO').AsInteger <> 5 then
-                TipoProduto := 'simple'
-            else
-            begin
-                TipoProduto := 'variable';
-                Atributos := BuscarAtributos;
+      if FieldByName('NUM_TIPO_PRODUTO').AsInteger <> 5 then
+        TipoProduto := 'simple'
+      else
+      begin
+        TipoProduto := 'variable';
+        Atributos   := BuscarAtributos;
 
-                if Atributos.Count <> Length(FTabelasVariacao) then
-                    raise Exception.CreateFmt(
-                        'Atributos e FTabelasVariação são de tamanhos diferentes!' + sLineBreak +
-                        'Atributos: %d. FTabelasVariação: %d.',
-                        [Atributos.Count, Length(FTabelasVariacao)]
-                    );
+        if Atributos.Count <> Length(FTabelasVariacao) then
+          raise Exception.CreateFmt(
+            'Atributos e FTabelasVariação são de tamanhos diferentes!' + sLineBreak +
+            'Atributos: %d. FTabelasVariação: %d.',
+            [Atributos.Count, Length(FTabelasVariacao)]
+          );
 
+        ProdutosGrade := BuscarProdutosGrade(
+          ProdutoDB.CodIdEmpresa,
+          ProdutoDB.CodIdEmpresa,
+          ProdutoDB.CodIdProduto
+        );
 
-                ProdutosGrade := BuscarProdutosGrade(
-                	ProdutoDB.CodIdEmpresa,
-                    ProdutoDB.CodIdEmpresa,
-                    ProdutoDB.CodIdProduto
-                );
+        TermosProduto := EnviarTermos(Atributos, ProdutosGrade);
+      end;
 
-                TermosProduto := EnviarTermos(Atributos, ProdutosGrade);
-            end;
+      ListaImagensRequest := RetornarImagensRequest(ProdutoDB.CodIdProduto);
+      Secao               := BuscarSecaoNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDB.CodIdSecao);
+      CategoriaResponse   := BuscarCategorias(Secao);
 
-            ListaImagensRequest := RetornarImagensRequest(ProdutoDB.CodIdProduto);
-            Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDB.CodIdSecao);
-            CategoriaResponse := BuscarCategorias(Secao);
+      WooProdutoRequest := ProdutoToWooProdutoRequest(
+        ProdutoDB,
+        TipoProduto,
+        CategoriaResponse.Id,
+        ListaImagensRequest,
+        TermosProduto
+      );
 
-        	WooProdutoRequest := ProdutoToWooProdutoRequest(
-                ProdutoDB,
-                TipoProduto,
-                CategoriaResponse.Id,
-                ListaImagensRequest,
-                TermosProduto
-            );
+      SalvarConteudoEmArquivo(
+        TPath.Combine(TPath.GetDocumentsPath, 'produto-request-object.txt.'),
+        TJson.ObjectToJsonString(WooProdutoRequest)
+      );
 
-        	SalvarConteudoEmArquivo(
-                TPath.Combine(TPath.GetDocumentsPath, 'produto-request-object.txt.'),
-                TJson.ObjectToJsonString(WooProdutoRequest)
-            );
+      WooProdutoResponse := EnviarProduto(WooProdutoRequest);
 
-        	WooProdutoResponse := EnviarProduto(WooProdutoRequest);
-
-            if WooProdutoResponse.PType = 'variable' then
-            	CriarVariacoesDoProduto(
-                    WooProdutoResponse,
-                    ProdutosGrade
-                );
-        finally
-        	WooProdutoResponse.Free;
-        	WooProdutoRequest.Free;
-            CategoriaResponse.Free;
-            Secao.Free;
-            TermosProduto.Free;
-            ProdutosGrade.Free;
-            Atributos.Free;
-            ProdutoDB.Free;
-        end;
-	end;
+      if WooProdutoResponse.PType = 'variable' then
+        CriarVariacoesDoProduto(WooProdutoResponse, ProdutosGrade);
+    finally
+      WooProdutoResponse.Free;
+      WooProdutoRequest.Free;
+      CategoriaResponse.Free;
+      Secao.Free;
+      TermosProduto.Free;
+      ProdutosGrade.Free;
+      Atributos.Free;
+      ProdutoDB.Free;
+    end;
+  end;
 end;
 
 procedure TfrmTela_Principal.DatabaseConnectionLost(Sender: TObject; Component: TComponent;
   ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
 begin
-	RetryMode := rmReconnectExecute;
+  RetryMode := rmReconnectExecute;
 end;
 
 end.
+
