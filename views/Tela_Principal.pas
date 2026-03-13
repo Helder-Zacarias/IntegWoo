@@ -26,14 +26,12 @@ type
     Database: TUniConnection;
     sqlProdutos: TUniQuery;
     sqlImagens: TUniQuery;
-    butReceberProdutos: TBitBtn;
     btnHamburguer: TButton;
     panelSide: TPanel;
     btnEnviarProdutosMandala: TBitBtn;
     procedure DatabaseConnectionLost(Sender: TObject; Component: TComponent;
       ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
     procedure btnHamburguerClick(Sender: TObject);
-    procedure butBuscarProdutosClick(Sender: TObject);
     procedure btnEnviarProdutosClick(Sender: TObject);
     function ChamadaAPIWooCommerce(Resource: string; Metodo: string;
       MensagemAposRetorno: string = ''; Body: string = ''): TJSONValue;
@@ -63,14 +61,9 @@ type
     function GerarListaDeStringsDosTermosDaAPI(TermosAPI: TObjectList<TWooTermoResponse>):
       TList<string>;
     function BuscarProdutoPorSKU(SKU: string): TWooProdutoResponse;
-    function BuscarProdutoNoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer;
-    	CodIdProduto: Integer): TProduto;
   private
     FSQLProdutosBase: string;
     FSQLImagensBase: string;
-    FCodIdEmpresa: Integer;
-    FCodIdLoja: Integer;
-    FCodIdProduto: Integer;
     FTabelasVariacao: TArray<string>;
     FFolderPath: string;
     { Private declarations }
@@ -91,121 +84,9 @@ procedure TfrmTela_Principal.FormCreate(Sender: TObject);
 begin
   FSQLProdutosBase := sqlProdutos.SQL.Text;
   FSQLImagensBase := sqlImagens.SQL.Text;
-  FCodIdEmpresa := 2433;
-  FCodIdLoja := 90;
-  FCodIdProduto:= 3967904;
   // Para adicionar uma 3ª variação no futuro, basta incluir aqui — o resto do código se adapta automaticamente
   FTabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
   FFolderPath := TPath.Combine(TPath.GetDocumentsPath, 'Ecommerce');
-end;
-
-// Atualmente, a função utiliza o código da empres,a o código da loja, e o
-// código do produto para fazer a busca no banco. O código do produto será
-// removido em produção, uma vez que vserá necessário enviar tods os produtos
-// da empresa.
-function TfrmTela_Principal.BuscarProdutoNoBanco(
-    CodIdEmpresa: Integer;
-    CodIdLoja: Integer;
-    CodIdProduto: Integer
-): TProduto;
-var
-	Query: TUniQuery;
-    Produto: TProduto;
-begin
-
-    Query := nil;
-    Result := nil;
-
-	try
-    	try
-            Query := CriarQuery;
-            with Query do
-            begin
-
-            	SQL.Text :=
-                    'SELECT pd.COD_ID_PRODUTO, ' +
-                    'pd.COD_ID_EMPRESA, ' +
-                    'pd.COD_ID_LOJA, ' +
-                    'pd.COD_PRODUTO, ' +
-                    'pd.COD_BARRAS, '  +
-                    'pd.COD_ID_GRADE, ' +
-                    'pd.COD_ID_SECAO, ' +
-                    'pd.DSC_COMPLETA, ' +
-                    'pd.NUM_TIPO_PRODUTO, ' +
-                    'pr.NUM_PRECO_VAREJO AS PRECO_VAREJO, ' +
-                    'e.NUM_ESTQ_ATUAL AS ESTOQUE_ATUAL ' +
-                    'FROM db_sgci.produtos pd ' +
-                    'INNER JOIN db_sgci.precos pr ' +
-                        'ON pd.COD_ID_PRODUTO = pr.COD_ID_PRODUTO ' +
-                        'AND pd.COD_ID_EMPRESA = pr.COD_ID_EMPRESA ' +
-                        'AND pd.COD_ID_LOJA = pr.COD_ID_LOJA ' +
-                    'INNER JOIN db_sgci.estoques e ' +
-                        'ON pd.COD_ID_PRODUTO = e.COD_ID_PRODUTO ' +
-                        'AND pd.COD_ID_EMPRESA = e.COD_ID_EMPRESA ' +
-                        'AND pd.COD_ID_LOJA = e.COD_ID_LOJA ' +
-                    'WHERE pd.COD_ID_EMPRESA = :COD_ID_EMPRESA AND ' +
-                    'pd.COD_ID_LOJA = :COD_ID_LOJA AND ' +
-                    'pd.COD_ID_PRODUTO = :COD_ID_PRODUTO';
-
-                ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
-                ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
-                ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
-                Open;
-                SaveToXML(TPath.Combine(TPath.GetDocumentsPath, 'produt-com-preco-e-estoque.xml'));
-
-                Result := TProduto.Create;
-
-                Result.CodIdProduto := FieldByName('COD_ID_PRODUTO').AsInteger;
-                Result.CodIdEmpresa := FieldByName('COD_ID_EMPRESA').AsInteger;
-                Result.CodIdLoja := FieldByName('COD_ID_LOJA').AsInteger;
-                Result.CodProduto := FieldByName('COD_PRODUTO').AsLargeInt;
-                Result.CodBarras := FieldByName('COD_BARRAS').AsString;
-                Result.CodIdGrade := FieldByName('COD_ID_GRADE').AsInteger;
-                Result.CodIdSecao := FieldByName('COD_ID_SECAO').AsInteger;
-                Result.DscCompleta := FieldByName('DSC_COMPLETA').AsString;
-                Result.NumTipoProduto := FieldByName('NUM_TIPO_PRODUTO').AsInteger;
-                Result.NumPrecoVarejo := FieldByName('PRECO_VAREJO').AsCurrency;
-                Result.NumEstqAtual := FieldByName('ESTOQUE_ATUAL').AsFloat;
-            end;
-        except
-            Result.Free;
-            raise;
-        end;
-    finally
-       Query.Free;
-    end;
-end;
-
-function TfrmTela_Principal.BuscarProdutoPorSKU(SKU: string): TWooProdutoResponse;
-var
-    JSONArray: TJSONArray;
-begin
-    try
-        JSONArray := nil;
-        Result := nil;
-
-        try
-        	JSONArray := ChecarERetornarJSONArray(
-                ChamadaAPIWooCommerce(
-                    Format('products?sku=%s', [SKU]),
-                    'GET'
-                )
-            );
-
-            if JSONArray.Size > 1 then
-                raise Exception.Create('Há mais de um produto com o mesmo SKU');
-
-            for var Resposta in JSONArray AS TJSONArray do
-            	Result := TJson.JsonToObject<TwooProdutoResponse>(Resposta.ToJSON);
-
-            SalvarConteudoEmArquivo(TPath.Combine(TPath.GetDocumentsPath, 'produto-por-sku.txt'), JSONArray.ToJSON);
-        except
-        	Result.Free;
-            raise;
-        end;
-    finally
-        JSONArray.Free;
-    end;
 end;
 
 procedure TfrmTela_Principal.btnHamburguerClick(Sender: TObject);
@@ -221,6 +102,12 @@ begin
 
   Result := TUniQuery.Create(nil);
   Result.Connection := Database;
+end;
+
+procedure TfrmTela_Principal.DatabaseConnectionLost(Sender: TObject; Component: TComponent;
+  ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
+begin
+  RetryMode := rmReconnectExecute;
 end;
 
 function TfrmTela_Principal.ChamadaAPIWooCommerce(
@@ -283,33 +170,36 @@ begin
   Result := JSONResponse as TJSONArray;
 end;
 
-procedure TfrmTela_Principal.butBuscarProdutosClick(Sender: TObject);
+function TfrmTela_Principal.BuscarProdutoPorSKU(SKU: string): TWooProdutoResponse;
+var
+    JSONArray: TJSONArray;
 begin
-  TTask.Run(
-    procedure
-    var
-      JSONResposta: TJSONValue;
-    begin
-      JSONResposta := nil;
+    JSONArray := nil;
+    Result := nil;
 
-      try
-        JSONResposta := ChamadaAPIWooCommerce('products', 'GET');
+    try
+        try
+        	JSONArray := ChecarERetornarJSONArray(
+                ChamadaAPIWooCommerce(
+                    Format('products?sku=%s', [SKU]),
+                    'GET'
+                )
+            );
 
-        if not Assigned(JSONResposta) then
-          raise Exception.Create('Nenhuma Resposta da API do WooCommerce!');
+            if JSONArray.Count > 1 then
+                raise Exception.Create('Há mais de um produto com o mesmo SKU');
 
-        TThread.Queue(
-          nil,
-          procedure
-          begin
-            ShowMessage('Produtos retornados com sucesso!');
-          end
-        );
-      finally
-        JSONResposta.Free;
-      end;
-    end
-  );
+            for var Resposta in JSONArray AS TJSONArray do
+            	Result := TJson.JsonToObject<TwooProdutoResponse>(Resposta.ToJSON);
+
+            SalvarConteudoEmArquivo(TPath.Combine(TPath.GetDocumentsPath, 'produto-por-sku.txt'), JSONArray.ToJSON);
+        except
+        	Result.Free;
+            raise;
+        end;
+    finally
+        JSONArray.Free;
+    end;
 end;
 
 // ============================================================
@@ -416,27 +306,29 @@ function TfrmTela_Principal.PostarTermoNaAPI(AtributoId: Integer; Termo: TWooTer
 var
   JSONResposta: TJSONValue;
 begin
-  try
-    JSONResposta := ChamadaAPIWooCommerce(
-      '/products/attributes/' + AtributoId.ToString + '/terms',
-      'POST',
-      'Termo criado com sucesso!',
-      TJson.ObjectToJsonString(Termo)
-    );
+    JSONResposta := nil;
 
-    Result := TJson.JsonToObject<TWooTermoResponse>(JSONResposta.ToJSON);
-  finally
-    JSONResposta.Free;
-  end;
+    try
+        JSONResposta := ChamadaAPIWooCommerce(
+              '/products/attributes/' + AtributoId.ToString + '/terms',
+              'POST',
+              'Termo criado com sucesso!',
+              TJson.ObjectToJsonString(Termo)
+        );
+
+        Result := TJson.JsonToObject<TWooTermoResponse>(JSONResposta.ToJSON);
+    finally
+    	JSONResposta.Free;
+    end;
 end;
 
 function TfrmTela_Principal.FiltrarTermosRepetidos(Variacoes: TList<string>): TList<string>;
 var
   TermosDistintos: TStringList;
 begin
-  Result          := TList<string>.Create;
+  Result := TList<string>.Create;
   TermosDistintos := TStringList.Create;
-  TermosDistintos.Sorted     := True;
+  TermosDistintos.Sorted := True;
   TermosDistintos.Duplicates := dupIgnore;
 
   for var Variacao in Variacoes do
@@ -795,9 +687,9 @@ begin
   CategoriaRequest := nil;
 
   try
-    CategoriaRequest      := TWooCategoriaRequest.Create;
+    CategoriaRequest := TWooCategoriaRequest.Create;
     CategoriaRequest.Name := Secao.DscSecao;
-    RequestPayload        := TJson.ObjectToJsonString(CategoriaRequest);
+    RequestPayload := TJson.ObjectToJsonString(CategoriaRequest);
 
     JSONResposta := ChamadaAPIWooCommerce(
       'products/categories',
@@ -998,101 +890,173 @@ var
   WooProdutoResponse: TWooProdutoResponse;
   ProdutosGrade: TObjectList<TProdutoGrade>;
   ProdutoRecebido: TWooProdutoResponse;
+  QueryProdutos: TUniQuery;
 begin
-	ProdutoDB := nil;
-    WooProdutoRequest := nil;
-    Atributos := nil;
-    CategoriaResponse := nil;
-    ListaImagensRequest := nil;
-    Secao := nil;
-    TermosProduto := nil;
-    WooProdutoResponse := nil;
-    ProdutosGrade := nil;
+    QueryProdutos := nil;
 
     try
-    	ProdutoDB := BuscarProdutoNoBanco(
-        	FCodIdEmpresa,
-            FCodIdLoja,
-            FCodIdProduto
-      	);
+        QueryProdutos := CriarQuery;
 
-        if not Assigned(ProdutoDB) then
-        	raise Exception.Create(
-            	Format('Não há nenhum produto na empresa %d loja %d com o id %d',
-                [FCodIdEmpresa, FCodIdLoja, FCodIdProduto])
-            );
+    	with QueryProdutos do
+    	begin
+        	SQL.Text :=
+                'SELECT pd.COD_ID_PRODUTO, ' +
+                'pd.COD_ID_EMPRESA, ' +
+                'pd.COD_ID_LOJA, ' +
+                'pd.COD_PRODUTO, ' +
+                'pd.COD_BARRAS, ' +
+                'pd.COD_ID_GRADE, ' +
+                'pd.COD_ID_SECAO, ' +
+                'pd.DSC_COMPLETA, ' +
+                'pd.NUM_TIPO_PRODUTO, ' +
+                'pr.NUM_PRECO_VAREJO AS PRECO_VAREJO, ' +
+                'CASE WHEN pd.NUM_CONTROLA_ESTOQUE = 1 THEN ' +
+                    'CASE WHEN lj.NUM_TIPO_ESTABELECIMENTO = 0 THEN ' +
+                        'CASE WHEN emp.NUM_CAD_FILIAIS_UNIFICADO = 1 THEN ' +
+                            'COALESCE(pd.NUM_ESTOQUE_INICIAL, 0.000) + ' +
+                            'COALESCE(db_sgci.fn_consulta_estoque_atual(pd.COD_ID_EMPRESA, ' +
+                            	'pd.COD_ID_LOJA, pd.COD_ID_PRODUTO), 0.00) ' +
+                        'ELSE ' +
+                            'COALESCE(e.NUM_ESTOQUE_INICIAL, 0.000) + ' +
+                            'COALESCE(db_sgci.fn_consulta_estoque_atual(pd.COD_ID_EMPRESA, ' +
+                            	'pd.COD_ID_LOJA, pd.COD_ID_PRODUTO), 0.00) ' +
+                        'END + ' +
+                        'COALESCE(db_sgci.fn_consulta_estoque_composicao(pd.COD_ID_EMPRESA, ' +
+                        	'pd.COD_ID_LOJA, pd.COD_ID_PRODUTO), 0.00) ' +
+                    'ELSE ' +
+                        'CASE WHEN emp.NUM_CAD_FILIAIS_UNIFICADO = 1 THEN ' +
+                            'COALESCE(pd.NUM_ESTOQUE_INI_PED, 0.000) + ' +
+                            'COALESCE(db_sgci.fn_consulta_estoque_pedido(pd.COD_ID_EMPRESA, ' +
+                            	'pd.COD_ID_LOJA, pd.COD_ID_PRODUTO), 0.00) ' +
+                        'ELSE ' +
+                            'COALESCE(e.NUM_ESTOQUE_INI_PED, 0.000) + ' +
+                            'COALESCE(db_sgci.fn_consulta_estoque_pedido(pd.COD_ID_EMPRESA, ' +
+                            	'pd.COD_ID_LOJA, pd.COD_ID_PRODUTO), 0.00) ' +
+                        'END + ' +
+                        'COALESCE(db_sgci.fn_consulta_estoque_composicao(pd.COD_ID_EMPRESA, ' +
+                        	'pd.COD_ID_LOJA, pd.COD_ID_PRODUTO), 0.00) ' +
+                    'END ' +
+                'ELSE ' +
+                    '0.000 ' +
+                'END AS ESTOQUE_ATUAL ' +
+                'FROM db_sgci.produtos pd ' +
+                'INNER JOIN db_sgci.precos pr ' +
+                    'ON pd.COD_ID_PRODUTO = pr.COD_ID_PRODUTO ' +
+                    'AND pd.COD_ID_EMPRESA = pr.COD_ID_EMPRESA ' +
+                    'AND pd.COD_ID_LOJA = pr.COD_ID_LOJA ' +
+                'LEFT JOIN db_sgci.estoques e ' +
+                    'ON pd.COD_ID_PRODUTO = e.COD_ID_PRODUTO ' +
+                    'AND pd.COD_ID_EMPRESA = e.COD_ID_EMPRESA ' +
+                    'AND pd.COD_ID_LOJA = e.COD_ID_LOJA ' +
+                'INNER JOIN db_sgci.empresas emp ' +
+                    'ON emp.COD_ID_EMPRESA = pd.COD_ID_EMPRESA ' +
+                'INNER JOIN db_sgci.lojas lj ' +
+                    'ON lj.COD_ID_EMPRESA = pd.COD_ID_EMPRESA ' +
+                    'AND lj.COD_ID_LOJA = pd.COD_ID_LOJA ' +
+                'WHERE pd.COD_ID_EMPRESA = 2433 ' +
+                    'AND pd.COD_ID_LOJA = 90 ' +
+                'LIMIT 5';
+            Open;
+            SaveToXML(TPath.Combine(TPath.GetDocumentsPath, 'produto-com-preco-e-estoque.xml'));
 
-      	ProdutoRecebido := BuscarProdutoPorSKU(ProdutoDB.CodProduto.ToString);
+            while not Eof do
+            begin
+                ProdutoDB := nil;
+                WooProdutoRequest := nil;
+                Atributos := nil;
+                CategoriaResponse := nil;
+                ListaImagensRequest := nil;
+                Secao := nil;
+                TermosProduto := nil;
+                WooProdutoResponse := nil;
+                ProdutosGrade := nil;
 
-      	if ProdutoDB.NumTipoProduto <> 5 then
-        	TipoProduto := 'simple'
-      	else
-      	begin
-            TipoProduto := 'variable';
-            Atributos := BuscarAtributos;
+            	try
+                    ProdutoDB := TProduto.Create;
+                    ProdutoDB.CodIdProduto := FieldByName('COD_ID_PRODUTO').AsInteger;
+                    ProdutoDB.CodIdEmpresa := FieldByName('COD_ID_EMPRESA').AsInteger;
+                    ProdutoDB.CodIdLoja := FieldByName('COD_ID_LOJA').AsInteger;
+                    ProdutoDB.CodProduto := FieldByName('COD_PRODUTO').AsLargeInt;
+                    ProdutoDB.CodBarras := FieldByName('COD_BARRAS').AsString;
+                    ProdutoDB.CodIdGrade := FieldByName('COD_ID_GRADE').AsInteger;
+                    ProdutoDB.CodIdSecao := FieldByName('COD_ID_SECAO').AsInteger;
+                    ProdutoDB.DscCompleta := FieldByName('DSC_COMPLETA').AsString;
+                    ProdutoDB.NumTipoProduto := FieldByName('NUM_TIPO_PRODUTO').AsInteger;
+                    ProdutoDB.NumPrecoVarejo := FieldByName('PRECO_VAREJO').AsCurrency;
+                    ProdutoDB.NumEstqAtual := FieldByName('ESTOQUE_ATUAL').AsFloat;
 
-            ProdutosGrade := BuscarProdutosGrade(
-              ProdutoDB.CodIdEmpresa,
-              ProdutoDB.CodIdEmpresa,
-              ProdutoDB.CodIdProduto
-            );
+                    ProdutoRecebido := BuscarProdutoPorSKU(ProdutoDB.CodProduto.ToString);
 
-        	TermosProduto := EnviarTermos(Atributos, ProdutosGrade);
-      	end;
+                    if ProdutoDB.NumTipoProduto <> 5 then
+                        TipoProduto := 'simple'
+                    else
+                    begin
+                        TipoProduto := 'variable';
+                        Atributos := BuscarAtributos;
 
-          ListaImagensRequest := RetornarImagensRequest(ProdutoDB.CodIdProduto);
-          Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDB.CodIdSecao);
-          CategoriaResponse := BuscarCategorias(Secao);
+                        ProdutosGrade := BuscarProdutosGrade(
+                          ProdutoDB.CodIdEmpresa,
+                          ProdutoDB.CodIdEmpresa,
+                          ProdutoDB.CodIdProduto
+                        );
 
-          WooProdutoRequest := ProdutoToWooProdutoRequest(
-            ProdutoDB,
-            TipoProduto,
-            CategoriaResponse.Id,
-            ListaImagensRequest,
-            TermosProduto
-          );
+                        TermosProduto := EnviarTermos(Atributos, ProdutosGrade);
+                    end;
 
-          if (Assigned(ProdutoRecebido)) and
-            (not SameText(WooProdutoRequest.Sku, ProdutoRecebido.Sku))
-          then
-          begin
-            ShowMessage(
-                'SKU do WooCommerce: ' + ProdutoRecebido.Sku + sLineBreak +
-                'SKU Produto Request: ' + WooProdutoRequest.SKU
-            );
-            raise Exception.Create('SKU do produto diverge do código do produto no banco');
-          end
-          else
-            ShowMessage('SKU OK');
+                    ListaImagensRequest := RetornarImagensRequest(ProdutoDB.CodIdProduto);
+                    Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDB.CodIdSecao);
+                    CategoriaResponse := BuscarCategorias(Secao);
 
-          SalvarConteudoEmArquivo(
-            TPath.Combine(TPath.GetDocumentsPath, 'produto-request-object.txt.'),
-            TJson.ObjectToJsonString(WooProdutoRequest)
-          );
+                    WooProdutoRequest := ProdutoToWooProdutoRequest(
+                        ProdutoDB,
+                        TipoProduto,
+                        CategoriaResponse.Id,
+                        ListaImagensRequest,
+                        TermosProduto
+                    );
 
-          WooProdutoResponse := EnviarProduto(
-              WooProdutoRequest,
-              ProdutoRecebido
-          );
+                    if (Assigned(ProdutoRecebido)) and
+                        (not SameText(WooProdutoRequest.Sku, ProdutoRecebido.Sku))
+                    then
+                    begin
+                        ShowMessage(
+                            'SKU do WooCommerce: ' + ProdutoRecebido.Sku + sLineBreak +
+                            'SKU Produto Request: ' + WooProdutoRequest.SKU
+                        );
+                        raise Exception.Create('SKU do produto diverge do código do produto no banco');
+                    end
+                    else
+                        ShowMessage('SKU OK');
 
-          if WooProdutoResponse.PType = 'variable' then
-            CriarVariacoesDoProduto(WooProdutoResponse, ProdutosGrade);
+                    SalvarConteudoEmArquivo(
+                        TPath.Combine(TPath.GetDocumentsPath, 'produto-request-object.txt.'),
+                        TJson.ObjectToJsonString(WooProdutoRequest)
+                    );
+
+                    WooProdutoResponse := EnviarProduto(
+                        WooProdutoRequest,
+                        ProdutoRecebido
+                    );
+
+                    if WooProdutoResponse.PType = 'variable' then
+                        CriarVariacoesDoProduto(WooProdutoResponse, ProdutosGrade);
+
+                    Next;
+                finally
+                	WooProdutoResponse.Free;
+                    WooProdutoRequest.Free;
+                    CategoriaResponse.Free;
+                    Secao.Free;
+                    TermosProduto.Free;
+                    ProdutosGrade.Free;
+                    Atributos.Free;
+                    ProdutoDB.Free;
+                end;
+            end;
+    	end;
     finally
-    	WooProdutoResponse.Free;
-        WooProdutoRequest.Free;
-        CategoriaResponse.Free;
-        Secao.Free;
-        TermosProduto.Free;
-        ProdutosGrade.Free;
-        Atributos.Free;
-        ProdutoDB.Free;
+    	QueryProdutos.Free;
     end;
-end;
-
-procedure TfrmTela_Principal.DatabaseConnectionLost(Sender: TObject; Component: TComponent;
-  ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
-begin
-  RetryMode := rmReconnectExecute;
 end;
 
 end.

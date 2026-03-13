@@ -30,22 +30,13 @@ object frmTela_Principal: TfrmTela_Principal
     Align = alLeft
     TabOrder = 1
     Visible = False
-    object butReceberProdutos: TBitBtn
-      Left = 0
-      Top = 116
-      Width = 155
-      Height = 33
-      Caption = 'Buscar Produtos'
-      TabOrder = 0
-      OnClick = butBuscarProdutosClick
-    end
     object btnEnviarProdutosMandala: TBitBtn
       Left = 0
-      Top = 155
+      Top = 205
       Width = 155
       Height = 33
       Caption = 'Enviar Produtos'
-      TabOrder = 1
+      TabOrder = 0
       OnClick = btnEnviarProdutosClick
     end
   end
