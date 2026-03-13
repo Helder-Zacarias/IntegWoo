@@ -9,6 +9,7 @@ uses
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Buttons, Vcl.ExtCtrls,
   Data.DB, Uni, UniProvider, MySQLUniProvider, DBAccess, MemData, MemDS,
   REST.Json, Rest.Json.Types, RESTRequest4D,
+  Horse,
   AppConfig, Tela_Envio_Produto, Tela_Cadastro_Atributo,
   FileWriter, TrimTexto, ContentPrinter, CustomObjectMapper,
   Produto, ProdutoGrade, ProdutoImagem, Secao, Variacao,
@@ -61,13 +62,17 @@ type
     function GerarListaDeStringsDosTermosDaAPI(TermosAPI: TObjectList<TWooTermoResponse>):
       TList<string>;
     function BuscarProdutoPorSKU(SKU: string): TWooProdutoResponse;
+    class procedure HorseAPISalvarItensDoCarrinho(Req: THorseRequest; Res: THorseResponse; Next: TProc);
   private
     FSQLProdutosBase: string;
     FSQLImagensBase: string;
     FTabelasVariacao: TArray<string>;
     FFolderPath: string;
+    const
+        HORSE_PORT = 9000;
     { Private declarations }
   public
+
     { Public declarations }
   end;
 
@@ -87,6 +92,56 @@ begin
   // Para adicionar uma 3ª variação no futuro, basta incluir aqui — o resto do código se adapta automaticamente
   FTabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
   FFolderPath := TPath.Combine(TPath.GetDocumentsPath, 'Ecommerce');
+
+//  THorse.Post('/api/salvar-itens-carrinho', HorseAPISalvarItensDoCarrinho);
+  THorse.Post('/api/enviar-itens-do-carrinho', HorseAPISalvarItensDoCarrinho);
+  THorse.Listen(HORSE_PORT);
+
+//  TTask.Run(
+//    procedure
+//    begin
+//        THorse.Post('http://localhost:9000/api/salvar-itens-carrinho',
+//        	procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+//            begin
+//                Res.Send('Hello');
+//                Writeln(Req.Body);
+//            end
+//        );
+//
+//        THorse.Listen(HORSE_PORT);
+//    end
+//  );
+end;
+
+class procedure TfrmTela_Principal.HorseAPISalvarItensDoCarrinho(
+    Req: THorseRequest;
+    Res: THorseResponse;
+    Next: TProc
+);
+var
+    CodIdRevenda: string;
+	Resp        : string;
+begin
+    try
+        // Receber parametros da url
+        if Req.Body.Trim.IsEmpty then
+            raise Exception.Create('"Body" da requisição não foi enviado');
+//            raise EBadRequest.Create('"Body" da requisição não foi enviado');
+
+//        if not TApiUtils.ValidarJsonString(Req.Body) then
+//            raise Exception.Create('JSON inválido no corpo da requisição');
+//            raise EBadRequest.Create('JSON inválido no corpo da requisição.');
+        //
+//        if iRev.NovoUsuario(Req.Body, Resp) then
+//            Res.Status(THTTPStatus.OK).Send(Resp)
+//        else
+//            Res.Status(THTTPStatus.BadRequest).Send(Resp);
+
+        SalvarConteudoEmArquivo(TPath.Combine(TPath.GetDocumentsPath, 'itens-carrinho.txt'), Req.Body);
+    except
+        on E: Exception do
+            Res.Status(THTTPStatus.InternalServerError).Send('Erro ao cadastrar usuário!\n' + E.Message);
+    end;
 end;
 
 procedure TfrmTela_Principal.btnHamburguerClick(Sender: TObject);
