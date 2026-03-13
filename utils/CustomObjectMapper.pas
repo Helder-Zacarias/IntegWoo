@@ -3,6 +3,7 @@ unit CustomObjectMapper;
 interface
 uses
 	System.SysUtils, System.IOUtils, System.Generics.Collections, Vcl.Dialogs, Uni,
+    REST.Json,
     Produto, ProdutoImagem,
     WooProdutoRequest, WooImagemRequest, WPImagemResponse,
     WooProdutoCategoriaRequest,  WooAtributosProdutoRequest, WooAtributoResponse, WooTermoResponse, FileWriter;
@@ -75,6 +76,10 @@ begin
     end;
 
     ShowMessage('Atribuição do produto finalizada');
+    SalvarConteudoEmArquivo(
+    	TPath.Combine(TPath.GetDocumentsPath, 'produto-payload.txt'),
+        TJson.ObjectToJsonString(Result)
+    );
 end;
 
 function ProdutoQueryToProduto(Query: TUniQuery): TProduto;

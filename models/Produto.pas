@@ -21,7 +21,7 @@ type TProduto = class
         property CodIdEmpresa: Integer read FCod_Id_Empresa write FCod_Id_Empresa;
         property CodIdLoja: Integer read FCod_Id_Loja write FCod_Id_Loja;
         property CodProduto: Int64 read FCod_Produto write FCod_Produto;
-        property Cod_Barras: string read FCod_Barras write FCod_Barras;
+        property CodBarras: string read FCod_Barras write FCod_Barras;
         property CodIdGrade: Integer read FCod_Id_Grade write FCod_Id_Grade;
         property CodIdSecao: Integer read FCod_Id_Secao write FCod_Id_Secao;
         property DscCompleta: string read FDsc_Completa write FDsc_Completa;

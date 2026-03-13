@@ -63,10 +63,13 @@ type
     function GerarListaDeStringsDosTermosDaAPI(TermosAPI: TObjectList<TWooTermoResponse>):
       TList<string>;
     function BuscarProdutoPorSKU(SKU: string): TWooProdutoResponse;
-    function BuscarEstoqueProdutoNoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdProduto: Integer): Double;
+    function BuscarProdutoNoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer;
+    	CodIdProduto: Integer): TProduto;
   private
     FSQLProdutosBase: string;
     FSQLImagensBase: string;
+    FCodIdEmpresa: Integer;
+    FCodIdLoja: Integer;
     FCodIdProduto: Integer;
     FTabelasVariacao: TArray<string>;
     FFolderPath: string;
@@ -87,59 +90,85 @@ uses
 procedure TfrmTela_Principal.FormCreate(Sender: TObject);
 begin
   FSQLProdutosBase := sqlProdutos.SQL.Text;
-  FSQLImagensBase  := sqlImagens.SQL.Text;
-  FCodIdProduto    := 3967904;
+  FSQLImagensBase := sqlImagens.SQL.Text;
+  FCodIdEmpresa := 2433;
+  FCodIdLoja := 90;
+  FCodIdProduto:= 3967904;
   // Para adicionar uma 3ª variação no futuro, basta incluir aqui — o resto do código se adapta automaticamente
   FTabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
-  FFolderPath      := TPath.Combine(TPath.GetDocumentsPath, 'Ecommerce');
+  FFolderPath := TPath.Combine(TPath.GetDocumentsPath, 'Ecommerce');
 end;
 
-function TfrmTela_Principal.BuscarEstoqueProdutoNoBanco(
+// Atualmente, a função utiliza o código da empres,a o código da loja, e o
+// código do produto para fazer a busca no banco. O código do produto será
+// removido em produção, uma vez que vserá necessário enviar tods os produtos
+// da empresa.
+function TfrmTela_Principal.BuscarProdutoNoBanco(
     CodIdEmpresa: Integer;
     CodIdLoja: Integer;
     CodIdProduto: Integer
-): Double;
+): TProduto;
 var
 	Query: TUniQuery;
+    Produto: TProduto;
 begin
 
     Query := nil;
+    Result := nil;
 
 	try
     	try
-        	Query := CriarQuery;
-            Query.SQL.Text :=
-                'SELECT pd.COD_ID_PRODUTO, ' +
-                'pd.COD_ID_EMPRESA, ' +
-                'pd.COD_ID_LOJA, ' +
-                'pd.COD_PRODUTO, ' +
-                'pd.COD_BARRAS, '  +
-                'pd.COD_ID_GRADE, ' +
-                'pd.COD_ID_SECAO, ' +
-                'pd.DSC_COMPLETA, ' +
-                'pd.NUM_TIPO_PRODUTO, ' +
-                'pr.NUM_PRECO_VAREJO AS PRECO_VAREJO, ' +
-                'e.NUM_ESTQ_ATUAL AS ESTOQUE_ATUAL ' +
-                'FROM db_sgci.produtos pd ' +
-                'INNER JOIN db_sgci.precos pr ' +
-                    'ON pd.COD_ID_PRODUTO = pr.COD_ID_PRODUTO ' +
-                    'AND pd.COD_ID_EMPRESA = pr.COD_ID_EMPRESA ' +
-                    'AND pd.COD_ID_LOJA = pr.COD_ID_LOJA ' +
-                'INNER JOIN db_sgci.estoques e ' +
-                	'ON pd.COD_ID_PRODUTO = e.COD_ID_PRODUTO ' +
-                    'AND pd.COD_ID_EMPRESA = e.COD_ID_EMPRESA ' +
-                    'AND pd.COD_ID_LOJA = e.COD_ID_LOJA ' +
-                'WHERE pd.COD_ID_EMPRESA = :COD_ID_EMPRESA AND ' +
-                'pd.COD_ID_LOJA = :COD_ID_LOJA AND ' +
-                'pd.COD_ID_PRODUTO = :COD_ID_PRODUTO';
+            Query := CriarQuery;
+            with Query do
+            begin
 
-            Query.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
-            Query.ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
-            Query.ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
-            Query.Open;
+            	SQL.Text :=
+                    'SELECT pd.COD_ID_PRODUTO, ' +
+                    'pd.COD_ID_EMPRESA, ' +
+                    'pd.COD_ID_LOJA, ' +
+                    'pd.COD_PRODUTO, ' +
+                    'pd.COD_BARRAS, '  +
+                    'pd.COD_ID_GRADE, ' +
+                    'pd.COD_ID_SECAO, ' +
+                    'pd.DSC_COMPLETA, ' +
+                    'pd.NUM_TIPO_PRODUTO, ' +
+                    'pr.NUM_PRECO_VAREJO AS PRECO_VAREJO, ' +
+                    'e.NUM_ESTQ_ATUAL AS ESTOQUE_ATUAL ' +
+                    'FROM db_sgci.produtos pd ' +
+                    'INNER JOIN db_sgci.precos pr ' +
+                        'ON pd.COD_ID_PRODUTO = pr.COD_ID_PRODUTO ' +
+                        'AND pd.COD_ID_EMPRESA = pr.COD_ID_EMPRESA ' +
+                        'AND pd.COD_ID_LOJA = pr.COD_ID_LOJA ' +
+                    'INNER JOIN db_sgci.estoques e ' +
+                        'ON pd.COD_ID_PRODUTO = e.COD_ID_PRODUTO ' +
+                        'AND pd.COD_ID_EMPRESA = e.COD_ID_EMPRESA ' +
+                        'AND pd.COD_ID_LOJA = e.COD_ID_LOJA ' +
+                    'WHERE pd.COD_ID_EMPRESA = :COD_ID_EMPRESA AND ' +
+                    'pd.COD_ID_LOJA = :COD_ID_LOJA AND ' +
+                    'pd.COD_ID_PRODUTO = :COD_ID_PRODUTO';
 
-            Query.SaveToXML(TPath.Combine(TPath.GetDocumentsPath, 'preco-e-estoque.xml'));
+                ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
+                ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
+                ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
+                Open;
+                SaveToXML(TPath.Combine(TPath.GetDocumentsPath, 'produt-com-preco-e-estoque.xml'));
+
+                Result := TProduto.Create;
+
+                Result.CodIdProduto := FieldByName('COD_ID_PRODUTO').AsInteger;
+                Result.CodIdEmpresa := FieldByName('COD_ID_EMPRESA').AsInteger;
+                Result.CodIdLoja := FieldByName('COD_ID_LOJA').AsInteger;
+                Result.CodProduto := FieldByName('COD_PRODUTO').AsLargeInt;
+                Result.CodBarras := FieldByName('COD_BARRAS').AsString;
+                Result.CodIdGrade := FieldByName('COD_ID_GRADE').AsInteger;
+                Result.CodIdSecao := FieldByName('COD_ID_SECAO').AsInteger;
+                Result.DscCompleta := FieldByName('DSC_COMPLETA').AsString;
+                Result.NumTipoProduto := FieldByName('NUM_TIPO_PRODUTO').AsInteger;
+                Result.NumPrecoVarejo := FieldByName('PRECO_VAREJO').AsCurrency;
+                Result.NumEstqAtual := FieldByName('ESTOQUE_ATUAL').AsFloat;
+            end;
         except
+            Result.Free;
             raise;
         end;
     finally
@@ -970,24 +999,7 @@ var
   ProdutosGrade: TObjectList<TProdutoGrade>;
   ProdutoRecebido: TWooProdutoResponse;
 begin
-  with sqlProdutos do
-  begin
-    Close;
-    Connection := Self.Database;
-    SQL.Text := FSQLProdutosBase;
-
-    if not SQL.Text.Contains(':COD_ID_PRODUTO') then
-      SQL.Add('AND COD_ID_PRODUTO = :COD_ID_PRODUTO');
-
-    ParamByName('COD_ID_PRODUTO').AsInteger := FCodIdProduto;
-    Open;
-
-    SaveToXML(TPath.Combine(TPath.GetDocumentsPath, 'preco-produto.xml'));
-
-    if sqlProdutos.IsEmpty then
-      raise Exception.Create('Nenhum produto retornado pelo banco!');
-
-    ProdutoDB := nil;
+	ProdutoDB := nil;
     WooProdutoRequest := nil;
     Atributos := nil;
     CategoriaResponse := nil;
@@ -998,80 +1010,83 @@ begin
     ProdutosGrade := nil;
 
     try
-      ProdutoDB := ProdutoQueryToProduto(sqlProdutos);
+    	ProdutoDB := BuscarProdutoNoBanco(
+        	FCodIdEmpresa,
+            FCodIdLoja,
+            FCodIdProduto
+      	);
 
-      ProdutoDB.NumEstqAtual := BuscarEstoqueProdutoNoBanco(
-          ProdutoDB.CodIdEmpresa,
-          ProdutoDB.CodIdLoja,
-          ProdutoDB.CodIdProduto
-      );
+        if not Assigned(ProdutoDB) then
+        	raise Exception.Create(
+            	Format('Não há nenhum produto na empresa %d loja %d com o id %d',
+                [FCodIdEmpresa, FCodIdLoja, FCodIdProduto])
+            );
 
-      ProdutoRecebido := BuscarProdutoPorSKU(ProdutoDB.CodProduto.ToString);
+      	ProdutoRecebido := BuscarProdutoPorSKU(ProdutoDB.CodProduto.ToString);
 
-      if FieldByName('NUM_TIPO_PRODUTO').AsInteger <> 5 then
-        TipoProduto := 'simple'
-      else
-      begin
-        TipoProduto := 'variable';
-        Atributos := BuscarAtributos;
+      	if ProdutoDB.NumTipoProduto <> 5 then
+        	TipoProduto := 'simple'
+      	else
+      	begin
+            TipoProduto := 'variable';
+            Atributos := BuscarAtributos;
 
-        ProdutosGrade := BuscarProdutosGrade(
-          ProdutoDB.CodIdEmpresa,
-          ProdutoDB.CodIdEmpresa,
-          ProdutoDB.CodIdProduto
-        );
+            ProdutosGrade := BuscarProdutosGrade(
+              ProdutoDB.CodIdEmpresa,
+              ProdutoDB.CodIdEmpresa,
+              ProdutoDB.CodIdProduto
+            );
 
-        TermosProduto := EnviarTermos(Atributos, ProdutosGrade);
-      end;
+        	TermosProduto := EnviarTermos(Atributos, ProdutosGrade);
+      	end;
 
-      ListaImagensRequest := RetornarImagensRequest(ProdutoDB.CodIdProduto);
-      Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDB.CodIdSecao);
-      CategoriaResponse := BuscarCategorias(Secao);
+          ListaImagensRequest := RetornarImagensRequest(ProdutoDB.CodIdProduto);
+          Secao := BuscarSecaoNoBanco(ProdutoDB.CodIdEmpresa, ProdutoDB.CodIdSecao);
+          CategoriaResponse := BuscarCategorias(Secao);
 
-      WooProdutoRequest := ProdutoToWooProdutoRequest(
-        ProdutoDB,
-        TipoProduto,
-        CategoriaResponse.Id,
-        ListaImagensRequest,
-        TermosProduto
-      );
+          WooProdutoRequest := ProdutoToWooProdutoRequest(
+            ProdutoDB,
+            TipoProduto,
+            CategoriaResponse.Id,
+            ListaImagensRequest,
+            TermosProduto
+          );
 
-      if (Assigned(ProdutoRecebido)) and
-      	(not SameText(WooProdutoRequest.Sku, ProdutoRecebido.Sku))
-      then
-      begin
-      	ShowMessage(
-        	'SKU do WooCommerce: ' + ProdutoRecebido.Sku + sLineBreak +
-            'SKU Produto Request: ' + WooProdutoRequest.SKU
-        );
-        raise Exception.Create('SKU do produto diverge do código do produto no banco');
-      end
-      else
-        ShowMessage('SKU OK');
+          if (Assigned(ProdutoRecebido)) and
+            (not SameText(WooProdutoRequest.Sku, ProdutoRecebido.Sku))
+          then
+          begin
+            ShowMessage(
+                'SKU do WooCommerce: ' + ProdutoRecebido.Sku + sLineBreak +
+                'SKU Produto Request: ' + WooProdutoRequest.SKU
+            );
+            raise Exception.Create('SKU do produto diverge do código do produto no banco');
+          end
+          else
+            ShowMessage('SKU OK');
 
-      SalvarConteudoEmArquivo(
-        TPath.Combine(TPath.GetDocumentsPath, 'produto-request-object.txt.'),
-        TJson.ObjectToJsonString(WooProdutoRequest)
-      );
+          SalvarConteudoEmArquivo(
+            TPath.Combine(TPath.GetDocumentsPath, 'produto-request-object.txt.'),
+            TJson.ObjectToJsonString(WooProdutoRequest)
+          );
 
-      WooProdutoResponse := EnviarProduto(
-          WooProdutoRequest,
-          ProdutoRecebido
-      );
+          WooProdutoResponse := EnviarProduto(
+              WooProdutoRequest,
+              ProdutoRecebido
+          );
 
-      if WooProdutoResponse.PType = 'variable' then
-        CriarVariacoesDoProduto(WooProdutoResponse, ProdutosGrade);
+          if WooProdutoResponse.PType = 'variable' then
+            CriarVariacoesDoProduto(WooProdutoResponse, ProdutosGrade);
     finally
-      WooProdutoResponse.Free;
-      WooProdutoRequest.Free;
-      CategoriaResponse.Free;
-      Secao.Free;
-      TermosProduto.Free;
-      ProdutosGrade.Free;
-      Atributos.Free;
-      ProdutoDB.Free;
+    	WooProdutoResponse.Free;
+        WooProdutoRequest.Free;
+        CategoriaResponse.Free;
+        Secao.Free;
+        TermosProduto.Free;
+        ProdutosGrade.Free;
+        Atributos.Free;
+        ProdutoDB.Free;
     end;
-  end;
 end;
 
 procedure TfrmTela_Principal.DatabaseConnectionLost(Sender: TObject; Component: TComponent;

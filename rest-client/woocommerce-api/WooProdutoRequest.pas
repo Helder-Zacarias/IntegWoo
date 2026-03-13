@@ -70,7 +70,7 @@ implementation
     constructor TWooProdutoRequest.Create;
     begin
       inherited;
-
+      FManage_stock := True;
       SetLength(FImages, 0);
       SetLength(FCategories, 0);
       SetLength(FAttributes, 0);
