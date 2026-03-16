@@ -30,6 +30,8 @@ type
     btnHamburguer: TButton;
     panelSide: TPanel;
     btnEnviarProdutosMandala: TBitBtn;
+    procedure OnFormCreate(Sender: TObject);
+    procedure OnFormDestroy(Sender: TObject);
     procedure DatabaseConnectionLost(Sender: TObject; Component: TComponent;
       ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
     procedure btnHamburguerClick(Sender: TObject);
@@ -48,7 +50,6 @@ type
     function CriarQuery: TUniQuery;
     function RetornarImagensRequest(CodIdProduto: Integer): TObjectList<TWooImagemRequest>;
     function ChecarERetornarJSONArray(JSONResponse: TJSONValue): TJSONArray;
-    procedure FormCreate(Sender: TObject);
     function CriarAtributos: TObjectList<TWooAtributoResponse>;
     function BuscarTermosNaApi(AtributoID: Integer): TObjectList<TWooTermoResponse>;
     function GetVariacoesDoProduto(ProdutoID: Integer): TObjectList<TWooVariacaoProdutoResponse>;
@@ -63,6 +64,8 @@ type
       TList<string>;
     function BuscarProdutoPorSKU(SKU: string): TWooProdutoResponse;
     class procedure HorseAPISalvarItensDoCarrinho(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+    class procedure HorseAPIAtualizarProduto(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+    class function ChecarBodyDoWebHook(ReqBody: string): Boolean;
   private
     FSQLProdutosBase: string;
     FSQLImagensBase: string;
@@ -85,7 +88,7 @@ uses
 
 {$R *.dfm}
 
-procedure TfrmTela_Principal.FormCreate(Sender: TObject);
+procedure TfrmTela_Principal.OnFormCreate(Sender: TObject);
 begin
   FSQLProdutosBase := sqlProdutos.SQL.Text;
   FSQLImagensBase := sqlImagens.SQL.Text;
@@ -93,24 +96,31 @@ begin
   FTabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
   FFolderPath := TPath.Combine(TPath.GetDocumentsPath, 'Ecommerce');
 
-//  THorse.Post('/api/salvar-itens-carrinho', HorseAPISalvarItensDoCarrinho);
-  THorse.Post('/api/enviar-itens-do-carrinho', HorseAPISalvarItensDoCarrinho);
+  THorse.Post('/api/pedido-woocommerce', HorseAPISalvarItensDoCarrinho);
   THorse.Listen(HORSE_PORT);
+end;
 
-//  TTask.Run(
-//    procedure
-//    begin
-//        THorse.Post('http://localhost:9000/api/salvar-itens-carrinho',
-//        	procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
-//            begin
-//                Res.Send('Hello');
-//                Writeln(Req.Body);
-//            end
-//        );
+class function TfrmTela_Principal.ChecarBodyDoWebHook(ReqBody: string): Boolean;
+begin
+    if ReqBody.Trim.IsEmpty then
+    begin
+        raise Exception.Create('"Body" da requisição não foi enviado');
+        Result := False;
+    end
+    else
+        Result := True;
+
+//        if ReqBody.Trim.IsEmpty then
+//        	raise EBadRequest.Create('"Body" da requisição não foi enviado');
 //
-//        THorse.Listen(HORSE_PORT);
-//    end
-//  );
+//        if not TApiUtils.ValidarJsonString(Req.Body) then
+//            raise Exception.Create('JSON inválido no corpo da requisição');
+//            raise EBadRequest.Create('JSON inválido no corpo da requisição.');
+//
+//        if iRev.NovoUsuario(Req.Body, Resp) then
+//            Res.Status(THTTPStatus.OK).Send(Resp)
+//        else                                                                                   9
+//            Res.Status(THTTPStatus.BadRequest).Send(Resp);
 end;
 
 class procedure TfrmTela_Principal.HorseAPISalvarItensDoCarrinho(
@@ -120,27 +130,96 @@ class procedure TfrmTela_Principal.HorseAPISalvarItensDoCarrinho(
 );
 var
     CodIdRevenda: string;
-	Resp        : string;
+	Resp : string;
 begin
     try
-        // Receber parametros da url
-        if Req.Body.Trim.IsEmpty then
-            raise Exception.Create('"Body" da requisição não foi enviado');
-//            raise EBadRequest.Create('"Body" da requisição não foi enviado');
-
-//        if not TApiUtils.ValidarJsonString(Req.Body) then
-//            raise Exception.Create('JSON inválido no corpo da requisição');
-//            raise EBadRequest.Create('JSON inválido no corpo da requisição.');
-        //
-//        if iRev.NovoUsuario(Req.Body, Resp) then
-//            Res.Status(THTTPStatus.OK).Send(Resp)
-//        else
-//            Res.Status(THTTPStatus.BadRequest).Send(Resp);
-
-        SalvarConteudoEmArquivo(TPath.Combine(TPath.GetDocumentsPath, 'itens-carrinho.txt'), Req.Body);
+        if ChecarBodyDoWebHook(Req.Body) then
+        	SalvarConteudoEmArquivo(
+                TPath.Combine(TPath.GetDocumentsPath, 'itens-carrinho.txt'),
+                Req.Body
+            );
     except
         on E: Exception do
             Res.Status(THTTPStatus.InternalServerError).Send('Erro ao cadastrar usuário!\n' + E.Message);
+    end;
+end;
+
+class procedure TfrmTela_Principal.HorseAPIAtualizarProduto(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+var
+	QuerySelect: TuniQuery;
+    QueryUpdate: TUniQuery;
+    ProdutoResposta: TWooProdutoResponse;
+    ProdutoDB: TProduto;
+begin
+    QuerySelect := nil;
+    QueryUpdate := nil;
+    ProdutoResposta := nil;
+    ProdutoDB := nil;
+
+    try
+    	try
+        	if ChecarBodyDoWebhook(Req.Body) then
+                SalvarConteudoEmArquivo(
+                    TPath.Combine(TPath.GetDocumentsPath, 'produto-payload.txt'),
+                    Req.Body
+                 );
+            ProdutoResposta :=  TJson.JsonToObject<TWooProdutoResponse>(Req.Body);
+
+
+            frmTela_Principal.Database.StartTransaction;
+
+            try
+            	QuerySelect := frmTela_Principal.CriarQuery;
+            	QuerySelect.SQL.Text :=
+            	'SELECT * FROM db_sgci.produtos WHERE ' +
+                    'COD_ID_EMPRESA = 2433 ' +
+                    'AND COD_ID_LOJA = 90 ' +
+                    'AND COD_PRODUTO = :SITE_SKU_PRODUTO';
+                QuerySelect.ParamByName('SITE_SKU_PRODUTO').AsLargeInt :=  ProdutoResposta.Sku.ToInt64;
+                QuerySelect.Open;
+
+                if QuerySelect.IsEmpty then
+                    raise Exception.Create(
+                        Format(
+                            'Não há produto cadastrado com o COD_PRODUTO %d',
+                            [ProdutoResposta.Sku.ToInteger]
+                        )
+                    );
+
+                ProdutoDB := ProdutoQueryToProduto(QuerySelect);
+                ProdutoDB.DscCompleta := ProdutoResposta.Name;
+
+                QueryUpdate := frmTela_Principal.CriarQuery;
+                QueryUpdate.SQL.Text :=
+                'UPDATE db_sgci.produtos ' +
+                'SET DSC_COMPLETA = :DSC_COMPLETA WHERE ' +
+                	'COD_ID_EMPRESA = 2433 ' +
+                	'AND COD_ID_LOJA = 90 ' +
+                    'AND COD_PRODUTO = :COD_PRODUTO';
+
+                QueryUpdate.ParamByName('DSC_COMPLETA').AsString :=  ProdutoDB.DscCompleta;
+                QueryUpdate.ParamByName('COD_PRODUTO').AsLargeInt :=  ProdutoDB.CodProduto;
+                QueryUpdate.ExecSQL;
+
+                 if QueryUpdate.RowsAffected = 0 then
+                 	raise Exception.Create('Produto não foi atualizado');
+
+                frmTela_Principal.Database.Commit;
+
+                Res.Status(THTTPStatus.OK).Send('Produto atualizado com sucesso');
+            except
+               frmTela_Principal.Database.Rollback;
+               raise;
+            end;
+    	except
+    		on E: Exception do
+        		Res.Status(THTTPStatus.InternalServerError).Send('Erro ao cadastrar usuário!\n' + E.Message);
+    	end;
+    finally
+    	QueryUpdate.Free;
+        ProdutoDB.Free;
+    	QuerySelect.Free;
+        ProdutoResposta.Free;
     end;
 end;
 
@@ -1112,6 +1191,12 @@ begin
     finally
     	QueryProdutos.Free;
     end;
+end;
+
+procedure TfrmTela_Principal.OnFormDestroy(Sender: TObject);
+begin
+    if THorse.IsRunning then
+    	THorse.StopListen;
 end;
 
 end.

@@ -11,7 +11,8 @@ object frmTela_Principal: TfrmTela_Principal
   Font.Name = 'Segoe UI'
   Font.Style = []
   Position = poScreenCenter
-  OnCreate = FormCreate
+  OnCreate = OnFormCreate
+  OnDestroy = OnFormDestroy
   TextHeight = 15
   object btnHamburguer: TButton
     Left = 0
