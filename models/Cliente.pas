@@ -1,4 +1,4 @@
-unit Clientes;
+unit Cliente;
 
 interface
 
@@ -6,7 +6,7 @@ uses
   System.SysUtils;
 
 type
-  TClientes = class
+  TCliente = class
   private
     FCOD_ID_CLIENTE: Integer;
     FCOD_ID_EMPRESA: Integer;
@@ -27,20 +27,21 @@ type
     FCOD_CEP: string;
     FNUM_STATUS: Integer;
     FDAT_INCLUSAO: TDateTime;
-
+    FCOD_ID_WOOCOMMERCE: Int64;
+    FSTATUS_SINCRONIZADO_WOOCOMMERCE: Integer;
   public
-
     property CodIdCliente: Integer
-      read FCOD_ID_CLIENTE write FCOD_ID_CLIENTE;
+    	read FCOD_ID_CLIENTE write FCOD_ID_CLIENTE;
 
     property CodIdEmpresa: Integer
-      read FCOD_ID_EMPRESA write FCOD_ID_EMPRESA;
+    	read FCOD_ID_EMPRESA write FCOD_ID_EMPRESA;
 
     property CodIdLoja: Integer
-      read FCOD_ID_LOJA write FCOD_ID_LOJA;
+    	read FCOD_ID_LOJA write FCOD_ID_LOJA;
 
     property CodCliente: string
-      read FCOD_CLIENTE write FCOD_CLIENTE;
+    	read FCOD_CLIENTE write FCOD_CLIENTE;
+
 
     property DscNome: string
       read FDSC_NOME write FDSC_NOME;
@@ -82,11 +83,16 @@ type
       read FCOD_CEP write FCOD_CEP;
 
     property NumStatus: Integer
-      read FNUM_STATUS write FNUM_STATUS;
+    	read FNUM_STATUS write FNUM_STATUS;
 
     property DatInclusao: TDateTime
-      read FDAT_INCLUSAO write FDAT_INCLUSAO;
+    	read FDAT_INCLUSAO write FDAT_INCLUSAO;
 
+    property CodIdWooCommerce: Int64
+    	read FCOD_ID_WOOCOMMERCE write FCOD_ID_WOOCOMMERCE;
+
+    property StatusSincronizadoWooCommerce: Integer
+    	read FSTATUS_SINCRONIZADO_WOOCOMMERCE write FSTATUS_SINCRONIZADO_WOOCOMMERCE;
   end;
 
 implementation

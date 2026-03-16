@@ -66,6 +66,9 @@ type
     class procedure HorseAPISalvarItensDoCarrinho(Req: THorseRequest; Res: THorseResponse; Next: TProc);
     class procedure HorseAPIAtualizarProduto(Req: THorseRequest; Res: THorseResponse; Next: TProc);
     class function ChecarBodyDoWebHook(ReqBody: string): Boolean;
+    procedure RegistrarRotas;
+    procedure SalvarPedidoWoo(Req: THorseRequest; Res: THorseResponse);
+    procedure SalvarPedidoNoBanco(JSONResposta: TJSONValue);
   private
     FSQLProdutosBase: string;
     FSQLImagensBase: string;
@@ -95,9 +98,62 @@ begin
   // Para adicionar uma 3ª variação no futuro, basta incluir aqui — o resto do código se adapta automaticamente
   FTabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
   FFolderPath := TPath.Combine(TPath.GetDocumentsPath, 'Ecommerce');
+  RegistrarRotas;
+end;
 
-  THorse.Post('/api/pedido-woocommerce', HorseAPISalvarItensDoCarrinho);
-  THorse.Listen(HORSE_PORT);
+procedure TfrmTela_Principal.RegistrarRotas;
+begin
+	THorse.Post('/api/pedido-woocommerce', HorseAPISalvarItensDoCarrinho);
+    THorse.Listen(HORSE_PORT);
+end;
+
+procedure TfrmTela_Principal.SalvarPedidoWoo(Req: THorseRequest; Res: THorseResponse);
+var
+  JSONResposta: TJSONObject;
+begin
+  JSONResposta := Req.Body<TJSONObject>;
+
+  try
+    SalvarPedidoNoBanco(JSONResposta);
+    Res.Send('Pedido salvo com sucesso');
+  except
+    on E: Exception do
+      Res.Status(500).Send(E.Message);
+  end;
+end;
+
+procedure TfrmTela_Principal.SalvarPedidoNoBanco(JSONResposta: TJSONValue);
+var
+    SelectPedidoQuery: TuniQuery;
+    CodIdWooCommerce: Int64;
+begin
+    SelectPedidoQuery := nil;
+    CodIdWooCommerce := JSONResposta.GetValue<Int64>('id');
+
+    try
+        SelectPedidoQuery := CriarQuery;
+
+        with SelectPedidoQuery do
+        begin
+        	Connection.StartTransaction;
+
+            try
+            	SQL.Text :=
+                    'SELECT * FROM pedido_venda WHERE ' +
+                        'COD_ID_EMPRESA = 2433 ' +
+                        'AND COD_ID_LOJA = 90 ' +
+                        'AND COD_ID_WOOCOMMERCE := COD_ID_WOOCOMMERCE';
+            	ParamByName('COD_ID_WOOCOMMERCE').AsLargeInt := CodIdWooCommerce;
+            	Open;
+
+            	Connection.Commit
+            except
+                Connection.Rollback;
+            end;
+        end;
+    finally
+        SelectPedidoQuery.Free;
+    end;
 end;
 
 class function TfrmTela_Principal.ChecarBodyDoWebHook(ReqBody: string): Boolean;

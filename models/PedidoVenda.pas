@@ -24,6 +24,10 @@ type
     FNUM_STATUS_PEDIDO: Integer;
     FNUM_STATUS_PRODUCAO: Integer;
     FDSC_OBSERVACOES: string;
+    FCOD_ID_WOOCOMMERCE: Int64;
+	FSTATUS_PEDIDO_WOOCOMMERCE: string;
+	FCHAVE_PEDIDO_WOOCOMMERCE: string;
+    FSTATUS_SINCRONIZADO_WOOCOMMERCE_STATUS: Integer;
 
   public
 
@@ -74,6 +78,18 @@ type
 
     property DscObservacoes: string
       read FDSC_OBSERVACOES write FDSC_OBSERVACOES;
+
+    property CodIdWooCommerce: Int64
+    	read FCOD_ID_WOOCOMMERCE write FCOD_ID_WOOCOMMERCE;
+
+    property FStatusPedidoWooCommerce: string
+        read FSTATUS_PEDIDO_WOOCOMMERCE write FSTATUS_PEDIDO_WOOCOMMERCE;
+
+    property ChavePedidoWooCommerce: string
+    	read FCHAVE_PEDIDO_WOOCOMMERCE write FCHAVE_PEDIDO_WOOCOMMERCE;
+
+    property StatusSincronizadoWooCommerce: Integer
+        read FSTATUS_SINCRONIZADO_WOOCOMMERCE_STATUS  write FSTATUS_SINCRONIZADO_WOOCOMMERCE_STATUS;
 
   end;
 

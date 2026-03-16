@@ -46,6 +46,7 @@ type
     FNUM_STATUS_PRODUCAO: Integer;
     FNUM_STATUS_ITEM: Integer;
     FNUM_STS_STQ: Integer;
+    FCOD_ITEM_WOOCOMMERCE: Int64;
 
   public
 
@@ -87,6 +88,7 @@ type
     property NumStatusProducao: Integer read FNUM_STATUS_PRODUCAO write FNUM_STATUS_PRODUCAO;
     property NumStatusItem: Integer read FNUM_STATUS_ITEM write FNUM_STATUS_ITEM;
     property NumStsStq: Integer read FNUM_STS_STQ write FNUM_STS_STQ;
+    property FCodItemWooCommerce: Int64 read FCOD_ITEM_WOOCOMMERCE write FCOD_ITEM_WOOCOMMERCE;
 
   end;
 
