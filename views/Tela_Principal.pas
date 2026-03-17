@@ -11,15 +11,16 @@ uses
   REST.Json, Rest.Json.Types, RESTRequest4D,
   Horse,
   AppConfig, Tela_Envio_Produto, Tela_Cadastro_Atributo,
-  FileWriter, TrimTexto, ContentPrinter, CustomObjectMapper,
+  FileWriter, TrimTexto, ContentPrinter, CustomObjectMapper, FormatadorDocumentos,
   Produto, ProdutoGrade, ProdutoImagem, Secao, Variacao,
+  Cliente, PedidoVenda, PedidoVendaItens, PedidoVendaPgtos,
   WooProdutoRequest, WooProdutoResponse,
   WPImagemResponse, WooImagemRequest, WooImagemResponse,
   WooCreateCategoriaRequest, WooCategoriaRequest, WooCategoriaResponse, WooProdutoCategoriaRequest,
   WooAtributoRequest, WooAtributoResponse,
   WooTermoAtributoRequest, WooTermoResponse,
   WooVariacaoProdutoResponse, WooVariacaoProdutoRequest, WooAtributoDaVariacao,
-  WooAtributoProduto, WooVariacaoProdutoBatchRequest;
+  WooAtributoProduto, WooVariacaoProdutoBatchRequest, ClienteBilling;
 
 type
   TfrmTela_Principal = class(TForm)
@@ -63,12 +64,14 @@ type
     function GerarListaDeStringsDosTermosDaAPI(TermosAPI: TObjectList<TWooTermoResponse>):
       TList<string>;
     function BuscarProdutoPorSKU(SKU: string): TWooProdutoResponse;
-    class procedure HorseAPISalvarItensDoCarrinho(Req: THorseRequest; Res: THorseResponse; Next: TProc);
-    class procedure HorseAPIAtualizarProduto(Req: THorseRequest; Res: THorseResponse; Next: TProc);
-    class function ChecarBodyDoWebHook(ReqBody: string): Boolean;
+    procedure HorseAPISalvarItensDoCarrinho(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+    procedure HorseAPIAtualizarProduto(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+    function ChecarBodyDoWebHook(ReqBody: string): Boolean;
     procedure RegistrarRotas;
     procedure SalvarPedidoWoo(Req: THorseRequest; Res: THorseResponse);
     procedure SalvarPedidoNoBanco(JSONResposta: TJSONValue);
+    function CarregarClienteDoJSON(Billing: TJSONObject): TClienteBilling;
+    function BuscarOuInserirClienteNoBanco(ClienteBilling: TClienteBilling): TCliente;
   private
     FSQLProdutosBase: string;
     FSQLImagensBase: string;
@@ -103,8 +106,209 @@ end;
 
 procedure TfrmTela_Principal.RegistrarRotas;
 begin
-	THorse.Post('/api/pedido-woocommerce', HorseAPISalvarItensDoCarrinho);
+	THorse.Post('/api/pedido-woocommerce/:codIdEmpresa/:codIdLoja', HorseAPISalvarItensDoCarrinho);
     THorse.Listen(HORSE_PORT);
+end;
+
+function TfrmTela_Principal.CarregarClienteDoJSON(Billing: TJSONObject): TClienteBilling;
+begin
+	try
+    	if not Assigned(Billing) then
+        	raise Exception.Create('JSON Vazio');
+
+        Result := TClienteBilling.Create;
+        Result.FirstName   := Billing.GetValue<string>('first_name');
+        Result.LastName    := Billing.GetValue<string>('last_name');
+        Result.Company     := Billing.GetValue<string>('company');
+        Result.Address1    := Billing.GetValue<string>('address_1');
+        Result.Address2    := Billing.GetValue<string>('address_2');
+        Result.City        := Billing.GetValue<string>('city');
+        Result.State       := Billing.GetValue<string>('state');
+        Result.Postcode    := Billing.GetValue<string>('postcode');
+        Result.Country     := Billing.GetValue<string>('country');
+        Result.Email       := Billing.GetValue<string>('email');
+        Result.Phone       := Billing.GetValue<string>('phone');
+        Result.Number      := Billing.GetValue<string>('number');
+        Result.Neighborhood:= Billing.GetValue<string>('neighborhood');
+        Result.PersonType  := Billing.GetValue<string>('persontype');
+        Result.Cpf         := Billing.GetValue<string>('cpf');
+        Result.Rg          := Billing.GetValue<string>('rg');
+        Result.Cnpj        := Billing.GetValue<string>('cnpj');
+        Result.Ie          := Billing.GetValue<string>('ie');
+        Result.Birthdate   := Billing.GetValue<string>('birthdate');
+        Result.Gender      := Billing.GetValue<string>('gender');
+        Result.Cellphone   := Billing.GetValue<string>('cellphone');
+        SalvarConteudoEmArquivo(
+            TPath.Combine(TPath.GetDocumentsPath, 'pedido-payload.txt'),
+            TJson.ObjectToJsonString(Result)
+        );
+    except
+       Result.Free;
+       raise;
+    end;
+end;
+
+function TfrmTela_Principal.BuscarOuInserirClienteNoBanco(ClienteBilling: TClienteBilling): TCliente;
+var
+  Query: TUniQuery;
+  ClienteID: Integer;
+begin
+  Query := CriarQuery;
+  try
+    Query.Connection.StartTransaction;
+    try
+      Query.SQL.Text :=
+        'INSERT INTO db_sgci.clientes ( ' +
+        '    COD_ID_EMPRESA, ' +
+        '    COD_ID_LOJA, ' +
+        '    NUM_TIPO, ' +
+        '    NUM_SEXO, ' +
+        '    DSC_NOME, ' +
+        '    DSC_ENDERECO, ' +
+        '    DSC_NUMERO, ' +
+        '    DSC_COMPLEMENTO, ' +
+        '    DSC_BAIRRO, ' +
+//        '    COD_ID_UF, ' +
+//        '    COD_ID_MUNICIPIO, ' +
+        '    DSC_CEP, ' +
+        '    DSC_TELEFONE, ' +
+        '    DSC_CELULAR, ' +
+        '    DSC_CPF_CNPJ, ' +
+        '    DSC_EMAIL, ' +
+        '    DAT_NASCIMENTO, ' +
+        '    DSC_IE, ' +
+        '    DAT_CADASTRO, ' +
+        '    NUM_STATUS ' +
+//        '    DSC_CIDADE, ' +
+//        '    DSC_UF    ' +
+        ') VALUES ( ' +
+        '    2433, ' +
+        '    90, ' +
+        '    :NUM_TIPO, ' +
+        '    :NUM_SEXO, ' +
+        '    :DSC_NOME, ' +
+        '    :DSC_ENDERECO, ' +
+        '    :DSC_NUMERO, ' +
+        '    :DSC_COMPLEMENTO, ' +
+        '    :DSC_BAIRRO, ' +
+//        '    :COD_ID_UF, ' +
+//        '    :COD_ID_MUNICIPIO, ' +
+        '    :DSC_CEP, ' +
+        '    :DSC_TELEFONE, ' +
+        '    :DSC_CELULAR, ' +
+        '    :DSC_CPF_CNPJ, ' +
+        '    :DSC_EMAIL, ' +
+        '    :DAT_NASCIMENTO, ' +
+        '    :DSC_IE, ' +
+//		'    DSC_CIDADE, ' +
+//        '    DSC_UF    ' +
+        '    NOW(), ' +
+        '    0 ' +
+        ') ' +
+        'ON DUPLICATE KEY UPDATE ' +
+        '    COD_CLIENTE = LAST_INSERT_ID(COD_CLIENTE);';
+
+      if ClienteBilling.PersonType = 'F' then
+      begin
+        Query.ParamByName('NUM_TIPO').AsInteger := 0;
+        Query.ParamByName('DSC_CPF_CNPJ').AsString := FormatarCPF(ClienteBilling.Cpf);
+      end
+      else
+      begin
+        Query.ParamByName('NUM_TIPO').AsInteger := 1;
+        Query.ParamByName('DSC_CPF_CNPJ').AsString := FormatarCNPJ(ClienteBilling.Cnpj);
+      end;
+
+      // Sexo
+      if ClienteBilling.Gender = 'F' then
+        Query.ParamByName('NUM_SEXO').AsInteger := 0
+      else if ClienteBilling.Gender = 'M' then
+        Query.ParamByName('NUM_SEXO').AsInteger := 1
+      else
+        Query.ParamByName('NUM_SEXO').Clear;
+
+      // Nome
+      Query.ParamByName('DSC_NOME').AsString :=
+        Trim(ClienteBilling.FirstName + ' ' + ClienteBilling.LastName);
+
+      // Endereço
+      Query.ParamByName('DSC_ENDERECO').AsString := ClienteBilling.Address1;
+      Query.ParamByName('DSC_NUMERO').AsString := ClienteBilling.Number;
+      Query.ParamByName('DSC_COMPLEMENTO').AsString := ClienteBilling.Address2;
+      Query.ParamByName('DSC_BAIRRO').AsString := ClienteBilling.Neighborhood;
+      Query.ParamByName('DSC_CEP').AsString := ClienteBilling.Postcode;
+//      Query.ParamByName('DSC_CIDADE').AsString := ClienteBilling.City;
+//      Query.ParamByName('DSC_UF').AsString := ClienteBilling.State;
+
+      // Contato
+      if ClienteBilling.Phone <> '' then
+        Query.ParamByName('DSC_TELEFONE').AsString := ClienteBilling.Phone
+      else
+        Query.ParamByName('DSC_TELEFONE').Clear;
+
+      if ClienteBilling.Cellphone <> '' then
+        Query.ParamByName('DSC_CELULAR').AsString := ClienteBilling.Cellphone
+      else
+        Query.ParamByName('DSC_CELULAR').Clear;
+
+      Query.ParamByName('DSC_EMAIL').AsString := ClienteBilling.Email;
+
+      // IE
+      if ClienteBilling.Ie <> '' then
+        Query.ParamByName('DSC_IE').AsString := ClienteBilling.Ie
+      else
+        Query.ParamByName('DSC_IE').Clear;
+
+      // Nascimento
+      if ClienteBilling.Birthdate <> '' then
+        Query.ParamByName('DAT_NASCIMENTO').AsDate :=
+          StrToDateDef(ClienteBilling.Birthdate, 0)
+      else
+        Query.ParamByName('DAT_NASCIMENTO').Clear;
+
+      Query.ExecSQL;
+      Query.SQL.Text := 'SELECT LAST_INSERT_ID() AS ID';
+      Query.Open;
+      ClienteID := Query.FieldByName('ID').AsInteger;
+      Query.Close;
+
+      Query.SQL.Text := 'SELECT * FROM db_sgci.clientes WHERE COD_CLIENTE = :ID';
+      Query.ParamByName('ID').AsInteger := ClienteID;
+      Query.Open;
+
+      Result := TCliente.Create;
+      Result.CodIdCliente := Query.FieldByName('COD_ID_CLIENTE').AsInteger;
+      Result.CodIdEmpresa := Query.FieldByName('COD_ID_EMPRESA').AsInteger;
+      Result.CodIdLoja    := Query.FieldByName('COD_ID_LOJA').AsInteger;
+      Result.CodCliente   := Query.FieldByName('COD_CLIENTE').AsInteger;
+      Result.DscNome      := Query.FieldByName('DSC_NOME').AsString;
+//      Result.DscFantasia  := Query.FieldByName('DSC_FANTASIA').AsString;
+      Result.DscCpfCnpj   := Query.FieldByName('DSC_CPF_CNPJ').AsString;
+      Result.DscEmail     := Query.FieldByName('DSC_EMAIL').AsString;
+      Result.DscTelefone  := Query.FieldByName('DSC_TELEFONE').AsString;
+      Result.DscCelular   := Query.FieldByName('DSC_CELULAR').AsString;
+      Result.DscEndereco     := Query.FieldByName('DSC_ENDERECO').AsString;
+      Result.DscNumero       := Query.FieldByName('DSC_NUMERO').AsString;
+      Result.DscComplemento  := Query.FieldByName('DSC_COMPLEMENTO').AsString;
+      Result.DscBairro       := Query.FieldByName('DSC_BAIRRO').AsString;
+//      Result.DscCidade       := Query.FieldByName('DSC_CIDADE').AsString;
+//      Result.DscUf           := Query.FieldByName('DSC_UF').AsString;
+      Result.CodCep          := Query.FieldByName('DSC_CEP').AsString;
+      Result.NumStatus    := Query.FieldByName('NUM_STATUS').AsInteger;
+      Result.DatInclusao  := Query.FieldByName('DAT_CADASTRO').AsDateTime;
+//      Result.CodIdWooCommerce := Query.FieldByName('COD_ID_WOOCOMMERCE').AsLargeInt;
+//      Result.StatusSincronizadoWooCommerce :=
+//	  Query.FieldByName('STATUS_SINCRONIZADO_WOOCOMMERCE').AsInteger;
+
+      Query.Connection.Commit;
+    except
+      Query.Connection.Rollback;
+      raise;
+    end;
+
+  finally
+    Query.Free;
+  end;
 end;
 
 procedure TfrmTela_Principal.SalvarPedidoWoo(Req: THorseRequest; Res: THorseResponse);
@@ -114,7 +318,7 @@ begin
   JSONResposta := Req.Body<TJSONObject>;
 
   try
-    SalvarPedidoNoBanco(JSONResposta);
+  	SalvarPedidoNoBanco(JSONResposta);
     Res.Send('Pedido salvo com sucesso');
   except
     on E: Exception do
@@ -141,9 +345,10 @@ begin
             	SQL.Text :=
                     'SELECT * FROM pedido_venda WHERE ' +
                         'COD_ID_EMPRESA = 2433 ' +
-                        'AND COD_ID_LOJA = 90 ' +
-                        'AND COD_ID_WOOCOMMERCE := COD_ID_WOOCOMMERCE';
-            	ParamByName('COD_ID_WOOCOMMERCE').AsLargeInt := CodIdWooCommerce;
+                        'AND COD_ID_LOJA = 90 '  ;
+
+//                       + 'AND COD_ID_WOOCOMMERCE := COD_ID_WOOCOMMERCE';
+//            	ParamByName('COD_ID_WOOCOMMERCE').AsLargeInt := CodIdWooCommerce;
             	Open;
 
             	Connection.Commit
@@ -156,7 +361,7 @@ begin
     end;
 end;
 
-class function TfrmTela_Principal.ChecarBodyDoWebHook(ReqBody: string): Boolean;
+function TfrmTela_Principal.ChecarBodyDoWebHook(ReqBody: string): Boolean;
 begin
     if ReqBody.Trim.IsEmpty then
     begin
@@ -179,28 +384,66 @@ begin
 //            Res.Status(THTTPStatus.BadRequest).Send(Resp);
 end;
 
-class procedure TfrmTela_Principal.HorseAPISalvarItensDoCarrinho(
+procedure TfrmTela_Principal.HorseAPISalvarItensDoCarrinho(
     Req: THorseRequest;
     Res: THorseResponse;
     Next: TProc
 );
 var
-    CodIdRevenda: string;
+    CodIdEmpresa: string;
+    CodIdLoja: string;
 	Resp : string;
+    ClienteBilling: TClienteBilling;
+    Cliente: TCliente;
+    JSONPedido: TJsonObject;
 begin
+    ClienteBilling := nil;
+    JSONPedido := nil;
+
     try
-        if ChecarBodyDoWebHook(Req.Body) then
-        	SalvarConteudoEmArquivo(
+    	try
+        	CodIdEmpresa := Req.Params
+                .Field('codIdEmpresa')
+                .Required(True)
+                .RequiredMessage('"codIdEmpresa" não foi recebido na URL da requisição').AsString;
+
+            CodIdLoja := Req.Params
+                .Field('codIdLoja')
+                .Required(True)
+                .RequiredMessage('"codIdLoja" não foi recebido na URL da requisição').AsString;
+
+            ChecarBodyDoWebHook(Req.Body);
+
+            JSONPedido := TJSONObject.ParseJSONValue(Req.Body) as TJSONObject;
+//
+            ClienteBilling := CarregarClienteDoJSON(
+                JSONPedido.GetValue<TJSONObject>('billing')
+            );
+
+            Cliente := BuscarOuInserirClienteNoBanco(ClienteBilling);
+
+            SalvarConteudoEmArquivo(
                 TPath.Combine(TPath.GetDocumentsPath, 'itens-carrinho.txt'),
                 Req.Body
             );
-    except
-        on E: Exception do
-            Res.Status(THTTPStatus.InternalServerError).Send('Erro ao cadastrar usuário!\n' + E.Message);
+
+            SalvarConteudoEmArquivo(
+                TPath.Combine(TPath.GetDocumentsPath, 'cliente-cadastrado.txt'),
+                TJson.ObjectToJsonString(Cliente)
+            );
+
+            Res.Send('OK');
+        except
+        	on E: Exception do
+            	Res.Status(THTTPStatus.InternalServerError).Send('Erro ao cadastrar usuário!\n' + E.Message);
+    	end;
+    finally
+        ClienteBilling.Free;
+        JSONPedido.Free;
     end;
 end;
 
-class procedure TfrmTela_Principal.HorseAPIAtualizarProduto(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+procedure TfrmTela_Principal.HorseAPIAtualizarProduto(Req: THorseRequest; Res: THorseResponse; Next: TProc);
 var
 	QuerySelect: TuniQuery;
     QueryUpdate: TUniQuery;
@@ -432,9 +675,9 @@ var
   JSONResposta: TJSONValue;
   JSONArray: TJSONArray;
 begin
-  Result       := nil;
+  Result := nil;
   JSONResposta := nil;
-  JSONArray    := nil;
+  JSONArray := nil;
 
   try
     JSONResposta := ChamadaAPIWooCommerce('products/attributes', 'GET', 'Atributos retornados com sucesso');

@@ -11,10 +11,10 @@ type
     FCOD_ID_CLIENTE: Integer;
     FCOD_ID_EMPRESA: Integer;
     FCOD_ID_LOJA: Integer;
-    FCOD_CLIENTE: string;
+    FCOD_CLIENTE: Integer;
     FDSC_NOME: string;
     FDSC_FANTASIA: string;
-    FCOD_CPF_CNPJ: string;
+    FDSC_CPF_CNPJ: string;
     FDSC_EMAIL: string;
     FDSC_TELEFONE: string;
     FDSC_CELULAR: string;
@@ -29,6 +29,7 @@ type
     FDAT_INCLUSAO: TDateTime;
     FCOD_ID_WOOCOMMERCE: Int64;
     FSTATUS_SINCRONIZADO_WOOCOMMERCE: Integer;
+
   public
     property CodIdCliente: Integer
     	read FCOD_ID_CLIENTE write FCOD_ID_CLIENTE;
@@ -39,9 +40,8 @@ type
     property CodIdLoja: Integer
     	read FCOD_ID_LOJA write FCOD_ID_LOJA;
 
-    property CodCliente: string
+    property CodCliente: Integer
     	read FCOD_CLIENTE write FCOD_CLIENTE;
-
 
     property DscNome: string
       read FDSC_NOME write FDSC_NOME;
@@ -49,8 +49,8 @@ type
     property DscFantasia: string
       read FDSC_FANTASIA write FDSC_FANTASIA;
 
-    property CodCpfCnpj: string
-      read FCOD_CPF_CNPJ write FCOD_CPF_CNPJ;
+    property DscCpfCnpj: string
+      read FDSC_CPF_CNPJ write FDSC_CPF_CNPJ;
 
     property DscEmail: string
       read FDSC_EMAIL write FDSC_EMAIL;
