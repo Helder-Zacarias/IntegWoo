@@ -41,7 +41,9 @@ uses
   PedidoVendaItens in 'models\PedidoVendaItens.pas',
   PedidoVendaPgtos in 'models\PedidoVendaPgtos.pas',
   ClienteBilling in 'rest-client\woocommerce-api\ClienteBilling.pas',
-  FormatadorDocumentos in 'utils\FormatadorDocumentos.pas';
+  FormatadorDocumentos in 'utils\FormatadorDocumentos.pas',
+  Municipio in 'models\Municipio.pas',
+  Uf in 'models\Uf.pas';
 
 {$R *.res}
 

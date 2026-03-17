@@ -4,11 +4,11 @@ interface
 uses
 	System.SysUtils;
 
-function RemoverEspacos(Texto: string): string;
+function NormalizarTexto(Texto: string): string;
 function SubstituirEspacosPorTraco(Texto: string): string;
 
 implementation
-function RemoverEspacos(Texto: string): string;
+function NormalizarTexto(Texto: string): string;
 begin
     Result := Trim(UpperCase(Texto))
 end;

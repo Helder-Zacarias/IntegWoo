@@ -13,7 +13,7 @@ uses
   AppConfig, Tela_Envio_Produto, Tela_Cadastro_Atributo,
   FileWriter, TrimTexto, ContentPrinter, CustomObjectMapper, FormatadorDocumentos,
   Produto, ProdutoGrade, ProdutoImagem, Secao, Variacao,
-  Cliente, PedidoVenda, PedidoVendaItens, PedidoVendaPgtos,
+  Cliente, PedidoVenda, PedidoVendaItens, PedidoVendaPgtos, Municipio, Uf,
   WooProdutoRequest, WooProdutoResponse,
   WPImagemResponse, WooImagemRequest, WooImagemResponse,
   WooCreateCategoriaRequest, WooCategoriaRequest, WooCategoriaResponse, WooProdutoCategoriaRequest,
@@ -72,6 +72,11 @@ type
     procedure SalvarPedidoNoBanco(JSONResposta: TJSONValue);
     function CarregarClienteDoJSON(Billing: TJSONObject): TClienteBilling;
     function BuscarOuInserirClienteNoBanco(ClienteBilling: TClienteBilling): TCliente;
+    function RetornarMunicipio(Cidade: string; UF: string): TMunicipio;
+//    function BuscarOuInserirMunicipio(Cidade: string; UF: string): TMunicipio;
+    function BuscarMunicipioPorTexto(Cidade: string; UF: string): TMunicipio;
+    function BuscarUfPorSigla(Sigla: string): TUf;
+    function BuscarOuInserirUf(Sigla: string): TUf;
   private
     FSQLProdutosBase: string;
     FSQLImagensBase: string;
@@ -148,159 +153,270 @@ begin
     end;
 end;
 
+function TfrmTela_Principal.BuscarUfPorSigla(Sigla: string): TUf;
+var
+  Query: TUniQuery;
+begin
+  Result := nil;
+  Query := CriarQuery;
+
+  try
+    Query.SQL.Text :=
+      'SELECT * FROM db_sgci.uf ' +
+      'WHERE DSC_SIGLA_UF = :SIGLA ' +
+      'LIMIT 1';
+
+    Query.ParamByName('SIGLA').AsString := NormalizarTexto(Sigla);
+
+    Query.Open;
+
+    if not Query.IsEmpty then
+    begin
+      Result := TUf.Create;
+
+      Result.CodIdUf      := Query.FieldByName('COD_ID_UF').AsInteger;
+      Result.CodUfIbge    := Query.FieldByName('COD_UF_IBGE').AsInteger;
+      Result.DscUf        := Query.FieldByName('DSC_UF').AsString;
+      Result.DscSiglaUf   := Query.FieldByName('DSC_SIGLA_UF').AsString;
+      Result.DscChave     := Query.FieldByName('DSC_CHAVE').AsString;
+    end;
+
+  finally
+    Query.Free;
+  end;
+end;
+
+function TfrmTela_Principal.BuscarOuInserirUf(Sigla: string): TUf;
+var
+  Query: TUniQuery;
+  UfId: Integer;
+begin
+  Result := nil;
+  Query := CriarQuery;
+
+  try
+//    Query.Connection.StartTransaction;
+    try
+
+      Query.SQL.Text :=
+      'INSERT INTO db_sgci.uf ( ' +
+      '  DSC_UF ' +
+      ') VALUES ( ' +
+      '  :DSC_UF ' +
+      ') ON DUPLICATE KEY UPDATE ' +
+      '  COD_ID_UF = LAST_INSERT_ID(COD_ID_UF);';
+
+      Query.ParamByName('DSC_UF').AsString := NormalizarTexto(Sigla);
+
+      Query.ExecSQL;
+
+      Query.SQL.Text :=
+        'SELECT LAST_INSERT_ID() AS ID';
+
+      Query.Open;
+      UfId := Query.FieldByName('ID').AsInteger;
+
+      Query.SQL.Text :=
+        'SELECT * FROM db_sgci.uf WHERE COD_ID_UF = :ID';
+
+      Query.ParamByName('ID').AsInteger := UfId;
+      Query.Open;
+
+      Result := TUf.Create;
+
+      Result.CodIdUf    := Query.FieldByName('COD_ID_UF').AsInteger;
+      Result.CodUfIbge  := Query.FieldByName('COD_UF_IBGE').AsInteger;
+      Result.DscUf      := Query.FieldByName('DSC_UF').AsString;
+      Result.DscSiglaUf := Query.FieldByName('DSC_SIGLA_UF').AsString;
+      Result.DscChave   := Query.FieldByName('DSC_CHAVE').AsString;
+
+//      Query.Connection.Commit;
+
+    except
+      Query.Connection.Rollback;
+      raise;
+    end;
+
+  finally
+    Query.Free;
+  end;
+end;
+
 function TfrmTela_Principal.BuscarOuInserirClienteNoBanco(ClienteBilling: TClienteBilling): TCliente;
 var
   Query: TUniQuery;
   ClienteID: Integer;
+  Uf: TUf;
+  Municipio: TMunicipio;
 begin
   Query := CriarQuery;
+  Municipio := nil;
+
   try
     Query.Connection.StartTransaction;
+
     try
-      Query.SQL.Text :=
-        'INSERT INTO db_sgci.clientes ( ' +
-        '    COD_ID_EMPRESA, ' +
-        '    COD_ID_LOJA, ' +
-        '    NUM_TIPO, ' +
-        '    NUM_SEXO, ' +
-        '    DSC_NOME, ' +
-        '    DSC_ENDERECO, ' +
-        '    DSC_NUMERO, ' +
-        '    DSC_COMPLEMENTO, ' +
-        '    DSC_BAIRRO, ' +
-//        '    COD_ID_UF, ' +
-//        '    COD_ID_MUNICIPIO, ' +
-        '    DSC_CEP, ' +
-        '    DSC_TELEFONE, ' +
-        '    DSC_CELULAR, ' +
-        '    DSC_CPF_CNPJ, ' +
-        '    DSC_EMAIL, ' +
-        '    DAT_NASCIMENTO, ' +
-        '    DSC_IE, ' +
-        '    DAT_CADASTRO, ' +
-        '    NUM_STATUS ' +
-//        '    DSC_CIDADE, ' +
-//        '    DSC_UF    ' +
-        ') VALUES ( ' +
-        '    2433, ' +
-        '    90, ' +
-        '    :NUM_TIPO, ' +
-        '    :NUM_SEXO, ' +
-        '    :DSC_NOME, ' +
-        '    :DSC_ENDERECO, ' +
-        '    :DSC_NUMERO, ' +
-        '    :DSC_COMPLEMENTO, ' +
-        '    :DSC_BAIRRO, ' +
-//        '    :COD_ID_UF, ' +
-//        '    :COD_ID_MUNICIPIO, ' +
-        '    :DSC_CEP, ' +
-        '    :DSC_TELEFONE, ' +
-        '    :DSC_CELULAR, ' +
-        '    :DSC_CPF_CNPJ, ' +
-        '    :DSC_EMAIL, ' +
-        '    :DAT_NASCIMENTO, ' +
-        '    :DSC_IE, ' +
-//		'    DSC_CIDADE, ' +
-//        '    DSC_UF    ' +
-        '    NOW(), ' +
-        '    0 ' +
-        ') ' +
-        'ON DUPLICATE KEY UPDATE ' +
-        '    COD_CLIENTE = LAST_INSERT_ID(COD_CLIENTE);';
+     	Uf := BuscarOuInserirUf(ClienteBilling.State);
 
-      if ClienteBilling.PersonType = 'F' then
-      begin
-        Query.ParamByName('NUM_TIPO').AsInteger := 0;
-        Query.ParamByName('DSC_CPF_CNPJ').AsString := FormatarCPF(ClienteBilling.Cpf);
-      end
-      else
-      begin
-        Query.ParamByName('NUM_TIPO').AsInteger := 1;
-        Query.ParamByName('DSC_CPF_CNPJ').AsString := FormatarCNPJ(ClienteBilling.Cnpj);
-      end;
+    	Municipio := RetornarMunicipio(
+        	ClienteBilling.City,
+        	ClienteBilling.State
+        );
 
-      // Sexo
-      if ClienteBilling.Gender = 'F' then
-        Query.ParamByName('NUM_SEXO').AsInteger := 0
-      else if ClienteBilling.Gender = 'M' then
-        Query.ParamByName('NUM_SEXO').AsInteger := 1
-      else
-        Query.ParamByName('NUM_SEXO').Clear;
+        Query.SQL.Text :=
+        	'INSERT INTO db_sgci.clientes ( ' +
+            '    COD_ID_EMPRESA, ' +
+            '    COD_ID_LOJA, ' +
+            '    NUM_TIPO, ' +
+            '    NUM_SEXO, ' +
+            '    DSC_NOME, ' +
+            '    DSC_ENDERECO, ' +
+            '    DSC_NUMERO, ' +
+            '    DSC_COMPLEMENTO, ' +
+            '    DSC_BAIRRO, ' +
+            '    COD_ID_UF, ' +
+            '    COD_ID_MUNICIPIO, ' +
+            '    DSC_CEP, ' +
+            '    DSC_TELEFONE, ' +
+            '    DSC_CELULAR, ' +
+            '    DSC_CPF_CNPJ, ' +
+            '    DSC_EMAIL, ' +
+            '    DAT_NASCIMENTO, ' +
+            '    DSC_IE, ' +
+            '    DAT_CADASTRO, ' +
+            '    NUM_STATUS ' +
+            '    DSC_CIDADE, ' +
+            '    DSC_MUNICIPIO, ' +
+            '    DSC_UF    ' +
+            ') VALUES ( ' +
+            '    2433, ' +
+            '    90, ' +
+            '    :NUM_TIPO, ' +
+            '    :NUM_SEXO, ' +
+            '    :DSC_NOME, ' +
+            '    :DSC_ENDERECO, ' +
+            '    :DSC_NUMERO, ' +
+            '    :DSC_COMPLEMENTO, ' +
+            '    :DSC_BAIRRO, ' +
+            '    :COD_ID_UF, ' +
+            '    :COD_ID_MUNICIPIO, ' +
+            '    :DSC_CEP, ' +
+            '    :DSC_TELEFONE, ' +
+            '    :DSC_CELULAR, ' +
+            '    :DSC_CPF_CNPJ, ' +
+            '    :DSC_EMAIL, ' +
+            '    :DAT_NASCIMENTO, ' +
+            '    :DSC_IE, ' +
+    		'    DSC_CIDADE, ' +
+            '    DSC_UF    ' +
+            '    NOW(), ' +
+            '    0 ' +
+            ') ' +
+            'ON DUPLICATE KEY UPDATE ' +
+            '    COD_CLIENTE = LAST_INSERT_ID(COD_CLIENTE);';
 
-      // Nome
-      Query.ParamByName('DSC_NOME').AsString :=
-        Trim(ClienteBilling.FirstName + ' ' + ClienteBilling.LastName);
+          if ClienteBilling.PersonType = 'F' then
+          begin
+            Query.ParamByName('NUM_TIPO').AsInteger := 0;
+            Query.ParamByName('DSC_CPF_CNPJ').AsString := FormatarCPF(ClienteBilling.Cpf);
+          end
+          else
+          begin
+            Query.ParamByName('NUM_TIPO').AsInteger := 1;
+            Query.ParamByName('DSC_CPF_CNPJ').AsString := FormatarCNPJ(ClienteBilling.Cnpj);
+          end;
 
-      // Endereço
-      Query.ParamByName('DSC_ENDERECO').AsString := ClienteBilling.Address1;
-      Query.ParamByName('DSC_NUMERO').AsString := ClienteBilling.Number;
-      Query.ParamByName('DSC_COMPLEMENTO').AsString := ClienteBilling.Address2;
-      Query.ParamByName('DSC_BAIRRO').AsString := ClienteBilling.Neighborhood;
-      Query.ParamByName('DSC_CEP').AsString := ClienteBilling.Postcode;
-//      Query.ParamByName('DSC_CIDADE').AsString := ClienteBilling.City;
-//      Query.ParamByName('DSC_UF').AsString := ClienteBilling.State;
+          if ClienteBilling.Gender = 'F' then
+            Query.ParamByName('NUM_SEXO').AsInteger := 0
+          else if ClienteBilling.Gender = 'M' then
+            Query.ParamByName('NUM_SEXO').AsInteger := 1
+          else
+            Query.ParamByName('NUM_SEXO').Clear;
 
-      // Contato
-      if ClienteBilling.Phone <> '' then
-        Query.ParamByName('DSC_TELEFONE').AsString := ClienteBilling.Phone
-      else
-        Query.ParamByName('DSC_TELEFONE').Clear;
+          Query.ParamByName('DSC_NOME').AsString :=
+            Trim(ClienteBilling.FirstName + ' ' + ClienteBilling.LastName);
 
-      if ClienteBilling.Cellphone <> '' then
-        Query.ParamByName('DSC_CELULAR').AsString := ClienteBilling.Cellphone
-      else
-        Query.ParamByName('DSC_CELULAR').Clear;
+          Query.ParamByName('DSC_ENDERECO').AsString := ClienteBilling.Address1;
+          Query.ParamByName('DSC_NUMERO').AsString := ClienteBilling.Number;
+          Query.ParamByName('DSC_COMPLEMENTO').AsString := ClienteBilling.Address2;
+          Query.ParamByName('DSC_BAIRRO').AsString := ClienteBilling.Neighborhood;
+          Query.ParamByName('DSC_CEP').AsString := ClienteBilling.Postcode;
 
-      Query.ParamByName('DSC_EMAIL').AsString := ClienteBilling.Email;
+		if Assigned(Municipio) then
+        begin
+        	Query.ParamByName('COD_ID_UF').AsInteger :=
+              Municipio.CodIdUf;
 
-      // IE
-      if ClienteBilling.Ie <> '' then
-        Query.ParamByName('DSC_IE').AsString := ClienteBilling.Ie
-      else
-        Query.ParamByName('DSC_IE').Clear;
+            Query.ParamByName('COD_ID_MUNICIPIO').AsInteger :=
+          Municipio.CodIdMunicipio;
+      	end
+      	else
+      	begin
+            Query.ParamByName('COD_ID_UF').Clear;
+            Query.ParamByName('COD_ID_MUNICIPIO').Clear;
+//            Query.ParamByName('DSC_UF').Clear;
+      	end;
+          // Contato
+          if ClienteBilling.Phone <> '' then
+            Query.ParamByName('DSC_TELEFONE').AsString := ClienteBilling.Phone
+          else
+            Query.ParamByName('DSC_TELEFONE').Clear;
 
-      // Nascimento
-      if ClienteBilling.Birthdate <> '' then
-        Query.ParamByName('DAT_NASCIMENTO').AsDate :=
-          StrToDateDef(ClienteBilling.Birthdate, 0)
-      else
-        Query.ParamByName('DAT_NASCIMENTO').Clear;
+          if ClienteBilling.Cellphone <> '' then
+            Query.ParamByName('DSC_CELULAR').AsString := ClienteBilling.Cellphone
+          else
+            Query.ParamByName('DSC_CELULAR').Clear;
 
-      Query.ExecSQL;
-      Query.SQL.Text := 'SELECT LAST_INSERT_ID() AS ID';
-      Query.Open;
-      ClienteID := Query.FieldByName('ID').AsInteger;
-      Query.Close;
+          Query.ParamByName('DSC_EMAIL').AsString := ClienteBilling.Email;
 
-      Query.SQL.Text := 'SELECT * FROM db_sgci.clientes WHERE COD_CLIENTE = :ID';
-      Query.ParamByName('ID').AsInteger := ClienteID;
-      Query.Open;
+          // IE
+          if ClienteBilling.Ie <> '' then
+            Query.ParamByName('DSC_IE').AsString := ClienteBilling.Ie
+          else
+            Query.ParamByName('DSC_IE').Clear;
 
-      Result := TCliente.Create;
-      Result.CodIdCliente := Query.FieldByName('COD_ID_CLIENTE').AsInteger;
-      Result.CodIdEmpresa := Query.FieldByName('COD_ID_EMPRESA').AsInteger;
-      Result.CodIdLoja    := Query.FieldByName('COD_ID_LOJA').AsInteger;
-      Result.CodCliente   := Query.FieldByName('COD_CLIENTE').AsInteger;
-      Result.DscNome      := Query.FieldByName('DSC_NOME').AsString;
-//      Result.DscFantasia  := Query.FieldByName('DSC_FANTASIA').AsString;
-      Result.DscCpfCnpj   := Query.FieldByName('DSC_CPF_CNPJ').AsString;
-      Result.DscEmail     := Query.FieldByName('DSC_EMAIL').AsString;
-      Result.DscTelefone  := Query.FieldByName('DSC_TELEFONE').AsString;
-      Result.DscCelular   := Query.FieldByName('DSC_CELULAR').AsString;
-      Result.DscEndereco     := Query.FieldByName('DSC_ENDERECO').AsString;
-      Result.DscNumero       := Query.FieldByName('DSC_NUMERO').AsString;
-      Result.DscComplemento  := Query.FieldByName('DSC_COMPLEMENTO').AsString;
-      Result.DscBairro       := Query.FieldByName('DSC_BAIRRO').AsString;
-//      Result.DscCidade       := Query.FieldByName('DSC_CIDADE').AsString;
-//      Result.DscUf           := Query.FieldByName('DSC_UF').AsString;
-      Result.CodCep          := Query.FieldByName('DSC_CEP').AsString;
-      Result.NumStatus    := Query.FieldByName('NUM_STATUS').AsInteger;
-      Result.DatInclusao  := Query.FieldByName('DAT_CADASTRO').AsDateTime;
-//      Result.CodIdWooCommerce := Query.FieldByName('COD_ID_WOOCOMMERCE').AsLargeInt;
-//      Result.StatusSincronizadoWooCommerce :=
-//	  Query.FieldByName('STATUS_SINCRONIZADO_WOOCOMMERCE').AsInteger;
+          // Nascimento
+          if ClienteBilling.Birthdate <> '' then
+            Query.ParamByName('DAT_NASCIMENTO').AsDate :=
+              StrToDateDef(ClienteBilling.Birthdate, 0)
+          else
+            Query.ParamByName('DAT_NASCIMENTO').Clear;
 
-      Query.Connection.Commit;
+          Query.ExecSQL;
+          Query.SQL.Text := 'SELECT LAST_INSERT_ID() AS ID';
+          Query.Open;
+          ClienteID := Query.FieldByName('ID').AsInteger;
+          Query.Close;
+
+          Query.SQL.Text := 'SELECT * FROM db_sgci.clientes WHERE COD_CLIENTE = :ID';
+          Query.ParamByName('ID').AsInteger := ClienteID;
+          Query.Open;
+
+          Result := TCliente.Create;
+          Result.CodIdCliente := Query.FieldByName('COD_ID_CLIENTE').AsInteger;
+          Result.CodIdEmpresa := Query.FieldByName('COD_ID_EMPRESA').AsInteger;
+          Result.CodIdLoja    := Query.FieldByName('COD_ID_LOJA').AsInteger;
+          Result.CodCliente   := Query.FieldByName('COD_CLIENTE').AsInteger;
+          Result.DscNome      := Query.FieldByName('DSC_NOME').AsString;
+    //      Result.DscFantasia  := Query.FieldByName('DSC_FANTASIA').AsString;
+          Result.DscCpfCnpj   := Query.FieldByName('DSC_CPF_CNPJ').AsString;
+          Result.DscEmail     := Query.FieldByName('DSC_EMAIL').AsString;
+          Result.DscTelefone  := Query.FieldByName('DSC_TELEFONE').AsString;
+          Result.DscCelular   := Query.FieldByName('DSC_CELULAR').AsString;
+          Result.DscEndereco     := Query.FieldByName('DSC_ENDERECO').AsString;
+          Result.DscNumero       := Query.FieldByName('DSC_NUMERO').AsString;
+          Result.DscComplemento  := Query.FieldByName('DSC_COMPLEMENTO').AsString;
+          Result.DscBairro       := Query.FieldByName('DSC_BAIRRO').AsString;
+    //      Result.DscCidade       := Query.FieldByName('DSC_CIDADE').AsString;
+    //      Result.DscUf           := Query.FieldByName('DSC_UF').AsString;
+          Result.CodCep          := Query.FieldByName('DSC_CEP').AsString;
+          Result.NumStatus    := Query.FieldByName('NUM_STATUS').AsInteger;
+          Result.DatInclusao  := Query.FieldByName('DAT_CADASTRO').AsDateTime;
+    //      Result.CodIdWooCommerce := Query.FieldByName('COD_ID_WOOCOMMERCE').AsLargeInt;
+    //      Result.StatusSincronizadoWooCommerce :=
+          Query.FieldByName('STATUS_SINCRONIZADO_WOOCOMMERCE').AsInteger;
+
+          Query.Connection.Commit;
     except
       Query.Connection.Rollback;
       raise;
@@ -735,6 +851,57 @@ begin
   end;
 end;
 
+function TfrmTela_Principal.BuscarMunicipioPorTexto(
+  Cidade: string;
+  UF: string
+): TMunicipio;
+var
+  Query: TUniQuery;
+  Municipio: TMunicipio;
+begin
+  Query := nil;
+  Municipio := TMunicipio.Create;
+
+  try
+    Query := CriarQuery;
+
+    Query.SQL.Text :=
+      'SELECT M.*, U.DSC_SIGLA_UF ' +
+      'FROM db_sgci.municipios M ' +
+      'INNER JOIN db_sgci.uf U ON U.COD_ID_UF = M.COD_ID_UF ' +
+      'WHERE U.DSC_SIGLA_UF = :UF ' +
+      'AND M.DSC_CHAVE = :CHAVE';
+
+    Query.ParamByName('UF').AsString := UpperCase(UF);
+    Query.ParamByName('CHAVE').AsString := NormalizarTexto(Cidade);
+
+    Query.Open;
+
+    if Query.IsEmpty then
+      Exit(nil);
+
+    Municipio.CodIdMunicipio := Query.FieldByName('COD_ID_MUNICIPIO').AsInteger;
+    Municipio.CodIdUf := Query.FieldByName('COD_ID_UF').AsInteger;
+    Municipio.CodUf := Query.FieldByName('COD_UF').AsInteger;
+    Municipio.CodMunicipioIbge := Query.FieldByName('COD_MUNICIPIO_IBGE').AsInteger;
+    Municipio.DscMunicipio := Query.FieldByName('DSC_MUNICIPIO').AsString;
+    Municipio.DscChave := Query.FieldByName('DSC_CHAVE').AsString;
+
+    Result := Municipio;
+
+  finally
+    Query.Free;
+  end;
+end;
+
+function TfrmTela_Principal.RetornarMunicipio(Cidade: string; UF: string): TMunicipio;
+begin
+  Result := BuscarMunicipioPorTexto(Cidade, UF);
+//
+//  if Result = nil then
+//    Result := BuscarOuInserirMunicipio(Cidade, UF);
+end;
+
 function TfrmTela_Principal.PostarTermoNaAPI(AtributoId: Integer; Termo: TWooTermoAtributoRequest): TWooTermoResponse;
 var
   JSONResposta: TJSONValue;
@@ -1098,7 +1265,7 @@ begin
     begin
       CategoriaRetornada := CategoriaJSON.GetValue<string>('name');
 
-      if RemoverEspacos(Categoria) = RemoverEspacos(CategoriaRetornada) then
+      if NormalizarTexto(Categoria) = NormalizarTexto(CategoriaRetornada) then
       begin
         Result := TJson.JsonToObject<TWooCategoriaResponse>(CategoriaJSON.ToJSON);
         Break;
