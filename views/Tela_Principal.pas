@@ -13,7 +13,7 @@ uses
   AppConfig, Tela_Envio_Produto, Tela_Cadastro_Atributo,
   FileWriter, TrimTexto, ContentPrinter, CustomObjectMapper, FormatadorDocumentos,
   Produto, ProdutoGrade, ProdutoImagem, Secao, Variacao,
-  Cliente, PedidoVenda, PedidoVendaItens, PedidoVendaPgtos, Municipio, Uf,
+  Cliente, PedidoVenda, PedidoVendaItem, PedidoVendaPgtos, Municipio, Uf,
   WooProdutoRequest, WooProdutoResponse,
   WPImagemResponse, WooImagemRequest, WooImagemResponse,
   WooCreateCategoriaRequest, WooCategoriaRequest, WooCategoriaResponse, WooProdutoCategoriaRequest,
@@ -64,15 +64,20 @@ type
     function GerarListaDeStringsDosTermosDaAPI(TermosAPI: TObjectList<TWooTermoResponse>):
       TList<string>;
     function BuscarProdutoPorSKU(SKU: string): TWooProdutoResponse;
-    procedure HorseAPISalvarItensDoCarrinho(Req: THorseRequest; Res: THorseResponse; Next: TProc);
     procedure HorseAPIAtualizarProduto(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+    procedure HorseAPISalvarPedido(Req: THorseRequest; Res: THorseResponse; Next: TProc);
     function ChecarBodyDoWebHook(ReqBody: string): Boolean;
     procedure RegistrarRotas;
-    procedure SalvarPedidoNoBanco(WooPedido: TWooPedido; Cliente: TCliente);
+    function SalvarPedidoNoBanco(WooPedido: TWooPedido; Cliente: TCliente): Int64;
     function BuscarOuInserirClienteNoBanco(Billing: TBilling; CodIdEmpresa: Integer;
     	CodIdLoja: Integer): TCliente;
     function BuscarMunicipio(Municipio: string): TMunicipio;
     function WooPedidoToPedidoVenda(WooPedido: TWooPedido; IdCliente: Integer): TPedidoVenda;
+    function RetornarItensDoPedidoDeVenda(Itens: TArray<TLineItem>; CodIdEmpresa: Integer;
+    	CodIdLoja: Integer; CodIdPedido: Int64): TArray<TPedidoVendaItem>;
+    function BuscarProdutoNoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer;
+    	Descricao: String): TProduto;
+    procedure SalvarProdutosDoPedido(ProdutosPedido: TArray<TPedidoVendaItem>);
   private
     FSQLProdutosBase: string;
     FSQLImagensBase: string;
@@ -106,8 +111,121 @@ end;
 
 procedure TfrmTela_Principal.RegistrarRotas;
 begin
-	THorse.Post('/api/pedido-woocommerce/:codIdEmpresa/:codIdLoja', HorseAPISalvarItensDoCarrinho);
+	THorse.Post(
+        '/api/pedido-woocommerce/:codIdEmpresa/:codIdLoja',
+        HorseAPISalvarPedido
+    );
     THorse.Listen(HORSE_PORT);
+end;
+
+function TfrmTela_Principal.BuscarProdutoNoBanco(
+	CodIdEmpresa: Integer;
+	CodIdLoja: Integer;
+	Descricao: String
+): TProduto;
+var
+    Query: TUniQuery;
+begin
+    Query := nil;
+    Result := NIL;
+
+    try
+        Query := CriarQuery;
+
+        with Query do
+        begin
+            SQL.Text :=
+             'SELECT pd.COD_ID_PRODUTO, ' +
+             '	pd.COD_ID_EMPRESA, ' +
+             '	pd.COD_ID_LOJA, ' +
+             '	pd.COD_PRODUTO, ' +
+             '	pd.COD_BARRAS, ' +
+             '	pd.COD_ID_GRADE, ' +
+             '	pd.COD_ID_SECAO, ' +
+             '	pd.DSC_COMPLETA, ' +
+             '	pd.NUM_TIPO_PRODUTO, ' +
+             '	pr.NUM_PRECO_VAREJO AS PRECO_VAREJO, ' +
+             '	CASE WHEN pd.NUM_CONTROLA_ESTOQUE = 1 THEN ' +
+             '		CASE WHEN lj.NUM_TIPO_ESTABELECIMENTO = 0 THEN ' +
+             '			CASE WHEN emp.NUM_CAD_FILIAIS_UNIFICADO = 1 THEN ' +
+             '				COALESCE(pd.NUM_ESTOQUE_INICIAL, 0.000) + ' +
+             '				   COALESCE(db_sgci.fn_consulta_estoque_atual(pd.COD_ID_EMPRESA, ' +
+             '						pd.COD_ID_LOJA, pd.COD_ID_PRODUTO), 0.00) ' +
+             '			ELSE ' +
+             '				COALESCE(e.NUM_ESTOQUE_INICIAL, 0.000) + ' +
+             				'COALESCE(db_sgci.fn_consulta_estoque_atual(pd.COD_ID_EMPRESA, ' +
+             					'pd.COD_ID_LOJA, pd.COD_ID_PRODUTO), 0.00) ' +
+             '			END + ' +
+             '			COALESCE(db_sgci.fn_consulta_estoque_composicao(pd.COD_ID_EMPRESA, ' +
+             '				pd.COD_ID_LOJA, pd.COD_ID_PRODUTO), 0.00) ' +
+             '		ELSE ' +
+             '			CASE WHEN emp.NUM_CAD_FILIAIS_UNIFICADO = 1 THEN ' +
+             '				COALESCE(pd.NUM_ESTOQUE_INI_PED, 0.000) + ' +
+             '				COALESCE(db_sgci.fn_consulta_estoque_pedido(pd.COD_ID_EMPRESA, ' +
+             '					pd.COD_ID_LOJA, pd.COD_ID_PRODUTO), 0.00) ' +
+             '			ELSE ' +
+             '				COALESCE(e.NUM_ESTOQUE_INI_PED, 0.000) + ' +
+             '				COALESCE(db_sgci.fn_consulta_estoque_pedido(pd.COD_ID_EMPRESA, ' +
+             '					pd.COD_ID_LOJA, pd.COD_ID_PRODUTO), 0.00) ' +
+             '			END + ' +
+             '			COALESCE(db_sgci.fn_consulta_estoque_composicao(pd.COD_ID_EMPRESA, ' +
+             '				pd.COD_ID_LOJA, pd.COD_ID_PRODUTO), 0.00) ' +
+             '		END ' +
+             '	ELSE ' +
+             '		0.000 ' +
+             '	END AS ESTOQUE_ATUAL ' +
+             'FROM db_sgci.produtos pd ' +
+             'INNER JOIN db_sgci.precos pr ' +
+             '	ON pd.COD_ID_PRODUTO = pr.COD_ID_PRODUTO ' +
+             '	AND pd.COD_ID_EMPRESA = pr.COD_ID_EMPRESA ' +
+             '	AND pd.COD_ID_LOJA = pr.COD_ID_LOJA ' +
+             'LEFT JOIN db_sgci.estoques e ' +
+             '	ON pd.COD_ID_PRODUTO = e.COD_ID_PRODUTO ' +
+             '	AND pd.COD_ID_EMPRESA = e.COD_ID_EMPRESA ' +
+             '	AND pd.COD_ID_LOJA = e.COD_ID_LOJA ' +
+             'INNER JOIN db_sgci.empresas emp ' +
+             '	ON emp.COD_ID_EMPRESA = pd.COD_ID_EMPRESA ' +
+             'INNER JOIN db_sgci.lojas lj ' +
+             '	ON lj.COD_ID_EMPRESA = pd.COD_ID_EMPRESA ' +
+             '	AND lj.COD_ID_LOJA = pd.COD_ID_LOJA ' +
+             'WHERE pd.COD_ID_EMPRESA = :COD_ID_EMPRESA ' +
+             '	AND pd.COD_ID_LOJA = :COD_ID_LOJA ' +
+             '	AND pd.DSC_COMPLETA = :DSC_COMPLETA';
+
+            ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
+            ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
+            ParamByName('DSC_COMPLETA').AsString := Descricao;
+
+            Open;
+
+            Result := TProduto.Create;
+
+            try
+                Result.CodIdEmpresa := FieldByName('COD_ID_EMPRESA').AsInteger;
+                Result.CodIdLoja := FieldByName('COD_ID_LOJA').AsInteger;
+                Result.CodIdProduto := FieldByName('COD_ID_PRODUTO').AsInteger;
+                Result.CodProduto := FieldByName('COD_PRODUTO').AsLargeInt;
+                Result.DscCompleta := FieldByName('DSC_COMPLETA').AsString;
+                Result.NumPrecoVarejo := FieldByName('PRECO_VAREJO').AsCurrency;
+                Result.NumEstqAtual := FieldByName('ESTOQUE_ATUAL').AsFloat;
+
+                ShowMessage(
+                	'COD_ID_EMPRESA: ' + Result.CodIdEmpresa.ToString + sLineBreak +
+                    'COD_ID_LOJA: ' + Result.CodIdLoja.ToString + sLineBreak +
+                    'COD_ID_PRODUTO: ' + Result.CodIdProduto.ToString + sLineBreak +
+                    'COD_PRODUTO: ' + Result.CodProduto.ToString + sLineBreak +
+                    'DSC_COMPLETA: ' + Result.DscCompleta + sLineBreak +
+                    'NUM_PRECO_VAREJO: ' + Result.NumPrecoVarejo.ToString() + sLineBreak +
+                    'NUM_ESTQ_ATUAL: ' + Result.NumEstqAtual.ToString
+                );
+            except
+                Result.Free;
+                raise;
+            end;
+        end;
+    finally
+        Query.Free;
+    end;
 end;
 
 function TfrmTela_Principal.WooPedidoToPedidoVenda(WooPedido: TWooPedido; IdCliente: Integer): TPedidoVenda;
@@ -122,13 +240,135 @@ begin
         Result.CodIdWooCommerce := WooPedido.Id;
         Result.DatPedido := ISO8601ToDate(WooPedido.DateCreated);
         Result.DatInclusao := ISO8601ToDate(WooPedido.DateCreated);
-        ShowMessage(
-            'COD_ID_EMRPRESA: ' + Result.CodIdEmpresa.ToString + sLineBreak +
-            'COD_ID_LOJA: ' + Result.CodIdLoja.ToString + sLineBreak +
-            'COD_ID_CLIENTE: ' + Result.CodIdCliente.ToString
-        );
     except
         Result.Free;
+        raise;
+    end;
+end;
+
+procedure TfrmTela_Principal.SalvarProdutosDoPedido(ProdutosPedido: TArray<TPedidoVendaItem>);
+var
+    Query: TuniQuery;
+    Valores: string;
+begin
+    Query := nil;
+
+    try
+        Query := CriarQuery;
+        Valores := '';
+
+        with Query do
+        begin
+            for var I := 0 to High(ProdutosPedido) do
+            begin
+                if (I > 0) then
+                	Valores := Valores + ',';
+
+                Valores := Valores + Format(
+                    '(' +
+                    '	:COD_ID_EMPRESA_%d,' +
+                    '	:COD_ID_LOJA_%d,' +
+                    '	:COD_ID_PEDIDO_%d,' +
+                    '	:DAT_INCLUSAO_%d,' +
+                    '	:COD_ID_PRODUTO_%d, ' +
+                    '	:COD_PRODUTO_%d, ' +
+                    '	:DSC_COMPLETA_%d, ' +
+                    '	:NUM_VALOR_UNITARIO_%d, ' +
+                    '	:NUM_QUANTIDADE_%d' +
+                    ' )',
+                	[I, I, I, I, I, I, I, I, I]
+                );
+            end;
+
+            SQL.Text :=
+            	'INSERT INTO db_sgci.pedido_venda_itens ' +
+                '( ' +
+                '	COD_ID_EMPRESA,' +
+    			'	COD_ID_LOJA,' +
+    			'	COD_ID_PEDIDO,' +
+                '	DAT_INCLUSAO,' +
+                '	COD_ID_PRODUTO, ' +
+                '	COD_PRODUTO, ' +
+                '	DSC_COMPLETA, ' +
+                '	NUM_VALOR_UNITARIO, ' +
+                '	NUM_QUANTIDADE ' +
+                ') ' +
+                'VALUES ' + Valores;
+
+        	for var I := 0 to High(ProdutosPedido) do
+    		begin
+                ParamByName('COD_ID_EMPRESA_' + I.ToString).AsInteger
+                	:= ProdutosPedido[I].CodIdEmpresa;
+                ParamByName('COD_ID_LOJA_' + I.ToString).AsInteger
+                	:= ProdutosPedido[I].CodIdLoja;
+                ParamByName('COD_ID_PEDIDO_' + I.ToString).AsLargeInt
+                	:= ProdutosPedido[I].CodIdPedido;
+                ParamByName('DAT_INCLUSAO_' + I.ToString).AsDateTime
+                	:= ProdutosPedido[I].DatInclusao;
+                ParamByName('COD_ID_PRODUTO_' + I.ToString).AsLargeInt
+                	:= ProdutosPedido[I].CodIdProduto;
+                ParamByName('COD_PRODUTO_' + I.ToString).AsLargeInt
+                	:= ProdutosPedido[I].CodProduto;
+                ParamByName('DSC_COMPLETA_' + I.ToString).AsString
+                	:= ProdutosPedido[I].DscCompleta;
+                ParamByName('NUM_VALOR_UNITARIO_' + I.ToString).AsCurrency
+                	:= ProdutosPedido[I].NumValorUnitario;
+                ParamByName('NUM_QUANTIDADE_' + I.ToString).AsFloat
+                	:= ProdutosPedido[I].NumQuantidade;
+    		end;
+
+            ExecSQL;
+        end;
+    finally
+        Query.Free;
+    end;
+end;
+
+function TfrmTela_Principal.RetornarItensDoPedidoDeVenda(
+    Itens: TArray<TLineItem>;
+    CodIdEmpresa: Integer;
+	CodIdLoja: Integer;
+    CodIdPedido: Int64
+): TArray<TPedidoVendaItem>;
+var
+    PedidoVendaItem: TPedidoVendaItem;
+    Produto: TProduto;
+begin
+    SetLength(Result, 0);
+
+    try
+    	for var Item in Itens do
+        begin
+        	try
+            	Produto := BuscarProdutoNoBanco(CodIdEmpresa, CodIdLoja, Item.Name);
+
+                if not Assigned(Produto) then
+                    raise Exception.Create(
+                        Format(
+                            '%S não é um produto cadastrado no sistema',
+                            [Item.Name]
+                        )
+                    );
+
+                PedidoVendaItem := TPedidoVendaItem.Create;
+                PedidoVendaItem.CodIdEmpresa := CodIdEmpresa;
+                PedidoVendaItem.CodIdLoja := CodIdLoja;
+                PedidoVendaItem.CodIdPedido := CodIdPedido;
+                PedidoVendaItem.CodIdProduto := Produto.CodIdProduto;
+                PedidoVendaItem.CodProduto := Produto.CodProduto;
+                PedidoVendaItem.DscCompleta := Produto.DscCompleta;
+                PedidoVendaItem.NumValorUnitario := Produto.NumPrecoVarejo;
+                PedidoVendaItem.NumQuantidade := Item.Quantity;
+
+                SetLength(Result, Length(Result) + 1);
+                Result[High(Result)] := PedidoVendaItem;
+            finally
+                Produto.Free;
+            end;
+        end;
+    except
+        for var Item in Result do
+            Item.Free;
         raise;
     end;
 end;
@@ -337,7 +577,7 @@ begin
   end;
 end;
 
-procedure TfrmTela_Principal.SalvarPedidoNoBanco(WooPedido: TWooPedido; Cliente: TCliente);
+function TfrmTela_Principal.SalvarPedidoNoBanco(WooPedido: TWooPedido; Cliente: TCliente): Int64;
 var
     Query: TUniQuery;
     Pedido: TPedidoVenda;
@@ -407,6 +647,10 @@ begin
 
                 ExecSQL;
 
+                SQL.Text := 'SELECT LAST_INSERT_ID() AS ID';
+                Open;
+                Result := FieldByName('ID').AsLargeInt;
+
             	Transaction.Commit;
             except
             	Transaction.Rollback;
@@ -440,7 +684,7 @@ begin
 //            Res.Status(THTTPStatus.BadRequest).Send(Resp);
 end;
 
-procedure TfrmTela_Principal.HorseAPISalvarItensDoCarrinho(
+procedure TfrmTela_Principal.HorseAPISalvarPedido(
     Req: THorseRequest;
     Res: THorseResponse;
     Next: TProc
@@ -450,8 +694,11 @@ var
     CodIdLoja: string;
     Cliente: TCliente;
     WooPedido: TWooPedido;
+    CodIdPedido: Int64;
+    ProdutosPedido: TArray<TPedidoVendaItem>;
 begin
     WooPedido := nil;
+    Cliente := nil;
 
     try
     	try
@@ -485,7 +732,16 @@ begin
                 TJson.ObjectToJsonString(Cliente)
             );
 
-            SalvarPedidoNoBanco(WooPedido, Cliente);
+            CodIdPedido := SalvarPedidoNoBanco(WooPedido, Cliente);
+
+            ProdutosPedido := RetornarItensDoPedidoDeVenda(
+                WooPedido.LineItems,
+                CodIdEmpresa.ToInteger,
+                CodIdLoja.ToInteger,
+                CodIdPedido
+            );
+
+            SalvarProdutosDoPedido(ProdutosPedido);
 
             Res.Status(THTTPStatus.Created).Send('Pedido criado com sucesso!');
         except

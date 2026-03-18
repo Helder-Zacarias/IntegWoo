@@ -38,7 +38,7 @@ uses
   WooVariacaoProdutoBatchRequest in 'rest-client\woocommerce-api\WooVariacaoProdutoBatchRequest.pas',
   Cliente in 'models\Cliente.pas',
   PedidoVenda in 'models\PedidoVenda.pas',
-  PedidoVendaItens in 'models\PedidoVendaItens.pas',
+  PedidoVendaItem in 'models\PedidoVendaItem.pas',
   PedidoVendaPgtos in 'models\PedidoVendaPgtos.pas',
   ClienteBilling in 'rest-client\woocommerce-api\ClienteBilling.pas',
   FormatadorDocumentos in 'utils\FormatadorDocumentos.pas',

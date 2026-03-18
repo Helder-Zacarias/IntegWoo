@@ -176,7 +176,7 @@
         <DCCReference Include="rest-client\woocommerce-api\WooVariacaoProdutoBatchRequest.pas"/>
         <DCCReference Include="models\Cliente.pas"/>
         <DCCReference Include="models\PedidoVenda.pas"/>
-        <DCCReference Include="models\PedidoVendaItens.pas"/>
+        <DCCReference Include="models\PedidoVendaItem.pas"/>
         <DCCReference Include="models\PedidoVendaPgtos.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\ClienteBilling.pas"/>
         <DCCReference Include="utils\FormatadorDocumentos.pas"/>

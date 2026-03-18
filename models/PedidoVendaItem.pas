@@ -1,4 +1,4 @@
-unit PedidoVendaItens;
+unit PedidoVendaItem;
 
 interface
 
@@ -6,7 +6,7 @@ uses
   System.SysUtils;
 
 type
-  TPedidoVendaItens = class
+  TPedidoVendaItem = class
   private
     FCOD_ID_ITEM: Int64;
     FCOD_ID_COMPLEMENTO_ITEM: Int64;
