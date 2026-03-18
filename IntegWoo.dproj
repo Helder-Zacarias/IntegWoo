@@ -182,6 +182,7 @@
         <DCCReference Include="utils\FormatadorDocumentos.pas"/>
         <DCCReference Include="models\Municipio.pas"/>
         <DCCReference Include="models\Uf.pas"/>
+        <DCCReference Include="webhooks-client\WooPedido.pas"/>
         <None Include="bin\config.ini"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

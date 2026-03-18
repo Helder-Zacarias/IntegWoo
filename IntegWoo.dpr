@@ -43,7 +43,8 @@ uses
   ClienteBilling in 'rest-client\woocommerce-api\ClienteBilling.pas',
   FormatadorDocumentos in 'utils\FormatadorDocumentos.pas',
   Municipio in 'models\Municipio.pas',
-  Uf in 'models\Uf.pas';
+  Uf in 'models\Uf.pas',
+  WooPedido in 'webhooks-client\WooPedido.pas';
 
 {$R *.res}
 

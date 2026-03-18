@@ -5,7 +5,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages,
   System.SysUtils, System.Variants, System.Classes, System.IOUtils, System.NetEncoding,
-  System.Generics.Collections, System.JSON, System.IniFiles, System.Threading,
+  System.Generics.Collections, System.JSON, System.IniFiles, System.Threading, System.DateUtils,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Buttons, Vcl.ExtCtrls,
   Data.DB, Uni, UniProvider, MySQLUniProvider, DBAccess, MemData, MemDS,
   REST.Json, Rest.Json.Types, RESTRequest4D,
@@ -20,7 +20,7 @@ uses
   WooAtributoRequest, WooAtributoResponse,
   WooTermoAtributoRequest, WooTermoResponse,
   WooVariacaoProdutoResponse, WooVariacaoProdutoRequest, WooAtributoDaVariacao,
-  WooAtributoProduto, WooVariacaoProdutoBatchRequest, ClienteBilling;
+  WooAtributoProduto, WooVariacaoProdutoBatchRequest, WooPedido;
 
 type
   TfrmTela_Principal = class(TForm)
@@ -68,11 +68,11 @@ type
     procedure HorseAPIAtualizarProduto(Req: THorseRequest; Res: THorseResponse; Next: TProc);
     function ChecarBodyDoWebHook(ReqBody: string): Boolean;
     procedure RegistrarRotas;
-    procedure SalvarPedidoWoo(Req: THorseRequest; Res: THorseResponse);
-    procedure SalvarPedidoNoBanco(JSONResposta: TJSONValue);
-    function CarregarClienteDoJSON(Billing: TJSONObject): TClienteBilling;
-    function BuscarOuInserirClienteNoBanco(ClienteBilling: TClienteBilling): TCliente;
+    procedure SalvarPedidoNoBanco(WooPedido: TWooPedido; Cliente: TCliente);
+    function BuscarOuInserirClienteNoBanco(Billing: TBilling; CodIdEmpresa: Integer;
+    	CodIdLoja: Integer): TCliente;
     function BuscarMunicipio(Municipio: string): TMunicipio;
+    function WooPedidoToPedidoVenda(WooPedido: TWooPedido; IdCliente: Integer): TPedidoVenda;
   private
     FSQLProdutosBase: string;
     FSQLImagensBase: string;
@@ -99,7 +99,6 @@ procedure TfrmTela_Principal.OnFormCreate(Sender: TObject);
 begin
   FSQLProdutosBase := sqlProdutos.SQL.Text;
   FSQLImagensBase := sqlImagens.SQL.Text;
-  // Para adicionar uma 3ª variação no futuro, basta incluir aqui — o resto do código se adapta automaticamente
   FTabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
   FFolderPath := TPath.Combine(TPath.GetDocumentsPath, 'Ecommerce');
   RegistrarRotas;
@@ -111,41 +110,26 @@ begin
     THorse.Listen(HORSE_PORT);
 end;
 
-function TfrmTela_Principal.CarregarClienteDoJSON(Billing: TJSONObject): TClienteBilling;
+function TfrmTela_Principal.WooPedidoToPedidoVenda(WooPedido: TWooPedido; IdCliente: Integer): TPedidoVenda;
 begin
-	try
-    	if not Assigned(Billing) then
-        	raise Exception.Create('JSON Vazio');
+    Result := nil;
 
-        Result := TClienteBilling.Create;
-        Result.FirstName   := Billing.GetValue<string>('first_name');
-        Result.LastName    := Billing.GetValue<string>('last_name');
-        Result.Company     := Billing.GetValue<string>('company');
-        Result.Address1    := Billing.GetValue<string>('address_1');
-        Result.Address2    := Billing.GetValue<string>('address_2');
-        Result.City        := Billing.GetValue<string>('city');
-        Result.State       := Billing.GetValue<string>('state');
-        Result.Postcode    := Billing.GetValue<string>('postcode');
-        Result.Country     := Billing.GetValue<string>('country');
-        Result.Email       := Billing.GetValue<string>('email');
-        Result.Phone       := Billing.GetValue<string>('phone');
-        Result.Number      := Billing.GetValue<string>('number');
-        Result.Neighborhood:= Billing.GetValue<string>('neighborhood');
-        Result.PersonType  := Billing.GetValue<string>('persontype');
-        Result.Cpf         := Billing.GetValue<string>('cpf');
-        Result.Rg          := Billing.GetValue<string>('rg');
-        Result.Cnpj        := Billing.GetValue<string>('cnpj');
-        Result.Ie          := Billing.GetValue<string>('ie');
-        Result.Birthdate   := Billing.GetValue<string>('birthdate');
-        Result.Gender      := Billing.GetValue<string>('gender');
-        Result.Cellphone   := Billing.GetValue<string>('cellphone');
-        SalvarConteudoEmArquivo(
-            TPath.Combine(TPath.GetDocumentsPath, 'pedido-payload.txt'),
-            TJson.ObjectToJsonString(Result)
+    try
+        Result := TPedidoVenda.Create;
+        Result.CodIdEmpresa := 2433;
+        Result.CodIdLoja := 90;
+        Result.CodIdCliente := IdCliente;
+        Result.CodIdWooCommerce := WooPedido.Id;
+        Result.DatPedido := ISO8601ToDate(WooPedido.DateCreated);
+        Result.DatInclusao := ISO8601ToDate(WooPedido.DateCreated);
+        ShowMessage(
+            'COD_ID_EMRPRESA: ' + Result.CodIdEmpresa.ToString + sLineBreak +
+            'COD_ID_LOJA: ' + Result.CodIdLoja.ToString + sLineBreak +
+            'COD_ID_CLIENTE: ' + Result.CodIdCliente.ToString
         );
     except
-       Result.Free;
-       raise;
+        Result.Free;
+        raise;
     end;
 end;
 
@@ -185,7 +169,11 @@ begin
     end;
 end;
 
-function TfrmTela_Principal.BuscarOuInserirClienteNoBanco(ClienteBilling: TClienteBilling): TCliente;
+function TfrmTela_Principal.BuscarOuInserirClienteNoBanco(
+    Billing: TBilling;
+    CodIdEmpresa: Integer;
+	CodIdLoja: Integer
+): TCliente;
 var
   Query: TUniQuery;
   ClienteID: Integer;
@@ -198,7 +186,7 @@ begin
     Query.Connection.StartTransaction;
 
     try
-    	Municipio := BuscarMunicipio(ClienteBilling.City);
+    	Municipio := BuscarMunicipio(Billing.City);
 
         Query.SQL.Text :=
         'INSERT INTO db_sgci.clientes ( ' +
@@ -222,8 +210,8 @@ begin
         '    DSC_IE, ' +
         '    DAT_CADASTRO ' +
         ') VALUES ( ' +
-        '    2433, ' +
-        '    90, ' +
+        '    :COD_ID_EMPRESA, ' +
+        '    :COD_ID_LOJA, ' +
         '    :NUM_TIPO, ' +
         '    :NUM_SEXO, ' +
         '    :DSC_NOME, ' +
@@ -244,32 +232,35 @@ begin
         ') ON DUPLICATE KEY UPDATE ' +
         '    COD_CLIENTE = LAST_INSERT_ID(COD_CLIENTE)';
 
-          if ClienteBilling.PersonType = 'F' then
-          begin
-            Query.ParamByName('NUM_TIPO').AsInteger := 0;
-            Query.ParamByName('DSC_CPF_CNPJ').AsString := FormatarCPF(ClienteBilling.Cpf);
-          end
-          else
-          begin
-            Query.ParamByName('NUM_TIPO').AsInteger := 1;
-            Query.ParamByName('DSC_CPF_CNPJ').AsString := FormatarCNPJ(ClienteBilling.Cnpj);
-          end;
+        Query.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
+        Query.ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
 
-          if ClienteBilling.Gender = 'F' then
-            Query.ParamByName('NUM_SEXO').AsInteger := 0
-          else if ClienteBilling.Gender = 'M' then
+        if Billing.PersonType = 'F' then
+        begin
+        	Query.ParamByName('NUM_TIPO').AsInteger := 0;
+            Query.ParamByName('DSC_CPF_CNPJ').AsString := FormatarCPF(Billing.Cpf);
+        end
+        else
+        begin
+            Query.ParamByName('NUM_TIPO').AsInteger := 1;
+            Query.ParamByName('DSC_CPF_CNPJ').AsString := FormatarCNPJ(Billing.Cnpj);
+        end;
+
+        if Billing.Gender = 'F' then
+        	Query.ParamByName('NUM_SEXO').AsInteger := 0
+        else if Billing.Gender = 'M' then
             Query.ParamByName('NUM_SEXO').AsInteger := 1
-          else
+        else
             Query.ParamByName('NUM_SEXO').Clear;
 
-          Query.ParamByName('DSC_NOME').AsString :=
-            Trim(ClienteBilling.FirstName + ' ' + ClienteBilling.LastName);
+        Query.ParamByName('DSC_NOME').AsString :=
+        Trim(Billing.FirstName + ' ' + Billing.LastName);
 
-          Query.ParamByName('DSC_ENDERECO').AsString := ClienteBilling.Address1;
-          Query.ParamByName('DSC_NUMERO').AsString := ClienteBilling.Number;
-          Query.ParamByName('DSC_COMPLEMENTO').AsString := ClienteBilling.Address2;
-          Query.ParamByName('DSC_BAIRRO').AsString := ClienteBilling.Neighborhood;
-          Query.ParamByName('DSC_CEP').AsString := ClienteBilling.Postcode;
+        Query.ParamByName('DSC_ENDERECO').AsString := Billing.Address1;
+        Query.ParamByName('DSC_NUMERO').AsString := Billing.Number;
+        Query.ParamByName('DSC_COMPLEMENTO').AsString := Billing.Address2;
+        Query.ParamByName('DSC_BAIRRO').AsString := Billing.Neighborhood;
+        Query.ParamByName('DSC_CEP').AsString := Billing.Postcode;
 
 		if Assigned(Municipio) then
         begin
@@ -284,26 +275,26 @@ begin
             Query.ParamByName('COD_ID_UF').Clear;
             Query.ParamByName('COD_ID_MUNICIPIO').Clear;
       	end;
-          if ClienteBilling.Phone <> '' then
-            Query.ParamByName('DSC_TELEFONE').AsString := ClienteBilling.Phone
+          if Billing.Phone <> '' then
+            Query.ParamByName('DSC_TELEFONE').AsString := Billing.Phone
           else
             Query.ParamByName('DSC_TELEFONE').Clear;
 
-          if ClienteBilling.Cellphone <> '' then
-            Query.ParamByName('DSC_CELULAR').AsString := ClienteBilling.Cellphone
+          if Billing.Cellphone <> '' then
+            Query.ParamByName('DSC_CELULAR').AsString := Billing.Cellphone
           else
             Query.ParamByName('DSC_CELULAR').Clear;
 
-          Query.ParamByName('DSC_EMAIL').AsString := ClienteBilling.Email;
+          Query.ParamByName('DSC_EMAIL').AsString := Billing.Email;
 
-          if ClienteBilling.Ie <> '' then
-            Query.ParamByName('DSC_IE').AsString := ClienteBilling.Ie
+          if Billing.Ie <> '' then
+            Query.ParamByName('DSC_IE').AsString := Billing.Ie
           else
             Query.ParamByName('DSC_IE').Clear;
 
-          if ClienteBilling.Birthdate <> '' then
+          if Billing.Birthdate <> '' then
             Query.ParamByName('DAT_NASCIMENTO').AsDate :=
-              StrToDateDef(ClienteBilling.Birthdate, 0)
+              StrToDateDef(Billing.Birthdate, 0)
           else
             Query.ParamByName('DAT_NASCIMENTO').Clear;
 
@@ -311,6 +302,7 @@ begin
           Query.SQL.Text := 'SELECT LAST_INSERT_ID() AS ID';
           Query.Open;
           ClienteID := Query.FieldByName('ID').AsInteger;
+          ShowMessage('Cliente ID: ' + ClienteID.ToString);
           Query.Close;
 
           Query.SQL.Text := 'SELECT * FROM db_sgci.clientes WHERE COD_CLIENTE = :ID';
@@ -318,7 +310,7 @@ begin
           Query.Open;
 
           Result := TCliente.Create;
-          Result.CodIdCliente := Query.FieldByName('COD_ID_CLIENTE').AsInteger;
+          Result.CodIdCliente := ClienteID;
           Result.CodIdEmpresa := Query.FieldByName('COD_ID_EMPRESA').AsInteger;
           Result.CodIdLoja    := Query.FieldByName('COD_ID_LOJA').AsInteger;
           Result.CodCliente   := Query.FieldByName('COD_CLIENTE').AsInteger;
@@ -336,8 +328,8 @@ begin
 
           Query.Connection.Commit;
     except
-      Query.Connection.Rollback;
-      raise;
+    	Query.Connection.Rollback;
+      	raise;
     end;
 
   finally
@@ -345,53 +337,83 @@ begin
   end;
 end;
 
-procedure TfrmTela_Principal.SalvarPedidoWoo(Req: THorseRequest; Res: THorseResponse);
+procedure TfrmTela_Principal.SalvarPedidoNoBanco(WooPedido: TWooPedido; Cliente: TCliente);
 var
-  JSONResposta: TJSONObject;
+    Query: TUniQuery;
+    Pedido: TPedidoVenda;
 begin
-  JSONResposta := Req.Body<TJSONObject>;
-
-  try
-  	SalvarPedidoNoBanco(JSONResposta);
-    Res.Send('Pedido salvo com sucesso');
-  except
-    on E: Exception do
-      Res.Status(500).Send(E.Message);
-  end;
-end;
-
-procedure TfrmTela_Principal.SalvarPedidoNoBanco(JSONResposta: TJSONValue);
-var
-    SelectPedidoQuery: TuniQuery;
-    CodIdWooCommerce: Int64;
-begin
-    SelectPedidoQuery := nil;
-    CodIdWooCommerce := JSONResposta.GetValue<Int64>('id');
+    Query := nil;
+    Pedido := nil;
 
     try
-        SelectPedidoQuery := CriarQuery;
+        Pedido := WooPedidoToPedidoVenda(WooPedido, Cliente.CodIdCliente);
+        Query := CriarQuery;
 
-        with SelectPedidoQuery do
+        with Query do
         begin
-        	Connection.StartTransaction;
-
             try
-            	SQL.Text :=
-                    'SELECT * FROM pedido_venda WHERE ' +
-                        'COD_ID_EMPRESA = 2433 ' +
-                        'AND COD_ID_LOJA = 90 '  ;
+            	Connection.StartTransaction;
 
-//                       + 'AND COD_ID_WOOCOMMERCE := COD_ID_WOOCOMMERCE';
-//            	ParamByName('COD_ID_WOOCOMMERCE').AsLargeInt := CodIdWooCommerce;
-            	Open;
+        		SQL.Text :=
+                  'INSERT INTO db_sgci.pedido_venda ( ' +
+                  '  COD_ID_EMPRESA, ' +
+                  '  COD_ID_LOJA, ' +
+                  '  COD_ID_CLIENTE, ' +
+                  '  COD_IDENTIFICADOR, ' +
+                  '  DAT_PEDIDO, ' +
+                  '  DAT_INCLUSAO, ' +
+                  '  DSC_ENTREGA_NOME, ' +
+                  '  DSC_ENTREGA_ENDERECO, ' +
+                  '  DSC_ENTREGA_TELEFONE, ' +
+                  '  DSC_ENTREGA_CELULAR, ' +
+                  '  NUM_VALOR_DESCONTO, ' +
+                  '  NUM_ENTREGA_VALOR, ' +
+                  '  NUM_STATUS_PEDIDO, ' +
+                  '  NUM_STATUS_PRODUCAO, ' +
+                  '  DSC_OBSERVACOES ' +
+                  ') VALUES ( ' +
+                  '  :COD_ID_EMPRESA, ' +
+                  '  :COD_ID_LOJA, ' +
+                  '  :COD_ID_CLIENTE, ' +
+                  '  :COD_IDENTIFICADOR, ' +
+                  '  :DAT_PEDIDO, ' +
+                  '  :DAT_INCLUSAO, ' +
+                  '  :DSC_ENTREGA_NOME, ' +
+                  '  :DSC_ENTREGA_ENDERECO, ' +
+                  '  :DSC_ENTREGA_TELEFONE, ' +
+                  '  :DSC_ENTREGA_CELULAR, ' +
+                  '  :NUM_VALOR_DESCONTO, ' +
+                  '  :NUM_ENTREGA_VALOR, ' +
+                  '  :NUM_STATUS_PEDIDO, ' +
+                  '  :NUM_STATUS_PRODUCAO, ' +
+                  '  :DSC_OBSERVACOES ' +
+                  ')';
 
-            	Connection.Commit
+                ParamByName('COD_ID_EMPRESA').AsInteger := Pedido.CodIdEmpresa;
+                ParamByName('COD_ID_LOJA').AsInteger := Pedido.CodIdLoja;
+                ParamByName('COD_ID_CLIENTE').AsInteger := Pedido.CodIdCliente;
+                ParamByName('COD_IDENTIFICADOR').AsString := Pedido.CodIdentificador;
+                ParamByName('DAT_PEDIDO').AsDateTime := Pedido.DatPedido;
+                ParamByName('DAT_INCLUSAO').AsDateTime := Now;
+                ParamByName('DSC_ENTREGA_NOME').AsString := Pedido.DscEntregaNome;
+                ParamByName('DSC_ENTREGA_ENDERECO').AsString := Pedido.DscEntregaEndereco;
+                ParamByName('DSC_ENTREGA_TELEFONE').AsString := Pedido.DscEntregaTelefone;
+                ParamByName('DSC_ENTREGA_CELULAR').AsString := Pedido.DscEntregaCelular;
+                ParamByName('NUM_VALOR_DESCONTO').AsFloat := Pedido.NumValorDesconto;
+                ParamByName('NUM_ENTREGA_VALOR').AsFloat := Pedido.NumEntregaValor;
+                ParamByName('NUM_STATUS_PEDIDO').AsInteger := Pedido.NumStatusPedido;
+                ParamByName('NUM_STATUS_PRODUCAO').AsInteger := Pedido.NumStatusProducao;
+                ParamByName('DSC_OBSERVACOES').AsString := Pedido.DscObservacoes;
+
+                ExecSQL;
+
+            	Transaction.Commit;
             except
-                Connection.Rollback;
+            	Transaction.Rollback;
             end;
         end;
     finally
-        SelectPedidoQuery.Free;
+        Query.Free;
     end;
 end;
 
@@ -414,7 +436,7 @@ begin
 //
 //        if iRev.NovoUsuario(Req.Body, Resp) then
 //            Res.Status(THTTPStatus.OK).Send(Resp)
-//        else                                                                                   9
+//        else
 //            Res.Status(THTTPStatus.BadRequest).Send(Resp);
 end;
 
@@ -426,13 +448,10 @@ procedure TfrmTela_Principal.HorseAPISalvarItensDoCarrinho(
 var
     CodIdEmpresa: string;
     CodIdLoja: string;
-	Resp : string;
-    ClienteBilling: TClienteBilling;
     Cliente: TCliente;
-    JSONPedido: TJsonObject;
+    WooPedido: TWooPedido;
 begin
-    ClienteBilling := nil;
-    JSONPedido := nil;
+    WooPedido := nil;
 
     try
     	try
@@ -448,17 +467,17 @@ begin
 
             ChecarBodyDoWebHook(Req.Body);
 
-            JSONPedido := TJSONObject.ParseJSONValue(Req.Body) as TJSONObject;
-//
-            ClienteBilling := CarregarClienteDoJSON(
-                JSONPedido.GetValue<TJSONObject>('billing')
+            WooPedido := TJSON.JsonToObject<TWooPedido>(Req.Body);
+
+            Cliente := BuscarOuInserirClienteNoBanco(
+                WooPedido.Billing,
+                CodIdEmpresa.ToInteger,
+                CodIdLoja.ToInteger
             );
 
-            Cliente := BuscarOuInserirClienteNoBanco(ClienteBilling);
-
             SalvarConteudoEmArquivo(
-                TPath.Combine(TPath.GetDocumentsPath, 'itens-carrinho.txt'),
-                Req.Body
+                TPath.Combine(TPath.GetDocumentsPath, 'pedido.txt'),
+                TJson.ObjectToJsonString(WooPedido)
             );
 
             SalvarConteudoEmArquivo(
@@ -466,14 +485,15 @@ begin
                 TJson.ObjectToJsonString(Cliente)
             );
 
-            Res.Send('OK');
+            SalvarPedidoNoBanco(WooPedido, Cliente);
+
+            Res.Status(THTTPStatus.Created).Send('Pedido criado com sucesso!');
         except
         	on E: Exception do
             	Res.Status(THTTPStatus.InternalServerError).Send('Erro ao cadastrar usuário!\n' + E.Message);
     	end;
     finally
-        ClienteBilling.Free;
-        JSONPedido.Free;
+    	Cliente.Free;
     end;
 end;
 
