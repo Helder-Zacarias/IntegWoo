@@ -45,7 +45,7 @@ type
     FProduct_id: Integer;
     FQuantity: Integer;
     FTotal: string;
-    FPrice: Double;
+    FPrice: string;
     FSku: string;
     FImage: TImage;
   published
@@ -65,7 +65,7 @@ type
     property Total: string read FTotal write FTotal;
 
     [JSONName('price')]
-    property Price: Double read FPrice write FPrice;
+    property Price: string read FPrice write FPrice;
 
     [JSONName('sku')]
     property Sku: string read FSku write FSku;
