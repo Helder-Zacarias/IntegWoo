@@ -208,6 +208,11 @@ type
     FCustomerId: Integer;
     FOrderKey: string;
     FDate_created: string;
+    FPayment_method: string;
+    FPayment_method_title: string;
+    FDate_completed: string;
+    FDate_paid: string;
+    FCart_hash: string;
     FBilling: TBilling;
     FShipping: TShipping;
     FLine_items: TArray<TLineItem>;
@@ -233,6 +238,21 @@ type
 
     [JSONName('date_created')]
     property DateCreated: string read FDate_created write FDate_created;
+
+    [JSONName('payment_method')]
+    property PaymentMethod: string read FPayment_method write FPayment_method;
+
+    [JSONName('payment_method_title')]
+    property PaymentMethodTitle: string read FPayment_method_title write FPayment_method_title;
+
+    [JSONName('date_completed')]
+    property DateCompleted: string read FDate_completed write FDate_completed;
+
+    [JSONName('date_paid')]
+    property DatePaid: string read FDate_paid write FDate_paid;
+
+    [JSONName('cart_hash')]
+    property CartHash: string read FCart_hash write FCart_hash;
 
     [JSONName('billing')]
     property Billing: TBilling read FBilling write FBilling;

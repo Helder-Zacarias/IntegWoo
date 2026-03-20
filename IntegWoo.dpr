@@ -26,7 +26,7 @@ uses
   WooCreateCategoriaRequest in 'rest-client\woocommerce-api\WooCreateCategoriaRequest.pas',
   WooCategoriaResponse in 'rest-client\woocommerce-api\WooCategoriaResponse.pas',
   WooProdutoCategoriaRequest in 'rest-client\woocommerce-api\WooProdutoCategoriaRequest.pas',
-  TrimTexto in 'utils\TrimTexto.pas',
+  TransformadorDeTexto in 'utils\TransformadorDeTexto.pas',
   ContentPrinter in 'utils\ContentPrinter.pas',
   ProdutoGrade in 'models\ProdutoGrade.pas',
   ProdutoImagem in 'models\ProdutoImagem.pas',
@@ -44,7 +44,8 @@ uses
   FormatadorDocumentos in 'utils\FormatadorDocumentos.pas',
   Municipio in 'models\Municipio.pas',
   Uf in 'models\Uf.pas',
-  WooPedido in 'webhooks-client\WooPedido.pas';
+  WooPedido in 'webhooks-client\WooPedido.pas',
+  Finalizadora in 'models\Finalizadora.pas';
 
 {$R *.res}
 

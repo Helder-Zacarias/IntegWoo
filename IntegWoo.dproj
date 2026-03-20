@@ -164,7 +164,7 @@
         <DCCReference Include="rest-client\woocommerce-api\WooCreateCategoriaRequest.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\WooCategoriaResponse.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\WooProdutoCategoriaRequest.pas"/>
-        <DCCReference Include="utils\TrimTexto.pas"/>
+        <DCCReference Include="utils\TransformadorDeTexto.pas"/>
         <DCCReference Include="utils\ContentPrinter.pas"/>
         <DCCReference Include="models\ProdutoGrade.pas"/>
         <DCCReference Include="models\ProdutoImagem.pas"/>
@@ -183,6 +183,7 @@
         <DCCReference Include="models\Municipio.pas"/>
         <DCCReference Include="models\Uf.pas"/>
         <DCCReference Include="webhooks-client\WooPedido.pas"/>
+        <DCCReference Include="models\Finalizadora.pas"/>
         <None Include="bin\config.ini"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

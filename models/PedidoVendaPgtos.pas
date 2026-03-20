@@ -14,6 +14,7 @@ type
     FCOD_ID_LOJA: Integer;
     FCOD_ID_FORMA_PGTO: Integer;
     FCOD_ID_CONDICAO_PGTO: Integer;
+    FCOD_ID_FINALIZADORA: Integer;
     FDAT_VENCIMENTO: TDate;
     FNUM_VALOR: Double;
     FNUM_PARCELA: Integer;
@@ -41,6 +42,9 @@ type
 
     property CodIdCondicaoPgto: Integer
       read FCOD_ID_CONDICAO_PGTO write FCOD_ID_CONDICAO_PGTO;
+
+    property CodIdFinalizadora: Integer
+      read FCOD_ID_FINALIZADORA write FCOD_ID_FINALIZADORA;
 
     property DatVencimento: TDate
       read FDAT_VENCIMENTO write FDAT_VENCIMENTO;
