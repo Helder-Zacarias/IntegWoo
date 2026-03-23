@@ -3,149 +3,160 @@ unit Tela_Principal;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages,
-  System.SysUtils, System.Variants, System.Classes, System.IOUtils, System.NetEncoding,
-  System.Generics.Collections, System.JSON, System.IniFiles, System.Threading, System.DateUtils,
-  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Buttons, Vcl.ExtCtrls,
-  Data.DB, Uni, UniProvider, MySQLUniProvider, DBAccess, MemData, MemDS,
-  REST.Json, Rest.Json.Types, RESTRequest4D,
-  Horse,
-  AppConfig, Tela_Envio_Produto, Tela_Cadastro_Atributo,
-  FileWriter, TransformadorDeTexto, ContentPrinter, CustomObjectMapper, FormatadorDocumentos,
-  Produto, ProdutoGrade, ProdutoImagem, Secao, Variacao,
-  Cliente, PedidoVenda, PedidoVendaItem, PedidoVendaPgtos, Municipio, Uf, Finalizadora,
-  WooProdutoRequest, WooProdutoResponse,
-  WPImagemResponse, WooImagemRequest, WooImagemResponse,
-  WooCreateCategoriaRequest, WooCategoriaRequest, WooCategoriaResponse, WooProdutoCategoriaRequest,
-  WooAtributoRequest, WooAtributoResponse,
-  WooTermoAtributoRequest, WooTermoResponse,
-  WooVariacaoProdutoResponse, WooVariacaoProdutoRequest, WooAtributoDaVariacao,
-  WooAtributoProduto, WooVariacaoProdutoBatchRequest, WooPedido;
+	Winapi.Windows, Winapi.Messages,
+    System.SysUtils, System.Variants, System.Classes, System.IOUtils, System.NetEncoding,
+    System.Generics.Collections, System.JSON, System.IniFiles, System.Threading, System.DateUtils,
+    Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Buttons, Vcl.ExtCtrls,
+    Data.DB, Uni, UniProvider, MySQLUniProvider, DBAccess, MemData, MemDS,
+    REST.Json, Rest.Json.Types, RESTRequest4D,
+    Horse,
+    AppConfig, Tela_Envio_Produto, Tela_Cadastro_Atributo,
+    FileWriter, TransformadorDeTexto, ContentPrinter, CustomObjectMapper, FormatadorDocumentos,
+    Produto, ProdutoGrade, ProdutoImagem, Secao, Variacao,
+    Cliente, PedidoVenda, PedidoVendaItem, PedidoVendaPgtos, Municipio, Uf, Finalizadora,
+    WooProdutoRequest, WooProdutoResponse,
+    WPImagemResponse, WooImagemRequest, WooImagemResponse,
+    WooCreateCategoriaRequest, WooCategoriaRequest, WooCategoriaResponse, WooProdutoCategoriaRequest,
+    WooAtributoRequest, WooAtributoResponse,
+    WooTermoAtributoRequest, WooTermoResponse,
+    WooVariacaoProdutoResponse, WooVariacaoProdutoRequest, WooAtributoDaVariacao,
+    WooAtributoProduto, WooVariacaoProdutoBatchRequest, WooPedido;
 
 type
-  TfrmTela_Principal = class(TForm)
-    MySQL: TMySQLUniProvider;
-    Database: TUniConnection;
-    sqlProdutos: TUniQuery;
-    sqlImagens: TUniQuery;
-    btnHamburguer: TButton;
-    panelSide: TPanel;
-    btnEnviarProdutosMandala: TBitBtn;
-    procedure OnFormCreate(Sender: TObject);
-    procedure DatabaseConnectionLost(Sender: TObject; Component: TComponent;
-    	ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
-    procedure btnHamburguerClick(Sender: TObject);
-    procedure btnEnviarProdutosClick(Sender: TObject);
-    function CriarQuery: TUniQuery;
-    function BuscarProdutoPorSKU(SKU: string): TWooProdutoResponse;
-    function ChecarERetornarJSONArray(JSONResponse: TJSONValue): TJSONArray;
-    function ChamadaAPIWooCommerce(Resource: string; Metodo: string;
-    	MensagemAposRetorno: string = ''; Body: string = ''): TJSONValue;
-    function BuscarProdutosGrade(CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdProduto: Integer
-    	): TObjectList<TProdutoGrade>;
-    function BuscarAtributos: TObjectList<TWooAtributoResponse>;
-    function CriarAtributos: TObjectList<TWooAtributoResponse>;
-    function EnviarTermos(Atributos: TObjectList<TWooAtributoResponse>;
-    	ProdutosGrade: TObjectList<TProdutoGrade>): TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
-    function GerarListasDeVariacoesDosProdutosGrade(Atributos: TObjectList<TWooAtributoResponse>;
-    	ProdutosGrade: TObjectList<TProdutoGrade>): TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
-    function BuscarTermosNaApi(AtributoID: Integer): TObjectList<TWooTermoResponse>;
-    function GerarListaDeStringsDosTermosDaAPI(TermosAPI: TObjectList<TWooTermoResponse>): TList<string>;
-    function FiltrarTermosRepetidos(Variacoes: TList<string>): TList<string>;
-    function PostarTermoNaAPI(AtributoId: Integer; Termo: TWooTermoAtributoRequest): TWooTermoResponse;
-    function RetornarImagensRequest(CodIdProduto: Integer): TObjectList<TWooImagemRequest>;
-    function EnviarImagem(ListaImagens: TObjectList<TProdutoImagem>): TObjectList<TWPImagemResponse>;
-    function DownloadImage(ImageUrl: string = ''): TMemoryStream;
-    function BuscarSecaoNoBanco(CodIdEmpresa: Integer; CodIdSecao: Integer): TSecao;
-    function BuscarCategorias(Secao: TSecao): TWooCategoriaResponse;
-    function CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
-    function EnviarProduto(ProdutoRequest: TWooProdutoRequest; ProdutoRecebido: TWooProdutoResponse): TWooProdutoResponse;
-    procedure CriarVariacoesDoProduto(ProdutoResponse: TWooProdutoResponse; ProdutosGrade: TObjectList<TProdutoGrade>);
-    procedure RegistrarRotas;
-    procedure HorseAPISalvarPedido(Req: THorseRequest; Res: THorseResponse; Next: TProc);
-    function ChecarBodyDoWebHook(ReqBody: string): Boolean;
-    function BuscarOuInserirClienteNoBanco(Billing: TBilling; CodIdEmpresa: Integer;
-    	CodIdLoja: Integer): TCliente;
-    function BuscarMunicipio(Municipio: string): TMunicipio;
-    function SalvarPedidoNoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer;
-    	WooPedido: TWooPedido; Cliente: TCliente): TPedidoVenda;
-    function SQLToPedidoVenda(Query: TUniQuery): TPedidoVenda;
-    function WooPedidoToPedidoVenda(CodIdEmpresa: Integer; CodIdLoja: Integer;
-    	WooPedido: TWooPedido; IdCliente: Integer): TPedidoVenda;
-    function RetornarItensDoPedidoDeVenda(Itens: TArray<TLineItem>; CodIdEmpresa: Integer;
-    	CodIdLoja: Integer; CodIdPedido: Int64): TArray<TPedidoVendaItem>;
-    function BuscarProdutoNoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer;
-    	Descricao: String): TProduto;
-    procedure SalvarProdutosDoPedido(ProdutosPedido: TArray<TPedidoVendaItem>);
-    function BuscarOuInserirFinalizadora(PaymentMethod: string; PaymentMethodTitle: string;
-    	CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdCliente: Integer): TFinalizadora;
-    function BuscarFinalizadorasDoBanco(PaymentMethodTtile: string; CodIdEmpresa: Integer;
-    	CodIdLoja: Integer): TFinalizadora;
-    function SQLToFinalizadora(Query: TUniQuery): TFinalizadora;
-    function InserirPagamentoNoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer;
-    	CodIdPedido: Int64; CodIdFinalizadora: Integer;
-        DataPagamento: TDateTime; ValorPedido: Double): TPedidoVendaPgtos;
-    procedure HorseAPIAtualizarProduto(Req: THorseRequest; Res: THorseResponse; Next: TProc);
-    procedure OnFormDestroy(Sender: TObject);
-  private
-    FSQLProdutosBase: string;
-    FSQLImagensBase: string;
-    FTabelasVariacao: TArray<string>;
-    FFolderPath: string;
-    const
-        HORSE_PORT = 9000;
-    { Private declarations }
-  public
+    TfrmTela_Principal = class(TForm)
+        MySQL: TMySQLUniProvider;
+        Database: TUniConnection;
+        sqlProdutos: TUniQuery;
+        sqlImagens: TUniQuery;
+        btnHamburguer: TButton;
+        panelSide: TPanel;
+        btnEnviarProdutosMandala: TBitBtn;
+        procedure OnFormCreate(Sender: TObject);
+        procedure RegistrarRotas;
+        procedure DatabaseConnectionLost(Sender: TObject; Component: TComponent;
+        	ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
+        procedure btnHamburguerClick(Sender: TObject);
+        procedure btnEnviarProdutosClick(Sender: TObject);
+        function CriarQuery: TUniQuery;
+        function BuscarProdutoPorSKU(SKU: string): TWooProdutoResponse;
+        function ChecarERetornarJSONArray(JSONResponse: TJSONValue): TJSONArray;
+        function ChamadaAPIWooCommerce(Resource: string; Metodo: string;
+        	MensagemAposRetorno: string = ''; Body: string = ''): TJSONValue;
+        function BuscarProdutosGrade(CodIdEmpresa: Integer; CodIdLoja: Integer;
+        	CodIdProduto: Integer): TObjectList<TProdutoGrade>;
+        function BuscarAtributos: TObjectList<TWooAtributoResponse>;
+        function CriarAtributos: TObjectList<TWooAtributoResponse>;
+        function EnviarTermos(Atributos: TObjectList<TWooAtributoResponse>;
+        	ProdutosGrade: TObjectList<TProdutoGrade>): TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
+        function GerarListasDeVariacoesDosProdutosGrade(Atributos: TObjectList<TWooAtributoResponse>;
+        	ProdutosGrade: TObjectList<TProdutoGrade>): TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
+        function BuscarTermosNaApi(AtributoID: Integer): TObjectList<TWooTermoResponse>;
+        function GerarListaDeStringsDosTermosDaAPI(TermosAPI: TObjectList<TWooTermoResponse>): TList<string>;
+        function FiltrarTermosRepetidos(Variacoes: TList<string>): TList<string>;
+        function PostarTermoNaAPI(AtributoId: Integer; Termo: TWooTermoAtributoRequest): TWooTermoResponse;
+        function RetornarImagensRequest(CodIdProduto: Integer): TObjectList<TWooImagemRequest>;
+        function EnviarImagem(ListaImagens: TObjectList<TProdutoImagem>): TObjectList<TWPImagemResponse>;
+        function DownloadImage(ImageUrl: string = ''): TMemoryStream;
+        function BuscarSecaoNoBanco(CodIdEmpresa: Integer; CodIdSecao: Integer): TSecao;
+        function BuscarCategorias(Secao: TSecao): TWooCategoriaResponse;
+        function CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
+        function EnviarProduto(ProdutoRequest: TWooProdutoRequest;
+        	ProdutoRecebido: TWooProdutoResponse): TWooProdutoResponse;
+        procedure CriarVariacoesDoProduto(ProdutoResponse:
+        	TWooProdutoResponse; ProdutosGrade: TObjectList<TProdutoGrade>);
+        procedure HorseAPISalvarPedido(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+        function ChecarBodyDoWebHook(ReqBody: string): Boolean;
+        function BuscarOuInserirClienteNoBanco(Billing: TBilling; CodIdEmpresa: Integer;
+        	CodIdLoja: Integer): TCliente;
+        function BuscarMunicipio(Municipio: string): TMunicipio;
+        function SalvarPedidoNoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer;
+        	WooPedido: TWooPedido; Cliente: TCliente): TPedidoVenda;
+        function SQLToPedidoVenda(Query: TUniQuery): TPedidoVenda;
+        function WooPedidoToPedidoVenda(CodIdEmpresa: Integer; CodIdLoja: Integer;
+        	WooPedido: TWooPedido; IdCliente: Integer): TPedidoVenda;
+        function RetornarItensDoPedidoDeVenda(Itens: TArray<TLineItem>; CodIdEmpresa: Integer;
+        	CodIdLoja: Integer; CodIdPedido: Int64): TArray<TPedidoVendaItem>;
+        function BuscarProdutoNoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer;
+        	SKU: Int64): TProduto;
+        procedure SalvarProdutosDoPedido(ProdutosPedido: TArray<TPedidoVendaItem>);
+        function BuscarOuInserirFinalizadora(PaymentMethod: string; PaymentMethodTitle: string;
+        	CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdCliente: Integer): TFinalizadora;
+        function BuscarFinalizadorasDoBanco(MetodoPagamento: string; CodIdEmpresa: Integer;
+        	CodIdLoja: Integer): TFinalizadora;
+        function SQLToFinalizadora(Query: TUniQuery): TFinalizadora;
+        function InserirPagamentoNoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer;
+            CodIdPedido: Int64; CodIdFinalizadora: Integer; DataPagamento: TDateTime;
+            ValorPedido: Double): TPedidoVendaPgtos;
+        procedure HorseAPIAtualizarProduto(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+        procedure OnFormDestroy(Sender: TObject);
+	private
+    	FSQLProdutosBase: string;
+        FSQLImagensBase: string;
+    	FTabelasVariacao: TArray<string>;
+    	FFolderPath: string;
+        const HORSE_PORT = 9000;
+    	{ Private declarations }
+	public
 
-    { Public declarations }
-  end;
+		{ Public declarations }
+end;
 
 var
-  frmTela_Principal: TfrmTela_Principal;
+	frmTela_Principal: TfrmTela_Principal;
 
 implementation
 uses
-  DataSet.Serialize;
+	DataSet.Serialize;
 
 {$R *.dfm}
 
 procedure TfrmTela_Principal.OnFormCreate(Sender: TObject);
 begin
-  FSQLProdutosBase := sqlProdutos.SQL.Text;
-  FSQLImagensBase := sqlImagens.SQL.Text;
-  FTabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
-  FFolderPath := TPath.Combine(TPath.GetDocumentsPath, 'Ecommerce');
-  RegistrarRotas;
+	FSQLProdutosBase := sqlProdutos.SQL.Text;
+    FSQLImagensBase := sqlImagens.SQL.Text;
+    FTabelasVariacao := ['db_sgci.grades_variacao_1', 'db_sgci.grades_variacao_2'];
+    FFolderPath := TPath.Combine(TPath.GetDocumentsPath, 'Ecommerce');
+    RegistrarRotas;
+end;
+
+procedure TfrmTela_Principal.RegistrarRotas;
+begin
+	THorse.Post(
+        '/api/pedido-woocommerce/:codIdEmpresa/:codIdLoja',
+        HorseAPISalvarPedido
+    );
+
+    THorse.Listen(HORSE_PORT);
 end;
 
 procedure TfrmTela_Principal.DatabaseConnectionLost(Sender: TObject; Component: TComponent;
-  ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
+	ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
 begin
-  RetryMode := rmReconnectExecute;
+	RetryMode := rmReconnectExecute;
 end;
 
 procedure TfrmTela_Principal.btnHamburguerClick(Sender: TObject);
 begin
-  panelSide.Visible := not panelSide.Visible;
-  btnHamburguer.BringToFront;
+	panelSide.Visible := not panelSide.Visible;
+    btnHamburguer.BringToFront;
 end;
 
 procedure TfrmTela_Principal.btnEnviarProdutosClick(Sender: TObject);
 var
-  ProdutoDB: TProduto;
-  WooProdutoRequest: TWooProdutoRequest;
-  TipoProduto: string;
-  Secao: TSecao;
-  CategoriaResponse: TWooCategoriaResponse;
-  Atributos: TObjectList<TWooAtributoResponse>;
-  ListaImagensRequest: TObjectList<TWooImagemRequest>;
-  TermosProduto: TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
-  WooProdutoResponse: TWooProdutoResponse;
-  ProdutosGrade: TObjectList<TProdutoGrade>;
-  ProdutoRecebido: TWooProdutoResponse;
-  QueryProdutos: TUniQuery;
+	ProdutoDB: TProduto;
+    WooProdutoRequest: TWooProdutoRequest;
+    TipoProduto: string;
+    Secao: TSecao;
+    CategoriaResponse: TWooCategoriaResponse;
+    Atributos: TObjectList<TWooAtributoResponse>;
+    ListaImagensRequest: TObjectList<TWooImagemRequest>;
+    TermosProduto: TObjectDictionary<Integer, TObjectList<TWooTermoResponse>>;
+    WooProdutoResponse: TWooProdutoResponse;
+    ProdutosGrade: TObjectList<TProdutoGrade>;
+    ProdutoRecebido: TWooProdutoResponse;
+    QueryProdutos: TUniQuery;
 begin
-    QueryProdutos := nil;
+	QueryProdutos := nil;
 
     try
         QueryProdutos := CriarQuery;
@@ -519,15 +530,6 @@ begin
     end;
 end;
 
-procedure TfrmTela_Principal.RegistrarRotas;
-begin
-	THorse.Post(
-        '/api/pedido-woocommerce/:codIdEmpresa/:codIdLoja',
-        HorseAPISalvarPedido
-    );
-    THorse.Listen(HORSE_PORT);
-end;
-
 // Início das funções para salvar pedido
 procedure TfrmTela_Principal.HorseAPISalvarPedido(
 	Req: THorseRequest;
@@ -535,8 +537,8 @@ procedure TfrmTela_Principal.HorseAPISalvarPedido(
 	Next: TProc
 );
 var
-    CodIdEmpresa: string;
-    CodIdLoja: string;
+    CodIdEmpresa: Integer;
+    CodIdLoja: Integer;
     Conexao: TUniConnection;
     Cliente: TCliente;
     ProdutosPedido: TArray<TPedidoVendaItem>;
@@ -554,12 +556,12 @@ begin
         CodIdEmpresa := Req.Params
             .Field('codIdEmpresa')
             .Required(True)
-            .RequiredMessage('"codIdEmpresa" não foi recebido na URL da requisição').AsString;
+            .RequiredMessage('"codIdEmpresa" não foi recebido na URL da requisição').AsInteger;
 
         CodIdLoja := Req.Params
             .Field('codIdLoja')
             .Required(True)
-            .RequiredMessage('"codIdLoja" não foi recebido na URL da requisição').AsString;
+            .RequiredMessage('"codIdLoja" não foi recebido na URL da requisição').AsInteger;
 
         ChecarBodyDoWebHook(Req.Body);
         WooPedido := TJSON.JsonToObject<TWooPedido>(Req.Body);
@@ -571,21 +573,21 @@ begin
 
             Cliente := BuscarOuInserirClienteNoBanco(
                 WooPedido.Billing,
-                CodIdEmpresa.ToInteger,
-                CodIdLoja.ToInteger
+                CodIdEmpresa,
+                CodIdLoja
             );
 
             PedidoRetornado := SalvarPedidoNoBanco(
-            	CodIdEmpresa.ToInteger,
-                CodIdLoja.ToInteger,
+            	CodIdEmpresa,
+                CodIdLoja,
                 WooPedido,
                 Cliente
             );
 
             ProdutosPedido := RetornarItensDoPedidoDeVenda(
                 WooPedido.LineItems,
-                CodIdEmpresa.ToInteger,
-                CodIdLoja.ToInteger,
+                CodIdEmpresa,
+                CodIdLoja,
                 PedidoRetornado.CodIdPedido
             );
 
@@ -594,14 +596,14 @@ begin
             Finalizadora := BuscarOuInserirFinalizadora(
                 WooPedido.PaymentMethod,
                 WooPedido.PaymentMethodTitle,
-                CodIdEmpresa.ToInteger,
-                CodIdLoja.ToInteger,
+                CodIdEmpresa,
+                CodIdLoja,
                 Cliente.CodIdCliente
             );
 
             InserirPagamentoNoBanco(
-            	CodIdEmpresa.ToInteger,
-                CodIdLoja.ToInteger,
+            	CodIdEmpresa,
+                CodIdLoja,
                 PedidoRetornado.CodIdPedido,
                 Finalizadora.CodIdFinalizadora,
                 PedidoRetornado.DatPedido,
@@ -615,11 +617,13 @@ begin
                 TJson.ObjectToJsonString(WooPedido)
             );
 
-            Res.Status(THTTPStatus.Created).Send('Pedido criado com sucesso!');
+            Res.Status(THTTPStatus.Created)
+            	.Send('Pedido criado com sucesso!');
         except
             on E: Exception do
             begin
-                Res.Status(THTTPStatus.InternalServerError).Send('Erro ao salvar pedido!\n');
+                Res.Status(THTTPStatus.InternalServerError)
+                	.Send('Erro ao salvar pedido!\n');
                 if Conexao.InTransaction then
                 	Conexao.Rollback;
             end;
@@ -634,11 +638,11 @@ end;
 
 function TfrmTela_Principal.ChecarBodyDoWebHook(ReqBody: string): Boolean;
 begin
-if ReqBody.Trim.IsEmpty then
-begin
-    raise Exception.Create('"Body" da requisição não foi enviado');
-    Result := False;
-end
+	if ReqBody.Trim.IsEmpty then
+    begin
+        raise Exception.Create('"Body" da requisição não foi enviado');
+        Result := False;
+	end
 else
     Result := True;
 
@@ -740,7 +744,7 @@ begin
         	Query.ParamByName('NUM_SEXO').Clear;
 
         Query.ParamByName('DSC_NOME').AsString :=
-        Trim(Billing.FirstName + ' ' + Billing.LastName);
+        	Trim(Billing.FirstName + ' ' + Billing.LastName);
 
         Query.ParamByName('DSC_ENDERECO').AsString := Billing.Address1;
         Query.ParamByName('DSC_NUMERO').AsString := Billing.Number;
@@ -751,10 +755,10 @@ begin
         if Assigned(Municipio) then
         begin
             Query.ParamByName('COD_ID_UF').AsInteger :=
-              Municipio.CodIdUf;
+            	Municipio.CodIdUf;
 
             Query.ParamByName('COD_ID_MUNICIPIO').AsInteger :=
-          Municipio.CodIdMunicipio;
+            	Municipio.CodIdMunicipio;
         end
         else
         begin
@@ -794,22 +798,22 @@ begin
         Query.ParamByName('ID').AsInteger := ClienteID;
         Query.Open;
 
-        Result := TCliente.Create;
-        Result.CodIdCliente := ClienteID;
-        Result.CodIdEmpresa := Query.FieldByName('COD_ID_EMPRESA').AsInteger;
-        Result.CodIdLoja    := Query.FieldByName('COD_ID_LOJA').AsInteger;
-        Result.CodCliente   := Query.FieldByName('COD_CLIENTE').AsInteger;
-        Result.DscNome      := Query.FieldByName('DSC_NOME').AsString;
-        Result.DscCpfCnpj   := Query.FieldByName('DSC_CPF_CNPJ').AsString;
-        Result.DscEmail     := Query.FieldByName('DSC_EMAIL').AsString;
-        Result.DscTelefone  := Query.FieldByName('DSC_TELEFONE').AsString;
-        Result.DscCelular   := Query.FieldByName('DSC_CELULAR').AsString;
+        Result 				   := TCliente.Create;
+        Result.CodIdCliente    := ClienteID;
+        Result.CodIdEmpresa    := Query.FieldByName('COD_ID_EMPRESA').AsInteger;
+        Result.CodIdLoja       := Query.FieldByName('COD_ID_LOJA').AsInteger;
+        Result.CodCliente      := Query.FieldByName('COD_CLIENTE').AsInteger;
+        Result.DscNome         := Query.FieldByName('DSC_NOME').AsString;
+        Result.DscCpfCnpj      := Query.FieldByName('DSC_CPF_CNPJ').AsString;
+        Result.DscEmail        := Query.FieldByName('DSC_EMAIL').AsString;
+        Result.DscTelefone     := Query.FieldByName('DSC_TELEFONE').AsString;
+        Result.DscCelular      := Query.FieldByName('DSC_CELULAR').AsString;
         Result.DscEndereco     := Query.FieldByName('DSC_ENDERECO').AsString;
         Result.DscNumero       := Query.FieldByName('DSC_NUMERO').AsString;
         Result.DscComplemento  := Query.FieldByName('DSC_COMPLEMENTO').AsString;
         Result.DscBairro       := Query.FieldByName('DSC_BAIRRO').AsString;
         Result.CodCep          := Query.FieldByName('DSC_CEP').AsString;
-        Result.DatInclusao  := Query.FieldByName('DAT_CADASTRO').AsDateTime;
+        Result.DatInclusao     := Query.FieldByName('DAT_CADASTRO').AsDateTime;
 	finally
     	Query.Free;
 	end;
@@ -862,7 +866,7 @@ var
 	Pedido: TPedidoVenda;
     PedidoId: Int64;
 begin
-    Query := nil;
+    Query  := nil;
 	Pedido := nil;
     Result := nil;
 
@@ -874,8 +878,6 @@ begin
             Cliente.CodIdCliente
         );
 
-        ShowMessage('Após conversão a pedido de venda');
-
 		Query := CriarQuery;
 
 		with Query do
@@ -883,58 +885,32 @@ begin
             try
             	SQL.Text :=
                   'INSERT INTO db_sgci.pedido_venda ( ' +
-                  '  COD_ID_EMPRESA, ' +
-                  '  COD_ID_LOJA, ' +
-                  '  COD_ID_CLIENTE, ' +
-//                  '  COD_IDENTIFICADOR, ' +
-                  '  DAT_PEDIDO, ' +
-                  '  DAT_INCLUSAO, ' +
-//                  '  DSC_ENTREGA_NOME, ' +
-//                  '  DSC_ENTREGA_ENDERECO, ' +
-//                  '  DSC_ENTREGA_TELEFONE, ' +
-//                  '  DSC_ENTREGA_CELULAR, ' +
-//                  '  NUM_VALOR_DESCONTO, ' +
-                  '  NUM_ENTREGA_VALOR ' +
-//                  '  NUM_STATUS_PEDIDO, ' +
-//                  '  NUM_STATUS_PRODUCAO, ' +
-//                  '  DSC_OBSERVACOES ' +
+                  '	COD_ID_EMPRESA,' +
+                  '	COD_ID_LOJA,' +
+                  '	COD_ID_CLIENTE,' +
+                  '	DAT_PEDIDO,' +
+                  '	DAT_INCLUSAO,' +
+                  '	NUM_STATUS_PEDIDO, ' +
+                  ' NUM_ENTREGA_VALOR' +
                   ') VALUES ( ' +
-                  '  :COD_ID_EMPRESA, ' +
-                  '  :COD_ID_LOJA, ' +
-                  '  :COD_ID_CLIENTE, ' +
-//                  '  :COD_IDENTIFICADOR, ' +
-                  '  :DAT_PEDIDO, ' +
-                  '  :DAT_INCLUSAO, ' +
-//                  '  :DSC_ENTREGA_NOME, ' +
-//                  '  :DSC_ENTREGA_ENDERECO, ' +
-//                  '  :DSC_ENTREGA_TELEFONE, ' +
-//                  '  :DSC_ENTREGA_CELULAR, ' +
-//                  '  :NUM_VALOR_DESCONTO, ' +
-                  '  :NUM_ENTREGA_VALOR ' +
-//                  '  :NUM_STATUS_PEDIDO, ' +
-//                  '  :NUM_STATUS_PRODUCAO, ' +
-//                  '  :DSC_OBSERVACOES ' +
+                  '	:COD_ID_EMPRESA, ' +
+                  '	:COD_ID_LOJA, ' +
+                  '	:COD_ID_CLIENTE, ' +
+                  '	:DAT_PEDIDO, ' +
+                  '	:DAT_INCLUSAO, ' +
+                  '	:NUM_STATUS_PEDIDO,' +
+                  ' :NUM_ENTREGA_VALOR ' +
                   ')';
 
                 ParamByName('COD_ID_EMPRESA').AsInteger := Pedido.CodIdEmpresa;
                 ParamByName('COD_ID_LOJA').AsInteger := Pedido.CodIdLoja;
                 ParamByName('COD_ID_CLIENTE').AsInteger := Pedido.CodIdCliente;
-//                ParamByName('COD_IDENTIFICADOR').AsString := Pedido.CodIdentificador;
                 ParamByName('DAT_PEDIDO').AsDateTime := Pedido.DatPedido;
                 ParamByName('DAT_INCLUSAO').AsDateTime := Now;
-//                ParamByName('DSC_ENTREGA_NOME').AsString := Pedido.DscEntregaNome;
-//                ParamByName('DSC_ENTREGA_ENDERECO').AsString := Pedido.DscEntregaEndereco;
-//                ParamByName('DSC_ENTREGA_TELEFONE').AsString := Pedido.DscEntregaTelefone;
-//                ParamByName('DSC_ENTREGA_CELULAR').AsString := Pedido.DscEntregaCelular;
-//                ParamByName('NUM_VALOR_DESCONTO').AsFloat := Pedido.NumValorDesconto;
+                ParamByName('NUM_STATUS_PEDIDO').AsInteger := Pedido.NumStatusPedido;
                 ParamByName('NUM_ENTREGA_VALOR').AsFloat := Pedido.NumEntregaValor;
-//                ParamByName('NUM_STATUS_PEDIDO').AsInteger := Pedido.NumStatusPedido;
-//                ParamByName('NUM_STATUS_PRODUCAO').AsInteger := Pedido.NumStatusProducao;
-//                ParamByName('DSC_OBSERVACOES').AsString := Pedido.DscObservacoes;
 
                 ExecSQL;
-
-                ShowMessage('Após inserção do pedido');
 
                 SQL.Text := 'SELECT LAST_INSERT_ID() AS ID';
                 Open;
@@ -946,8 +922,6 @@ begin
                 Open;
 
                 Result := SQLToPedidoVenda(Query);
-
-                ShowMessage('Após converter sql em pedido de venda');
             except
                 Result.Free;
                 raise;
@@ -970,19 +944,11 @@ begin
         	Result.CodIdPedido        := FieldByName('COD_ID_PEDIDO').AsLargeInt;
         	Result.CodIdEmpresa       := FieldByName('COD_ID_EMPRESA').AsInteger;
             Result.CodIdLoja          := FieldByName('COD_ID_LOJA').AsInteger;
-//            Result.CodIdentificador   := FieldByName('COD_IDENTIFICADOR').AsString;
             Result.CodIdCliente       := FieldByName('COD_ID_CLIENTE').AsInteger;
             Result.DatPedido          := FieldByName('DAT_PEDIDO').AsDateTime ;
             Result.DatInclusao        := FieldByName('DAT_INCLUSAO').AsDateTime;
-//            Result.DscEntregaNome     := FieldByName('DSC_ENTREGA_NOME').AsString;
-//            Result.DscEntregaEndereco := FieldByName('DSC_ENTREGA_ENDERECO').AsString;
-//            Result.DscEntregaTelefone := FieldByName('DSC_ENTREGA_TELEFONE').AsString;
-//            Result.DscEntregaCelular  := FieldByName('DSC_ENTREGA_CELULAR').AsString;
-//            Result.DscObservacoes     := FieldByName('DSC_OBSERVACOES').AsString;
-//            Result.NumValorDesconto   := FieldByName('NUM_VALOR_DESCONTO').AsFloat;
             Result.NumEntregaValor    := FieldByName('NUM_ENTREGA_VALOR').AsFloat;
-//            Result.NumStatusPedido    := FieldByName('NUM_STATUS_PEDIDO').AsInteger;
-//            Result.NumValorDesconto   := FieldByName('NUM_VALOR_DESCONTO').AsFloat;
+            Result.NumStatusPedido    := FieldByName('NUM_STATUS_PEDIDO').AsInteger;
         end;
     except
         Result.Free;
@@ -998,6 +964,7 @@ function TfrmTela_Principal.WooPedidoToPedidoVenda(
 ): TPedidoVenda;
 var
     LSettings: TFormatSettings;
+    StatusPedido: Integer;
 begin
     Result := nil;
     LSettings := TFormatSettings.Invariant; // Força padrão internacional (ponto)
@@ -1011,7 +978,17 @@ begin
         Result.DatPedido := ISO8601ToDate(WooPedido.DateCreated);
         Result.DatInclusao := ISO8601ToDate(WooPedido.DateCreated);
         Result.NumEntregaValor := StrToFloat(WooPedido.Total, LSettings);
-        ShowMessage('VALOR: ' + Result.NumEntregaValor.ToString)
+
+        if(WooPedido.Status = 'pending') or
+        	(WooPedido.Status = 'on-hold')
+        then
+        	StatusPedido := 0
+        else if WooPedido.Status = 'processing' then
+        	StatusPedido := 1
+        else if WooPedido.Status = 'completed' then
+            StatusPedido := 2
+        else
+            raise Exception.Create('Status do pedido não reconhecido');
     except
         Result.Free;
         raise;
@@ -1036,7 +1013,11 @@ begin
             Produto := nil;
 
         	try
-            	Produto := BuscarProdutoNoBanco(CodIdEmpresa, CodIdLoja, Item.Name);
+            	Produto := BuscarProdutoNoBanco(
+                    CodIdEmpresa,
+                    CodIdLoja,
+                    Item.Sku.ToInt64
+                );
 
                 if not Assigned(Produto) then
                     raise Exception.Create(
@@ -1080,7 +1061,7 @@ end;
 function TfrmTela_Principal.BuscarProdutoNoBanco(
 	CodIdEmpresa: Integer;
 	CodIdLoja: Integer;
-	Descricao: String
+	SKU: Int64
 ): TProduto;
 var
     Query: TUniQuery;
@@ -1149,11 +1130,11 @@ begin
              '	AND lj.COD_ID_LOJA = pd.COD_ID_LOJA ' +
              'WHERE pd.COD_ID_EMPRESA = :COD_ID_EMPRESA ' +
              '	AND pd.COD_ID_LOJA = :COD_ID_LOJA ' +
-             '	AND pd.DSC_COMPLETA = :DSC_COMPLETA';
+             '	AND pd.COD_PRODUTO = :COD_PRODUTO';
 
             ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
             ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
-            ParamByName('DSC_COMPLETA').AsString := Descricao;
+            ParamByName('COD_PRODUTO').AsLargeInt := SKU;
 
             Open;
 
@@ -1280,7 +1261,17 @@ begin
         );
 
         if Assigned(Result) then
-        	Exit(Result);
+        begin
+            Showmessage('Finalizadora encontrada: ' + Result.DscCompleta);
+            ShowMessage(
+                'COD_ID_FINALIZADORA: ' + Result.CodIdFinalizadora.ToString + sLineBreak +
+                'COD_ID_EMPRESA: ' + Result.CodIdEmpresa.ToString + sLineBreak +
+                'COD_ID_LOJA: ' + Result.CodIdLoja.ToString + sLineBreak +
+                'COD_ID_FINALIZADORA: ' + Result.DscCompleta + sLineBreak +
+                'COD_ID_FINALIZADORA: ' + Result.DscAbreviada
+            );
+            Exit(Result);
+        end;
 
         Query := CriarQuery;
 
@@ -1314,7 +1305,7 @@ begin
             ParamByName('DSC_COMPLETA').AsString:= PaymentMethodTitle;
 
             if LowerCase(RemoverAcentos(PaymentMethodTitle))
-            	.Contains('dinheiro') then
+            	.Contains('cod') then
             begin
                ParamByName('NUM_ESPECIE').AsInteger := 0;
                ParamByName('DSC_ABREVIADA').AsString := 'DINHEIRO';
@@ -1421,7 +1412,7 @@ begin
 end;
 
 function TfrmTela_Principal.BuscarFinalizadorasDoBanco(
-    PaymentMethodTtile: string;
+    MetodoPagamento: string;
     CodIdEmpresa: Integer;
     CodIdLoja: Integer
 ): TFinalizadora;
@@ -1438,26 +1429,16 @@ begin
         Query.SQL.Text :=
             'SELECT * FROM db_sgci.finalizadoras ' +
             'WHERE COD_ID_EMPRESA = :COD_ID_EMPRESA ' +
-            '	AND COD_ID_LOJA = :COD_ID_LOJA';
+            '	AND COD_ID_LOJA = :COD_ID_LOJA'+
+            '	AND DSC_COMPLETA LIKE :DSC';
         Query.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
         Query.ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
+        Query.ParamByName('DSC').AsString := '%' + MetodoPagamento + '%';
         Query.Open;
 
-        while not Query.Eof do
+        if not Query.Eof then
         begin
-            DscCompleta := Query.FieldByName('DSC_COMPLETA').AsString;
-            DscAbreviada := Query.FieldByName('DSC_ABREVIADA').AsString;
-
-            if LowerCase(RemoverAcentos(PaymentMethodTtile))
-            	.Contains(LowerCase(RemoverAcentos(DscCompleta))) and
-               LowerCase(RemoverAcentos(PaymentMethodTtile))
-            	.Contains(LowerCase(RemoverAcentos(DscAbreviada)))
-            then
-            begin
-            	ShowMessage('FINALIZADORA ENCONTRADA');
-                Result := SQLToFinalizadora(Query);
-            end;
-
+            Result := SQLToFinalizadora(Query);
             Query.Next;
         end;
 
@@ -1476,20 +1457,14 @@ begin
         with Query do
         begin
         	Result.CodIdFinalizadora := FieldByName('COD_ID_FINALIZADORA').AsInteger;
-            Result.CodIdEmpresa := FieldByName('COD_ID_EMPRESA').AsInteger;
-            Result.CodIdLoja := FieldByName('COD_ID_LOJA').AsInteger;
-            Result.CodIdCliente := FieldByName('COD_ID_CLIENTE').AsInteger;
-            Result.DscCompleta := FieldByName('DSC_COMPLETA').AsString;
-            Result.DscAbreviada := FieldByName('DSC_ABREVIADA').AsString;
-            Result.NumEspecie := FieldByName('NUM_ESPECIE').AsInteger;
-            Result.NumModalidade := FieldByName('NUM_MODALIDADE').AsInteger;
+            Result.CodIdEmpresa      := FieldByName('COD_ID_EMPRESA').AsInteger;
+            Result.CodIdLoja         := FieldByName('COD_ID_LOJA').AsInteger;
+            Result.CodIdCliente      := FieldByName('COD_ID_CLIENTE').AsInteger;
+            Result.DscCompleta       := FieldByName('DSC_COMPLETA').AsString;
+            Result.DscAbreviada      := FieldByName('DSC_ABREVIADA').AsString;
+            Result.NumEspecie        := FieldByName('NUM_ESPECIE').AsInteger;
+            Result.NumModalidade     := FieldByName('NUM_MODALIDADE').AsInteger;
         end;
-
-         ShowMessage(
-         	'COD_ID_FINALIZADORA: ' + Result.CodIdFinalizadora.ToString + sLineBreak +
-            'DSC_COMPLETA: ' + Result.DscCompleta + sLineBreak +
-            'DSC_ABREVIADA:' + Result.DscAbreviada
-         );
     except
         Result.Free;
         raise;
@@ -1537,16 +1512,16 @@ begin
             'ON DUPLICATE KEY UPDATE' +
             '	COD_ID_PAGAMENTO = LAST_INSERT_ID(COD_ID_PAGAMENTO)';
 
-            ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
-            ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
-            ParamByName('COD_ID_PEDIDO').AsLargeInt := CodIdPedido;
+            ParamByName('COD_ID_EMPRESA').AsInteger      := CodIdEmpresa;
+            ParamByName('COD_ID_LOJA').AsInteger         := CodIdLoja;
+            ParamByName('COD_ID_PEDIDO').AsLargeInt      := CodIdPedido;
             ParamByName('COD_ID_FINALIZADORA').AsInteger := CodIdFinalizadora;
-            ParamByName('DAT_PAGAMENTO').AsDateTime := DataPagamento;
-            ParamByName('NUM_VALOR_PAGO').AsCurrency := ValorPedido;
+            ParamByName('DAT_PAGAMENTO').AsDateTime      := DataPagamento;
+            ParamByName('NUM_VALOR_PAGO').AsCurrency     := ValorPedido;
 
 //          Status temporário - Deve ser definido de acordo com a situação
 //			do pagamento do pedido (Pago / Não Pago)
-            ParamByName('NUM_STATUS').AsInteger := 0;
+            ParamByName('NUM_STATUS').AsInteger := 1;
 
             ExecSQL;
         end;
@@ -1771,30 +1746,30 @@ end;
 
 function TfrmTela_Principal.BuscarTermosNaApi(AtributoID: Integer): TObjectList<TWooTermoResponse>;
 var
-  JSONResposta: TJSONValue;
-  ListaTermosAPI: TJSONArray;
+	JSONResposta: TJSONValue;
+    ListaTermosAPI: TJSONArray;
 begin
-  Result       := TObjectList<TWooTermoResponse>.Create(True);
-  JSONResposta := nil;
+    Result       := TObjectList<TWooTermoResponse>.Create(True);
+    JSONResposta := nil;
 
-  try
     try
-      JSONResposta := ChamadaAPIWooCommerce(
-        'products/attributes/' + AtributoId.ToString + '/terms?per_page=100',
-        'GET'
-      );
+        try
+            JSONResposta := ChamadaAPIWooCommerce(
+                'products/attributes/' + AtributoId.ToString + '/terms?per_page=100',
+                'GET'
+            );
 
-      ListaTermosAPI := ChecarERetornarJSONArray(JSONResposta);
+            ListaTermosAPI := ChecarERetornarJSONArray(JSONResposta);
 
-      for var TermoAPI in ListaTermosAPI do
-        Result.Add(TJson.JsonToObject<TWooTermoResponse>(TermoAPI.ToJSON));
-    except
-      Result.Free;
-      raise;
+            for var TermoAPI in ListaTermosAPI do
+            	Result.Add(TJson.JsonToObject<TWooTermoResponse>(TermoAPI.ToJSON));
+        except
+            Result.Free;
+            raise;
+        end;
+    finally
+    	JSONResposta.Free;
     end;
-  finally
-    JSONResposta.Free;
-  end;
 end;
 
 function TfrmTela_Principal.GerarListaDeStringsDosTermosDaAPI(
@@ -2125,70 +2100,70 @@ end;
 // qualquer número de atributos. GerarSKUVariacao foi removido.
 // ============================================================
 procedure TfrmTela_Principal.CriarVariacoesDoProduto(
-  ProdutoResponse: TWooProdutoResponse;
-  ProdutosGrade: TObjectList<TProdutoGrade>
+	ProdutoResponse: TWooProdutoResponse;
+  	ProdutosGrade: TObjectList<TProdutoGrade>
 );
 var
-  BatchRequest: TWooVariacaoProdutoBatchRequest;
-  VariacaoProdutoRequest: TWooVariacaoProdutoRequest;
-  RespostaAPI: TJSONValue;
-  SKUPartes: TStringList;
+	BatchRequest: TWooVariacaoProdutoBatchRequest;
+    VariacaoProdutoRequest: TWooVariacaoProdutoRequest;
+    RespostaAPI: TJSONValue;
+    SKUPartes: TStringList;
 begin
-  BatchRequest := TWooVariacaoProdutoBatchRequest.Create;
-  RespostaAPI  := nil;
+	BatchRequest := TWooVariacaoProdutoBatchRequest.Create;
+	RespostaAPI  := nil;
 
-  try
-    for var Grade in ProdutosGrade do
-    begin
-      VariacaoProdutoRequest := TWooVariacaoProdutoRequest.Create;
-      VariacaoProdutoRequest.RegularPrice  := FormatFloat('0.00', Grade.NumPrecoUnitario, TFormatSettings.Invariant);
-      VariacaoProdutoRequest.StockQuantity := Grade.NumEstoque;
+    try
+    	for var Grade in ProdutosGrade do
+    	begin
+        	VariacaoProdutoRequest := TWooVariacaoProdutoRequest.Create;
+            VariacaoProdutoRequest.RegularPrice  := FormatFloat('0.00', Grade.NumPrecoUnitario, TFormatSettings.Invariant);
+            VariacaoProdutoRequest.StockQuantity := Grade.NumEstoque;
 
-      SKUPartes := TStringList.Create;
-      try
-        SKUPartes.Add(ProdutoResponse.Name);
+            SKUPartes := TStringList.Create;
+            try
+                SKUPartes.Add(ProdutoResponse.Name);
 
-        // Itera sobre todas as variações do produto dinamicamente
-        for var I := 0 to Grade.Variacoes.Count - 1 do
-        begin
-          VariacaoProdutoRequest.AdicionarAtributo(
-            ProdutoResponse.Attributes[I].Id,
-            Grade.Variacoes[I].DscVariacao
-          );
-          SKUPartes.Add(Grade.Variacoes[I].DscVariacao);
-        end;
+                // Itera sobre todas as variações do produto dinamicamente
+                for var I := 0 to Grade.Variacoes.Count - 1 do
+                begin
+                    VariacaoProdutoRequest.AdicionarAtributo(
+                        ProdutoResponse.Attributes[I].Id,
+                        Grade.Variacoes[I].DscVariacao
+                    );
+                    SKUPartes.Add(Grade.Variacoes[I].DscVariacao);
+                end;
 
-        // SKU montado com todas as variações, independente da quantidade
-        VariacaoProdutoRequest.Sku := SubstituirEspacosPorTraco(
-          String.Join(' ', SKUPartes.ToStringArray)
+                // SKU montado com todas as variações, independente da quantidade
+                VariacaoProdutoRequest.Sku := SubstituirEspacosPorTraco(
+                    String.Join(' ', SKUPartes.ToStringArray)
+                );
+            finally
+                SKUPartes.Free;
+            end;
+
+    		BatchRequest.AdicionarVariacao(VariacaoProdutoRequest);
+    	end;
+
+        RespostaAPI := ChamadaAPIWooCommerce(
+            'products/' + ProdutoResponse.Id.ToString + '/variations/batch',
+            'POST',
+            'Variações do produto ' + ProdutoResponse.Name + ' criadas com sucesso',
+            TJson.ObjectToJsonString(BatchRequest)
         );
-      finally
-        SKUPartes.Free;
-      end;
 
-      BatchRequest.AdicionarVariacao(VariacaoProdutoRequest);
+        SalvarConteudoEmArquivo(
+        TPath.Combine(FFolderPath, 'variacoes-criadas-api.txt'),
+        RespostaAPI.ToJSON
+        );
+    finally
+        RespostaAPI.Free;
+        BatchRequest.Free;
     end;
-
-    RespostaAPI := ChamadaAPIWooCommerce(
-      'products/' + ProdutoResponse.Id.ToString + '/variations/batch',
-      'POST',
-      'Variações do produto ' + ProdutoResponse.Name + ' criadas com sucesso',
-      TJson.ObjectToJsonString(BatchRequest)
-    );
-
-    SalvarConteudoEmArquivo(
-      TPath.Combine(FFolderPath, 'variacoes-criadas-api.txt'),
-      RespostaAPI.ToJSON
-    );
-  finally
-    RespostaAPI.Free;
-    BatchRequest.Free;
-  end;
 end;
 
 procedure TfrmTela_Principal.OnFormDestroy(Sender: TObject);
 begin
-    if THorse.IsRunning then
+	if THorse.IsRunning then
     	THorse.StopListen;
 end;
 
