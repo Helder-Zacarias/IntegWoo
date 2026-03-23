@@ -89,7 +89,6 @@ type
             ValorPedido: Double): TPedidoVendaPgtos;
         function SQLToPagamentoDaVenda(Query: TUniQuery): TPedidoVendaPgtos;
         procedure SalvarParcelasDoPagamento(PedidoVenda: TPedidoVenda; Pagamento: TPedidoVendaPgtos);
-        procedure HorseAPIAtualizarProduto(Req: THorseRequest; Res: THorseResponse; Next: TProc);
         procedure OnFormDestroy(Sender: TObject);
 	private
     	FSQLProdutosBase: string;
@@ -2188,87 +2187,7 @@ begin
     	Query.Free;
     end;
 end;
-
 // Fim das funções para salvar pedido
-
-procedure TfrmTela_Principal.HorseAPIAtualizarProduto(Req: THorseRequest; Res: THorseResponse; Next: TProc);
-var
-	QuerySelect: TuniQuery;
-    QueryUpdate: TUniQuery;
-    ProdutoResposta: TWooProdutoResponse;
-    ProdutoDB: TProduto;
-begin
-    QuerySelect := nil;
-    QueryUpdate := nil;
-    ProdutoResposta := nil;
-    ProdutoDB := nil;
-
-    try
-    	try
-        	if ChecarBodyDoWebhook(Req.Body) then
-                SalvarConteudoEmArquivo(
-                    TPath.Combine(TPath.GetDocumentsPath, 'produto-payload.txt'),
-                    Req.Body
-                 );
-            ProdutoResposta :=  TJson.JsonToObject<TWooProdutoResponse>(Req.Body);
-
-
-            frmTela_Principal.Database.StartTransaction;
-
-            try
-            	QuerySelect := frmTela_Principal.CriarQuery;
-            	QuerySelect.SQL.Text :=
-            	'SELECT * FROM db_sgci.produtos WHERE ' +
-                    'COD_ID_EMPRESA = 2433 ' +
-                    'AND COD_ID_LOJA = 90 ' +
-                    'AND COD_PRODUTO = :SITE_SKU_PRODUTO';
-                QuerySelect.ParamByName('SITE_SKU_PRODUTO').AsLargeInt :=  ProdutoResposta.Sku.ToInt64;
-                QuerySelect.Open;
-
-                if QuerySelect.IsEmpty then
-                    raise Exception.Create(
-                        Format(
-                            'Não há produto cadastrado com o COD_PRODUTO %d',
-                            [ProdutoResposta.Sku.ToInteger]
-                        )
-                    );
-
-                ProdutoDB := ProdutoQueryToProduto(QuerySelect);
-                ProdutoDB.DscCompleta := ProdutoResposta.Name;
-
-                QueryUpdate := frmTela_Principal.CriarQuery;
-                QueryUpdate.SQL.Text :=
-                'UPDATE db_sgci.produtos ' +
-                'SET DSC_COMPLETA = :DSC_COMPLETA WHERE ' +
-                	'COD_ID_EMPRESA = 2433 ' +
-                	'AND COD_ID_LOJA = 90 ' +
-                    'AND COD_PRODUTO = :COD_PRODUTO';
-
-                QueryUpdate.ParamByName('DSC_COMPLETA').AsString :=  ProdutoDB.DscCompleta;
-                QueryUpdate.ParamByName('COD_PRODUTO').AsLargeInt :=  ProdutoDB.CodProduto;
-                QueryUpdate.ExecSQL;
-
-                 if QueryUpdate.RowsAffected = 0 then
-                 	raise Exception.Create('Produto não foi atualizado');
-
-                frmTela_Principal.Database.Commit;
-
-                Res.Status(THTTPStatus.OK).Send('Produto atualizado com sucesso');
-            except
-               frmTela_Principal.Database.Rollback;
-               raise;
-            end;
-    	except
-    		on E: Exception do
-        		Res.Status(THTTPStatus.InternalServerError).Send('Erro ao cadastrar usuário!\n' + E.Message);
-    	end;
-    finally
-    	QueryUpdate.Free;
-        ProdutoDB.Free;
-    	QuerySelect.Free;
-        ProdutoResposta.Free;
-    end;
-end;
 
 procedure TfrmTela_Principal.OnFormDestroy(Sender: TObject);
 begin
