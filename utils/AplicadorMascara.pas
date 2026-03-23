@@ -1,13 +1,15 @@
-unit FormatadorDocumentos;
+unit AplicadorMascara;
 
 interface
 uses
-    VCL.Dialogs;
-    function FormatarCPF(const CPF: string): string;
-    function FormatarCNPJ(const CNPJ: string): string;
+    System.SysUtils, VCL.Dialogs;
+
+function AplicarMascaraCPF(const CPF: string): string;
+function AplicarMascaraCNPJ(const CNPJ: string): string;
+function AplicarMascaraCEP(const CEP: string): string;
 implementation
 
-function FormatarCPF(const CPF: string): string;
+function AplicarMascaraCPF(const CPF: string): string;
 var
   ApenasNumeros: string;
   I: Integer;
@@ -36,7 +38,7 @@ begin
     Copy(ApenasNumeros, 10, 2);
 end;
 
-function FormatarCNPJ(const CNPJ: string): string;
+function AplicarMascaraCNPJ(const CNPJ: string): string;
 var
   ApenasNumeros: string;
   I: Integer;
@@ -64,6 +66,33 @@ begin
     Copy(ApenasNumeros, 6, 3) + '/' +
     Copy(ApenasNumeros, 9, 4) + '-' +
     Copy(ApenasNumeros, 13, 2);
+end;
+
+function AplicarMascaraCEP(const CEP: string): string;
+var
+  CepLimpo: string;
+begin
+  // Remove máscara existente
+  CepLimpo := CEP.Replace('.', '').Replace('-', '').Trim;
+
+  // Limita a 8 dígitos
+  if Length(CepLimpo) > 8 then
+    CepLimpo := Copy(CepLimpo, 1, 8);
+
+  case Length(CepLimpo) of
+    0..2:
+      Result := CepLimpo;
+
+    3..5:
+      Result := Copy(CepLimpo, 1, 2) + '.' + Copy(CepLimpo, 3, Length(CepLimpo));
+
+    6..8:
+      Result := Copy(CepLimpo, 1, 2) + '.' +
+                Copy(CepLimpo, 3, 3) + '-' +
+                Copy(CepLimpo, 6, 3);
+  else
+    Result := CepLimpo;
+  end;
 end;
 
 end.

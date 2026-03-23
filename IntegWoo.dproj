@@ -179,7 +179,7 @@
         <DCCReference Include="models\PedidoVendaItem.pas"/>
         <DCCReference Include="models\PedidoVendaPgtos.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\ClienteBilling.pas"/>
-        <DCCReference Include="utils\FormatadorDocumentos.pas"/>
+        <DCCReference Include="utils\AplicadorMascara.pas"/>
         <DCCReference Include="models\Municipio.pas"/>
         <DCCReference Include="models\Uf.pas"/>
         <DCCReference Include="webhooks-client\WooPedido.pas"/>

@@ -11,7 +11,7 @@ uses
     REST.Json, Rest.Json.Types, RESTRequest4D,
     Horse,
     AppConfig, Tela_Envio_Produto, Tela_Cadastro_Atributo,
-    FileWriter, TransformadorDeTexto, ContentPrinter, CustomObjectMapper, FormatadorDocumentos,
+    FileWriter, TransformadorDeTexto, ContentPrinter, CustomObjectMapper, AplicadorMascara,
     Produto, ProdutoGrade, ProdutoImagem, Secao, Variacao,
     Cliente, PedidoVenda, PedidoVendaItem, PedidoVendaPgtos, Municipio, Uf, Finalizadora,
     WooProdutoRequest, WooProdutoResponse,
@@ -285,14 +285,8 @@ begin
                         (not SameText(WooProdutoRequest.Sku, ProdutoRecebido.Sku))
                     then
                     begin
-                        ShowMessage(
-                            'SKU do WooCommerce: ' + ProdutoRecebido.Sku + sLineBreak +
-                            'SKU Produto Request: ' + WooProdutoRequest.SKU
-                        );
                         raise Exception.Create('SKU do produto diverge do código do produto no banco');
-                    end
-                    else
-                        ShowMessage('SKU OK');
+                    end;
 
                     SalvarConteudoEmArquivo(
                         TPath.Combine(TPath.GetDocumentsPath, 'produto-request-object.txt.'),
@@ -1296,12 +1290,12 @@ begin
         if Billing.PersonType = 'F' then
         begin
         	Query.ParamByName('NUM_TIPO').AsInteger := 0;
-        	Query.ParamByName('DSC_CPF_CNPJ').AsString := FormatarCPF(Billing.Cpf);
+        	Query.ParamByName('DSC_CPF_CNPJ').AsString := AplicarMascaraCPF(Billing.Cpf);
         end
         else
         begin
             Query.ParamByName('NUM_TIPO').AsInteger := 1;
-            Query.ParamByName('DSC_CPF_CNPJ').AsString := FormatarCNPJ(Billing.Cnpj);
+            Query.ParamByName('DSC_CPF_CNPJ').AsString := AplicarMascaraCNPJ(Billing.Cnpj);
         end;
 
         if Billing.Gender = 'F' then
@@ -1318,7 +1312,7 @@ begin
         Query.ParamByName('DSC_NUMERO').AsString := Billing.Number;
         Query.ParamByName('DSC_COMPLEMENTO').AsString := Billing.Address2;
         Query.ParamByName('DSC_BAIRRO').AsString := Billing.Neighborhood;
-        Query.ParamByName('DSC_CEP').AsString := Billing.Postcode;
+        Query.ParamByName('DSC_CEP').AsString := AplicarMascaraCEP(Billing.Postcode);
 
         if Assigned(Municipio) then
         begin
@@ -1823,14 +1817,6 @@ begin
 
         if Assigned(Result) then
         begin
-            Showmessage('Finalizadora encontrada: ' + Result.DscCompleta);
-            ShowMessage(
-                'COD_ID_FINALIZADORA: ' + Result.CodIdFinalizadora.ToString + sLineBreak +
-                'COD_ID_EMPRESA: ' + Result.CodIdEmpresa.ToString + sLineBreak +
-                'COD_ID_LOJA: ' + Result.CodIdLoja.ToString + sLineBreak +
-                'COD_ID_FINALIZADORA: ' + Result.DscCompleta + sLineBreak +
-                'COD_ID_FINALIZADORA: ' + Result.DscAbreviada
-            );
             Exit(Result);
         end;
 
@@ -2176,7 +2162,6 @@ begin
                 ')';
 
                 ParcelaID := (DateTimeToUnix(Now, False) * 1000) + Random(1000);
-                ShowMessage('Parcela ID: ' + ParcelaId.ToString);
                 ParamByNAME('COD_ID_PARCELA').AsLargeInt := ParcelaID;
                 ParamByName('COD_ID_EMPRESA').AsInteger := PedidoVenda.CodIdEmpresa;
                 ParamByName('COD_ID_LOJA').AsInteger := PedidoVenda.CodIdLoja;
@@ -2185,7 +2170,6 @@ begin
                 ParamByName('COD_ID_CLIENTE').AsInteger := PedidoVenda.CodIdCliente;
                 ParamByName('COD_ID_FINALIZADORA').AsInteger := Pagamento.CodIdFinalizadora;
                 ParamByName('DAT_LANCAMENTO').AsDateTime := Pagamento.datPagamento;
-//                ParamByName('NUM_PARCELA').AsInteger := numParcela;
 
 				// Valor de teste. Esse valor vai variar de acordo com
 				// as informações que vêm do ecommerce

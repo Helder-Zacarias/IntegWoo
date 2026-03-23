@@ -41,7 +41,7 @@ uses
   PedidoVendaItem in 'models\PedidoVendaItem.pas',
   PedidoVendaPgtos in 'models\PedidoVendaPgtos.pas',
   ClienteBilling in 'rest-client\woocommerce-api\ClienteBilling.pas',
-  FormatadorDocumentos in 'utils\FormatadorDocumentos.pas',
+  AplicadorMascara in 'utils\AplicadorMascara.pas',
   Municipio in 'models\Municipio.pas',
   Uf in 'models\Uf.pas',
   WooPedido in 'webhooks-client\WooPedido.pas',
