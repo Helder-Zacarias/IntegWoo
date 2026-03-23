@@ -45,7 +45,8 @@ uses
   Municipio in 'models\Municipio.pas',
   Uf in 'models\Uf.pas',
   WooPedido in 'webhooks-client\WooPedido.pas',
-  Finalizadora in 'models\Finalizadora.pas';
+  Finalizadora in 'models\Finalizadora.pas',
+  PedidoVendaPgtosParcelas in 'models\PedidoVendaPgtosParcelas.pas';
 
 {$R *.res}
 

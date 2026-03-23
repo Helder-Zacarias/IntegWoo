@@ -184,6 +184,7 @@
         <DCCReference Include="models\Uf.pas"/>
         <DCCReference Include="webhooks-client\WooPedido.pas"/>
         <DCCReference Include="models\Finalizadora.pas"/>
+        <DCCReference Include="models\PedidoVendaPgtosParcelas.pas"/>
         <None Include="bin\config.ini"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

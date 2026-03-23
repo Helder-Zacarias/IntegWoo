@@ -31,6 +31,7 @@ type
         btnHamburguer: TButton;
         panelSide: TPanel;
         btnEnviarProdutosMandala: TBitBtn;
+    Button1: TButton;
         procedure OnFormCreate(Sender: TObject);
         procedure RegistrarRotas;
         procedure DatabaseConnectionLost(Sender: TObject; Component: TComponent;
@@ -87,8 +88,11 @@ type
         function InserirPagamentoNoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer;
             CodIdPedido: Int64; CodIdFinalizadora: Integer; DataPagamento: TDateTime;
             ValorPedido: Double): TPedidoVendaPgtos;
+        function SQLToPagamentoDaVenda(Query: TUniQuery): TPedidoVendaPgtos;
+        procedure SalvarParcelasDoPagamento(PedidoVenda: TPedidoVenda; Pagamento: TPedidoVendaPgtos);
         procedure HorseAPIAtualizarProduto(Req: THorseRequest; Res: THorseResponse; Next: TProc);
         procedure OnFormDestroy(Sender: TObject);
+        procedure PrintTables(Sender: TObject);
 	private
     	FSQLProdutosBase: string;
         FSQLImagensBase: string;
@@ -545,12 +549,14 @@ var
     Finalizadora: TFinalizadora;
     WooPedido: TWooPedido;
     PedidoRetornado: TPedidoVenda;
+    PagamentoPedidoVenda: TPedidoVendaPgtos;
 begin
     Cliente := nil;
     Finalizadora := nil;
     WooPedido := nil;
     PedidoRetornado := nil;
     Conexao := nil;
+    PagamentoPedidoVenda := nil;
 
 	try
         CodIdEmpresa := Req.Params
@@ -601,13 +607,18 @@ begin
                 Cliente.CodIdCliente
             );
 
-            InserirPagamentoNoBanco(
+            PagamentoPedidoVenda := InserirPagamentoNoBanco(
             	CodIdEmpresa,
                 CodIdLoja,
                 PedidoRetornado.CodIdPedido,
                 Finalizadora.CodIdFinalizadora,
                 PedidoRetornado.DatPedido,
                 PedidoRetornado.NumEntregaValor
+            );
+
+            SalvarParcelasDoPagamento(
+            	PedidoRetornado,
+            	PagamentoPedidoVenda
             );
 
             Conexao.Commit;
@@ -629,6 +640,7 @@ begin
             end;
         end;
 	finally
+    	PagamentoPedidoVenda.Free;
     	Finalizadora.Free;
     	PedidoRetornado.Free;
         WooPedido.Free;
@@ -890,16 +902,14 @@ begin
                   '	COD_ID_CLIENTE,' +
                   '	DAT_PEDIDO,' +
                   '	DAT_INCLUSAO,' +
-                  '	NUM_STATUS_PEDIDO, ' +
-                  ' NUM_ENTREGA_VALOR' +
+                  '	NUM_STATUS_PEDIDO ' +
                   ') VALUES ( ' +
                   '	:COD_ID_EMPRESA, ' +
                   '	:COD_ID_LOJA, ' +
                   '	:COD_ID_CLIENTE, ' +
                   '	:DAT_PEDIDO, ' +
                   '	:DAT_INCLUSAO, ' +
-                  '	:NUM_STATUS_PEDIDO,' +
-                  ' :NUM_ENTREGA_VALOR ' +
+                  '	:NUM_STATUS_PEDIDO' +
                   ')';
 
                 ParamByName('COD_ID_EMPRESA').AsInteger := Pedido.CodIdEmpresa;
@@ -908,7 +918,6 @@ begin
                 ParamByName('DAT_PEDIDO').AsDateTime := Pedido.DatPedido;
                 ParamByName('DAT_INCLUSAO').AsDateTime := Now;
                 ParamByName('NUM_STATUS_PEDIDO').AsInteger := Pedido.NumStatusPedido;
-                ParamByName('NUM_ENTREGA_VALOR').AsFloat := Pedido.NumEntregaValor;
 
                 ExecSQL;
 
@@ -974,7 +983,6 @@ begin
         Result.CodIdEmpresa := CodIdEmpresa;
         Result.CodIdLoja := CodIdLoja;
         Result.CodIdCliente := IdCliente;
-        Result.CodIdWooCommerce := WooPedido.Id;
         Result.DatPedido := ISO8601ToDate(WooPedido.DateCreated);
         Result.DatInclusao := ISO8601ToDate(WooPedido.DateCreated);
         Result.NumEntregaValor := StrToFloat(WooPedido.Total, LSettings);
@@ -1481,6 +1489,7 @@ function TfrmTela_Principal.InserirPagamentoNoBanco(
 ): TPedidoVendaPgtos;
 var
     Query: TUniQuery;
+    PagamentoId: Int64;
 begin
 	Query := nil;
     Result := nil;
@@ -1522,14 +1531,120 @@ begin
 //          Status temporário - Deve ser definido de acordo com a situação
 //			do pagamento do pedido (Pago / Não Pago)
             ParamByName('NUM_STATUS').AsInteger := 1;
-
             ExecSQL;
+
+            SQL.Text := 'SELECT LAST_INSERT_ID() AS ID';
+            Open;
+            PagamentoId := Query.FieldByName('ID').AsLargeInt;
+            Close;
+
+            SQL.Text := 'SELECT * FROM db_sgci.pedido_venda_pgtos WHERE COD_ID_PAGAMENTO = :ID';
+            Query.ParamByName('ID').AsLargeInt := PagamentoId;
+            Query.Open;
+            Result := SQLToPagamentoDaVenda(Query);
         end;
     except
         Result.Free;
         raise;
     end;
 end;
+
+function TfrmTela_Principal.SQLToPagamentoDaVenda(Query: TUniQuery): TPedidoVendaPgtos;
+begin
+	Result := nil;
+
+    try
+    	Result := TPedidoVendaPgtos.Create;
+
+        with Query do
+        begin
+        	Result.CodIdPagamento    := FieldByName('COD_ID_PAGAMENTO').AsLargeInt;
+        	Result.CodIdEmpresa      := FieldByName('COD_ID_EMPRESA').AsInteger;
+            Result.CodIdLoja         := FieldByName('COD_ID_LOJA').AsInteger;
+            Result.CodIdPedido       := FieldByName('COD_ID_PEDIDO').AsInteger;
+            Result.CodIdFinalizadora := FieldByName('COD_ID_FINALIZADORA').AsInteger;
+            Result.NumValorPago      := FieldByName('NUM_VALOR_PAGO').AsFloat;
+            Result.DatPagamento      := FieldByName('DAT_PAGAMENTO').AsDateTime;
+            Result.NumStatus         := FieldByName('NUM_STATUS').AsInteger;
+        end;
+    except
+        Result.Free;
+        raise;
+    end;
+end;
+
+procedure TfrmTela_Principal.SalvarParcelasDoPagamento(
+	PedidoVenda: TPedidoVenda;
+	Pagamento: TPedidoVendaPgtos
+);
+var
+    Query: TUniQuery;
+    ParcelaID: Int64;
+begin
+	Query := nil;
+
+    try
+        Query := CriarQuery;
+
+        with Query do
+        begin
+        	SQL.Text :=
+            	'INSERT INTO db_sgci.pedido_venda_pgtos_parcelas (' +
+                '	COD_ID_PARCELA,' +
+                '	COD_ID_EMPRESA, ' +
+                '	COD_ID_LOJA, ' +
+                '	COD_ID_PEDIDO, ' +
+                '	COD_ID_PAGAMENTO, ' +
+                '	COD_ID_CLIENTE, ' +
+                '	COD_ID_FINALIZADORA, ' +
+                '	DAT_LANCAMENTO, ' +
+                '	NUM_PARCELAS, ' +
+                '	NUM_VALOR_PRINCIPAL,' +
+                '	NUM_VALOR_PARCELA ' +
+                ') VALUES (' +
+                '	:COD_ID_PARCELA,' +
+                '	:COD_ID_EMPRESA, ' +
+                '	:COD_ID_LOJA, ' +
+                '	:COD_ID_PEDIDO, ' +
+                '	:COD_ID_PAGAMENTO, ' +
+                '	:COD_ID_CLIENTE, ' +
+                '	:COD_ID_FINALIZADORA, ' +
+                '	:DAT_LANCAMENTO, ' +
+                '	:NUM_PARCELAS, ' +
+                '	:NUM_VALOR_PRINCIPAL,' +
+                '	:NUM_VALOR_PARCELA ' +
+                ')';
+
+                ParcelaID := (DateTimeToUnix(Now, False) * 1000) + Random(1000);
+                ShowMessage('Parcela ID: ' + ParcelaId.ToString);
+                ParamByNAME('COD_ID_PARCELA').AsLargeInt := ParcelaID;
+                ParamByName('COD_ID_EMPRESA').AsInteger := PedidoVenda.CodIdEmpresa;
+                ParamByName('COD_ID_LOJA').AsInteger := PedidoVenda.CodIdLoja;
+                ParamByName('COD_ID_PEDIDO').AsLargeInt := PedidoVenda.CodIdPedido;
+                ParamByName('COD_ID_PAGAMENTO').AsLargeInt := Pagamento.CodIdPagamento;
+                ParamByName('COD_ID_CLIENTE').AsInteger := PedidoVenda.CodIdCliente;
+                ParamByName('COD_ID_FINALIZADORA').AsInteger := Pagamento.CodIdFinalizadora;
+                ParamByName('DAT_LANCAMENTO').AsDateTime := Pagamento.datPagamento;
+//                ParamByName('NUM_PARCELA').AsInteger := numParcela;
+
+				// Valor de teste. Esse valor vai variar de acordo com
+				// as informações que vêm do ecommerce
+                ParamByName('NUM_PARCELAS').AsInteger := 1;
+                ParamByName('NUM_VALOR_PRINCIPAL').AsFloat := Pagamento.NumValorPago;
+                ParamByName('NUM_VALOR_PARCELA').AsFloat := Pagamento.NumValorPago;
+
+                ExecSQL;
+
+                SQL.Text := 'SELECT * FROM db_sgci.pedido_venda_pgtos_parcelas WHERE COD_ID_PARCELA = :ID';
+                ParamByName('ID').AsLargeInt := ParcelaID;
+                Open;
+                SaveToXML(TPath.Combine(FFolderPath, 'parcela.xml'));
+        end;
+    finally
+    	Query.Free;
+    end;
+end;
+
 // Fim das funções para salvar pedido
 
 procedure TfrmTela_Principal.HorseAPIAtualizarProduto(Req: THorseRequest; Res: THorseResponse; Next: TProc);
@@ -2165,6 +2280,26 @@ procedure TfrmTela_Principal.OnFormDestroy(Sender: TObject);
 begin
 	if THorse.IsRunning then
     	THorse.StopListen;
+end;
+
+procedure TfrmTela_Principal.PrintTables(Sender: TObject);
+var
+	Query: TUniQuery;
+    FolderPath: string;
+begin
+	Query := nil;
+    FolderPath := TPath.Combine(TPath.GetDocumentsPath, 'QUERIES-ATUALIZADAS');
+    if not TDirectory.Exists(FolderPath) then
+    	TDirectory.CreateDirectory(FolderPath);
+
+    try
+        Query := CriarQuery;
+        Query.SQL.Text := 'SELECT * FROM db_sgci.pedido_venda WHERE COD_ID_EMPRESA  = 2433 AND COD_ID_LOJA = 90';
+        Query.Open;
+        Query.SaveToXML(TPath.Combine(FolderPath, 'pedido_venda_select.xml'));
+    finally
+    	Query.Free;
+    end;
 end;
 
 end.

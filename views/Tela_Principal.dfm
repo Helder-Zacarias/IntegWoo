@@ -40,6 +40,15 @@ object frmTela_Principal: TfrmTela_Principal
       TabOrder = 0
       OnClick = btnEnviarProdutosClick
     end
+    object Button1: TButton
+      Left = 48
+      Top = 336
+      Width = 75
+      Height = 25
+      Caption = 'Button1'
+      TabOrder = 1
+      OnClick = PrintTables
+    end
   end
   object MySQL: TMySQLUniProvider
     Left = 392
