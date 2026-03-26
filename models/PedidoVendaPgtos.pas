@@ -9,6 +9,7 @@ type
 	TPedidoVendaPgtos = class
     private
     	FCOD_ID_PAGAMENTO: Int64;
+        FCOD_ID_SITE: string;
     	FCOD_ID_EMPRESA: Integer;
         FCOD_ID_LOJA: Integer;
         FCOD_ID_CAIXA: Integer;
@@ -34,8 +35,9 @@ type
         FNUM_INDC: Integer;
         FNUM_STATUS: Integer;
 
-        public
+    public
         property CodIdPagamento: Int64 read FCOD_ID_PAGAMENTO write FCOD_ID_PAGAMENTO;
+        property CodIdSite: string read FCOD_ID_SITE write FCOD_ID_SITE;
         property CodIdEmpresa: Integer read FCOD_ID_EMPRESA write FCOD_ID_EMPRESA;
         property CodIdLoja: Integer read FCOD_ID_LOJA write FCOD_ID_LOJA;
         property CodIdCaixa: Integer read FCOD_ID_CAIXA write FCOD_ID_CAIXA;
@@ -60,7 +62,7 @@ type
         property DscObservacoes: string read FDSC_OBSERVACOES write FDSC_OBSERVACOES;
         property NmIndc: Integer read FNUM_INDC write FNUM_INDC;
         property NumStatus: Integer read FNUM_STATUS write FNUM_STATUS;
-end;
+	end;
 
 implementation
 

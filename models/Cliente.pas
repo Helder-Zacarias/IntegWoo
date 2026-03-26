@@ -9,6 +9,7 @@ type
   TCliente = class
   private
     FCOD_ID_CLIENTE: Integer;
+    FCOD_ID_SITE: string;
     FCOD_ID_EMPRESA: Integer;
     FCOD_ID_LOJA: Integer;
     FCOD_CLIENTE: Integer;
@@ -33,6 +34,9 @@ type
   public
     property CodIdCliente: Integer
     	read FCOD_ID_CLIENTE write FCOD_ID_CLIENTE;
+
+    property CodIdSite: string
+        read FCOD_ID_SITE write FCOD_ID_SITE;
 
     property CodIdEmpresa: Integer
     	read FCOD_ID_EMPRESA write FCOD_ID_EMPRESA;

@@ -5,7 +5,7 @@ interface
 uses
 	Winapi.Windows, Winapi.Messages,
     System.SysUtils, System.Variants, System.Classes, System.IOUtils, System.NetEncoding,
-    System.Generics.Collections, System.JSON, System.IniFiles, System.Threading, System.DateUtils,
+    System.Generics.Defaults, System.Generics.Collections, System.JSON, System.IniFiles, System.Threading, System.DateUtils,
     Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Buttons, Vcl.ExtCtrls,
     Data.DB, Uni, UniProvider, MySQLUniProvider, DBAccess, MemData, MemDS,
     REST.Json, Rest.Json.Types, RESTRequest4D,
@@ -31,13 +31,16 @@ type
         btnHamburguer: TButton;
         panelSide: TPanel;
         btnEnviarProdutosMandala: TBitBtn;
+    Button1: TButton;
         procedure OnFormCreate(Sender: TObject);
         procedure RegistrarRotas;
         procedure DatabaseConnectionLost(Sender: TObject; Component: TComponent;
         	ConnLostCause: TConnLostCause; var RetryMode: TRetryMode);
         procedure btnHamburguerClick(Sender: TObject);
         procedure btnEnviarProdutosClick(Sender: TObject);
+        function SQLToProduto(Query: TUniQuery): TProduto;
         function CriarQuery: TUniQuery;
+        function BuscarProdutoPorIdDoWoocommerce(CodIdSite: string): TWooProdutoResponse;
         function BuscarProdutoPorSKU(SKU: string): TWooProdutoResponse;
         function ChecarERetornarJSONArray(JSONResponse: TJSONValue): TJSONArray;
         function ChamadaAPIWooCommerce(Resource: string; Metodo: string;
@@ -62,26 +65,32 @@ type
         function CriarCategoria(Secao: TSecao): TWooCategoriaResponse;
         function EnviarProduto(ProdutoRequest: TWooProdutoRequest;
         	ProdutoRecebido: TWooProdutoResponse): TWooProdutoResponse;
+        procedure SalvarCodIdSiteDoProduto(CodIdSite: string; CodIdProduto: Integer; CodProduto: Int64;
+        	CodIdEmpresa: Integer; CodIdLoja: Integer);
         procedure CriarVariacoesDoProduto(ProdutoResponse:
         	TWooProdutoResponse; ProdutosGrade: TObjectList<TProdutoGrade>);
         procedure HorseAPISalvarPedido(Req: THorseRequest; Res: THorseResponse; Next: TProc);
         function ChecarBodyDoWebHook(ReqBody: string): Boolean;
-        function BuscarOuInserirClienteNoBanco(Billing: TBilling; CodIdEmpresa: Integer;
-        	CodIdLoja: Integer): TCliente;
+        function BuscarOuInserirClienteNoBanco(CodIdSite: string; Billing: TBilling;
+        	CodIdEmpresa: Integer; CodIdLoja: Integer): TCliente;
+        function BuscarClienteNoBanco(CodIdSite: string; CodIdEmpresa: Integer;
+        	CodIdLoja: Integer; CPF: string; CNPJ: string): TCliente;
+        function SQLToCliente(Query: TUniQuery; IdCliente: Integer = 0): TCliente;
         function BuscarMunicipio(Municipio: string): TMunicipio;
-        function SalvarPedidoNoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer;
+        function BuscarOuInserirPedidoVendaNoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer;
         	WooPedido: TWooPedido; Cliente: TCliente): TPedidoVenda;
+        function BuscarPedidoVendaNoBanco(CodIdPedidoSite: string; CodIdEmpresa: Integer;
+        	CodIdLoja: Integer): TPedidoVenda;
+        function ChecarStatusDoPedido(Status: string): Integer;
         function SQLToPedidoVenda(Query: TUniQuery): TPedidoVenda;
-        function WooPedidoToPedidoVenda(CodIdEmpresa: Integer; CodIdLoja: Integer;
-        	WooPedido: TWooPedido; IdCliente: Integer): TPedidoVenda;
         function RetornarItensDoPedidoDeVenda(Itens: TArray<TLineItem>; CodIdEmpresa: Integer;
         	CodIdLoja: Integer; CodIdPedido: Int64): TArray<TPedidoVendaItem>;
         function BuscarProdutoNoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer;
-        	SKU: Int64): TProduto;
+        	CodIdSite: string; SKU: Int64): TProduto;
         procedure SalvarProdutosDoPedido(ProdutosPedido: TArray<TPedidoVendaItem>);
         function BuscarOuInserirFinalizadora(PaymentMethod: string; PaymentMethodTitle: string;
         	CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdCliente: Integer): TFinalizadora;
-        function BuscarFinalizadorasDoBanco(MetodoPagamento: string; CodIdEmpresa: Integer;
+        function BuscarFinalizadorasDoBanco(CodIdSite: string; CodIdEmpresa: Integer;
         	CodIdLoja: Integer): TFinalizadora;
         function SQLToFinalizadora(Query: TUniQuery): TFinalizadora;
         function InserirPagamentoNoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer;
@@ -90,6 +99,7 @@ type
         function SQLToPagamentoDaVenda(Query: TUniQuery): TPedidoVendaPgtos;
         procedure SalvarParcelasDoPagamento(PedidoVenda: TPedidoVenda; Pagamento: TPedidoVendaPgtos);
         procedure OnFormDestroy(Sender: TObject);
+        procedure ShowTables(Sender: TObject);
 	private
     	FSQLProdutosBase: string;
         FSQLImagensBase: string;
@@ -165,16 +175,17 @@ begin
     	with QueryProdutos do
     	begin
         	SQL.Text :=
-                'SELECT pd.COD_ID_PRODUTO, ' +
-                'pd.COD_ID_EMPRESA, ' +
-                'pd.COD_ID_LOJA, ' +
-                'pd.COD_PRODUTO, ' +
-                'pd.COD_BARRAS, ' +
-                'pd.COD_ID_GRADE, ' +
-                'pd.COD_ID_SECAO, ' +
-                'pd.DSC_COMPLETA, ' +
-                'pd.NUM_TIPO_PRODUTO, ' +
-                'pr.NUM_PRECO_VAREJO AS PRECO_VAREJO, ' +
+                'SELECT pd.COD_ID_PRODUTO,' +
+                '	pd.COD_ID_EMPRESA,' +
+                '	pd.COD_ID_LOJA,' +
+                '	pd.COD_ID_SITE,' +
+                '	pd.COD_PRODUTO,' +
+                '	pd.COD_BARRAS,' +
+                '	pd.COD_ID_GRADE,' +
+                '	pd.COD_ID_SECAO,' +
+                '	pd.DSC_COMPLETA,' +
+                '	pd.NUM_TIPO_PRODUTO, ' +
+                '	pr.NUM_PRECO_VAREJO AS PRECO_VAREJO, ' +
                 'CASE WHEN pd.NUM_CONTROLA_ESTOQUE = 1 THEN ' +
                     'CASE WHEN lj.NUM_TIPO_ESTABELECIMENTO = 0 THEN ' +
                         'CASE WHEN emp.NUM_CAD_FILIAIS_UNIFICADO = 1 THEN ' +
@@ -202,55 +213,49 @@ begin
                         	'pd.COD_ID_LOJA, pd.COD_ID_PRODUTO), 0.00) ' +
                     'END ' +
                 'ELSE ' +
-                    '0.000 ' +
+                '	0.000 ' +
                 'END AS ESTOQUE_ATUAL ' +
                 'FROM db_sgci.produtos pd ' +
                 'INNER JOIN db_sgci.precos pr ' +
-                    'ON pd.COD_ID_PRODUTO = pr.COD_ID_PRODUTO ' +
-                    'AND pd.COD_ID_EMPRESA = pr.COD_ID_EMPRESA ' +
-                    'AND pd.COD_ID_LOJA = pr.COD_ID_LOJA ' +
+                '	ON pd.COD_ID_PRODUTO  = pr.COD_ID_PRODUTO ' +
+                '	AND pd.COD_ID_EMPRESA = pr.COD_ID_EMPRESA ' +
+                '	AND pd.COD_ID_LOJA    = pr.COD_ID_LOJA ' +
                 'LEFT JOIN db_sgci.estoques e ' +
-                    'ON pd.COD_ID_PRODUTO = e.COD_ID_PRODUTO ' +
-                    'AND pd.COD_ID_EMPRESA = e.COD_ID_EMPRESA ' +
-                    'AND pd.COD_ID_LOJA = e.COD_ID_LOJA ' +
+                '	ON pd.COD_ID_PRODUTO  = e.COD_ID_PRODUTO ' +
+                '	AND pd.COD_ID_EMPRESA = e.COD_ID_EMPRESA ' +
+                '	AND pd.COD_ID_LOJA    = e.COD_ID_LOJA ' +
                 'INNER JOIN db_sgci.empresas emp ' +
-                    'ON emp.COD_ID_EMPRESA = pd.COD_ID_EMPRESA ' +
+                '	ON emp.COD_ID_EMPRESA = pd.COD_ID_EMPRESA ' +
                 'INNER JOIN db_sgci.lojas lj ' +
-                    'ON lj.COD_ID_EMPRESA = pd.COD_ID_EMPRESA ' +
-                    'AND lj.COD_ID_LOJA = pd.COD_ID_LOJA ' +
+                '	ON lj.COD_ID_EMPRESA = pd.COD_ID_EMPRESA ' +
+                '	AND lj.COD_ID_LOJA   = pd.COD_ID_LOJA ' +
                 'WHERE pd.COD_ID_EMPRESA = 2433 ' +
-                    'AND pd.COD_ID_LOJA = 90 ' +
+                '	AND pd.COD_ID_LOJA   = 90 ' +
+                '	AND NUM_TIPO_PRODUTO != 5 ' +
                 'LIMIT 5';
             Open;
-            SaveToXML(TPath.Combine(TPath.GetDocumentsPath, 'produto-com-preco-e-estoque.xml'));
+            SaveToXML(TPath.Combine(FFolderPath, 'produto-com-preco-e-estoque.xml'));
 
             while not Eof do
             begin
-                ProdutoDB := nil;
-                WooProdutoRequest := nil;
-                Atributos := nil;
-                CategoriaResponse := nil;
+                ProdutoDB           := nil;
+                WooProdutoRequest   := nil;
+                Atributos           := nil;
+                CategoriaResponse   := nil;
                 ListaImagensRequest := nil;
-                Secao := nil;
-                TermosProduto := nil;
-                WooProdutoResponse := nil;
-                ProdutosGrade := nil;
+                Secao               := nil;
+                TermosProduto       := nil;
+                WooProdutoResponse  := nil;
+                ProdutosGrade       := nil;
 
             	try
-                    ProdutoDB := TProduto.Create;
-                    ProdutoDB.CodIdProduto := FieldByName('COD_ID_PRODUTO').AsInteger;
-                    ProdutoDB.CodIdEmpresa := FieldByName('COD_ID_EMPRESA').AsInteger;
-                    ProdutoDB.CodIdLoja := FieldByName('COD_ID_LOJA').AsInteger;
-                    ProdutoDB.CodProduto := FieldByName('COD_PRODUTO').AsLargeInt;
-                    ProdutoDB.CodBarras := FieldByName('COD_BARRAS').AsString;
-                    ProdutoDB.CodIdGrade := FieldByName('COD_ID_GRADE').AsInteger;
-                    ProdutoDB.CodIdSecao := FieldByName('COD_ID_SECAO').AsInteger;
-                    ProdutoDB.DscCompleta := FieldByName('DSC_COMPLETA').AsString;
-                    ProdutoDB.NumTipoProduto := FieldByName('NUM_TIPO_PRODUTO').AsInteger;
-                    ProdutoDB.NumPrecoVarejo := FieldByName('PRECO_VAREJO').AsCurrency;
-                    ProdutoDB.NumEstqAtual := FieldByName('ESTOQUE_ATUAL').AsFloat;
+                    ProdutoDB := SQLToProduto(QueryProdutos);
 
-                    ProdutoRecebido := BuscarProdutoPorSKU(ProdutoDB.CodProduto.ToString);
+                    if not ProdutoDB.CodIdSite.IsEmpty then
+                    	ProdutoRecebido := BuscarProdutoPorIdDoWoocommerce(ProdutoDB.CodIdSite);
+
+                    if not Assigned(ProdutoDB) then
+                    	ProdutoRecebido := BuscarProdutoPorSKU(ProdutoDB.CodProduto.ToString);
 
                     if ProdutoDB.NumTipoProduto <> 5 then
                         TipoProduto := 'simple'
@@ -287,15 +292,19 @@ begin
                         raise Exception.Create('SKU do produto diverge do código do produto no banco');
                     end;
 
-                    SalvarConteudoEmArquivo(
-                        TPath.Combine(TPath.GetDocumentsPath, 'produto-request-object.txt.'),
-                        TJson.ObjectToJsonString(WooProdutoRequest)
-                    );
-
                     WooProdutoResponse := EnviarProduto(
                         WooProdutoRequest,
                         ProdutoRecebido
                     );
+
+                    if ProdutoDB.CodIdSite.IsEmpty then
+                    	SalvarCodIdSiteDoProduto(
+                        	WooProdutoResponse.Id.ToString,
+                        	ProdutoDB.CodIdProduto,
+                        	ProdutoDB.CodProduto,
+                        	ProdutoDB.CodIdEmpresa,
+                        	ProdutoDB.CodIdLoja
+                    	);
 
                     if WooProdutoResponse.PType = 'variable' then
                         CriarVariacoesDoProduto(WooProdutoResponse, ProdutosGrade);
@@ -318,6 +327,34 @@ begin
     end;
 end;
 
+function TfrmTela_Principal.SQLToProduto(Query: TUniQuery): TProduto;
+begin
+	Result := nil;
+
+    try
+        with Query do
+        begin
+        	Result                := TProduto.Create;
+            Result.CodIdProduto   := FieldByName('COD_ID_PRODUTO').AsInteger;
+            Result.CodIdEmpresa   := FieldByName('COD_ID_EMPRESA').AsInteger;
+            Result.CodIdSite      := FieldByName('COD_ID_SITE').AsString;
+            Result.CodIdLoja      := FieldByName('COD_ID_LOJA').AsInteger;
+            Result.CodProduto     := FieldByName('COD_PRODUTO').AsLargeInt;
+            Result.CodBarras      := FieldByName('COD_BARRAS').AsString;
+            Result.CodIdGrade     := FieldByName('COD_ID_GRADE').AsInteger;
+            Result.CodIdSecao     := FieldByName('COD_ID_SECAO').AsInteger;
+            Result.DscCompleta    := FieldByName('DSC_COMPLETA').AsString;
+            Result.NumTipoProduto := FieldByName('NUM_TIPO_PRODUTO').AsInteger;
+            Result.NumPrecoVarejo := FieldByName('PRECO_VAREJO').AsCurrency;
+            Result.NumEstqAtual   := FieldByName('ESTOQUE_ATUAL').AsFloat;
+        end;
+
+    except
+        Result.Free;
+        raise;
+    end;
+end;
+
 function TfrmTela_Principal.CriarQuery: TUniQuery;
 begin
 	if not Assigned(Database) then
@@ -325,6 +362,41 @@ begin
 
     Result := TUniQuery.Create(nil);
     Result.Connection := Database;
+end;
+
+function TfrmTela_Principal.BuscarProdutoPorIdDoWoocommerce(CodIdSite: string): TWooProdutoResponse;
+var
+    JSONArray: TJSONArray;
+begin
+    JSONArray := nil;
+    Result := nil;
+
+    try
+    	try
+            JSONArray := ChecarERetornarJSONArray(
+                ChamadaAPIWooCommerce(
+                    Format('products/%s', [CodIdSite]),
+                    'GET'
+                )
+            );
+
+            if JSONArray.Count > 1 then
+                raise Exception.Create('Há mais de um produto com ID ' + CodIdSite);
+
+            for var Resposta in JSONArray AS TJSONArray do
+            	Result := TJson.JsonToObject<TwooProdutoResponse>(Resposta.ToJSON);
+
+            SalvarConteudoEmArquivo(
+                TPath.Combine(FFolderPath, 'produto-por-id.txt'),
+                JSONArray.ToJSON
+            );
+        except
+            Result.Free;
+            raise;
+        end;
+    finally
+    	JSONArray.Free;
+    end;
 end;
 
 function TfrmTela_Principal.BuscarProdutoPorSKU(SKU: string): TWooProdutoResponse;
@@ -349,7 +421,10 @@ begin
             for var Resposta in JSONArray AS TJSONArray do
             	Result := TJson.JsonToObject<TwooProdutoResponse>(Resposta.ToJSON);
 
-            SalvarConteudoEmArquivo(TPath.Combine(TPath.GetDocumentsPath, 'produto-por-sku.txt'), JSONArray.ToJSON);
+            SalvarConteudoEmArquivo(
+                TPath.Combine(FFolderPath, 'produto-por-sku.txt'),
+                JSONArray.ToJSON
+            );
         except
         	Result.Free;
             raise;
@@ -1007,6 +1082,43 @@ begin
     end;
 end;
 
+procedure TfrmTela_Principal.SalvarCodIdSiteDoProduto(
+	CodIdSite: string;
+    CodIdProduto: Integer;
+    CodProduto: Int64;
+	CodIdEmpresa: Integer;
+	CodIdLoja: Integer);
+var
+	Query: TUniQuery;
+begin
+	Query := nil;
+
+    try
+        Query := CriarQuery;
+
+        with Query do
+        begin
+            SQL.Text :=
+            'UPDATE db_sgci.produtos ' +
+            'SET COD_ID_SITE = :COD_ID_SITE '+
+            'WHERE COD_ID_PRODUTO  = :COD_ID_PRODUTO' +
+            '	AND COD_PRODUTO    = :COD_PRODUTO' +
+            '	AND COD_ID_EMPRESA = :COD_ID_EMPRESA' +
+            '	AND COD_ID_LOJA    = :COD_ID_LOJA';
+
+            ParamByName('COD_ID_SITE').AsString := CodIdSite;
+            ParamByName('COD_ID_PRODUTO').AsInteger := CodIdProduto;
+            ParamByName('COD_PRODUTO').AsLargeInt := CodProduto;
+            ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
+            ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
+
+            ExecSql;
+        end;
+    finally
+    	Query.Free;
+    end;
+end;
+
 // ============================================================
 // MUDANÇA 3: CriarVariacoesDoProduto substituiu os dois blocos
 // fixos de AdicionarAtributo e o GerarSKUVariacao(a, b) por
@@ -1108,15 +1220,24 @@ begin
         CodIdEmpresa := Req.Params
             .Field('codIdEmpresa')
             .Required(True)
-            .RequiredMessage('"codIdEmpresa" não foi recebido na URL da requisição').AsInteger;
+            .RequiredMessage('"codIdEmpresa" não foi recebido na URL da requisição')
+            .AsInteger;
 
         CodIdLoja := Req.Params
             .Field('codIdLoja')
             .Required(True)
-            .RequiredMessage('"codIdLoja" não foi recebido na URL da requisição').AsInteger;
+            .RequiredMessage('"codIdLoja" não foi recebido na URL da requisição')
+            .AsInteger;
 
         ChecarBodyDoWebHook(Req.Body);
         WooPedido := TJSON.JsonToObject<TWooPedido>(Req.Body);
+
+        SalvarConteudoEmArquivo(
+                TPath.Combine(TPath.GetDocumentsPath, 'PEDIDO-WOOCOMMERCE.txt'),
+                TJson.ObjectToJsonString(WooPedido)
+            );
+
+        ShowMessage('Id do pedido WOOCOMMERCE:' + WooPedido.Id.ToString);
 
         Conexao := Database;
 
@@ -1124,16 +1245,28 @@ begin
             Conexao.StartTransaction;
 
             Cliente := BuscarOuInserirClienteNoBanco(
+                WooPedido.CustomerId.ToString,
                 WooPedido.Billing,
                 CodIdEmpresa,
                 CodIdLoja
             );
 
-            PedidoRetornado := SalvarPedidoNoBanco(
+            ShowMessage(
+            	'Cliente salvo com sucesso' +sLineBreak +
+                'ID_CLIENTE: ' + Cliente.CodIdCliente.ToString
+            );
+
+            PedidoRetornado := BuscarOuInserirPedidoVendaNoBanco(
             	CodIdEmpresa,
                 CodIdLoja,
                 WooPedido,
                 Cliente
+            );
+
+            ShowMessage(
+            	'Pedido salvo com sucesso:' + sLineBreak +
+                'COD_ID_PEDIDO: ' + PedidoRetornado.CodIdPedido.ToString + sLineBreak +
+                'COD_ID_PEDIDO_SITE: ' + PedidoRetornado.CodIdPedidoSite
             );
 
             ProdutosPedido := RetornarItensDoPedidoDeVenda(
@@ -1143,7 +1276,11 @@ begin
                 PedidoRetornado.CodIdPedido
             );
 
+            ShowMessage('Produtos retornados com sucesso');
+
             SalvarProdutosDoPedido(ProdutosPedido);
+
+            ShowMessage('Produtos salvo com sucesso');
 
             Finalizadora := BuscarOuInserirFinalizadora(
                 WooPedido.PaymentMethod,
@@ -1152,6 +1289,8 @@ begin
                 CodIdLoja,
                 Cliente.CodIdCliente
             );
+
+            ShowMessage('Finalizadora salva com sucesso');
 
             PagamentoPedidoVenda := InserirPagamentoNoBanco(
             	CodIdEmpresa,
@@ -1165,17 +1304,16 @@ begin
                 )
             );
 
+            ShowMessage('Pagamento salvo com sucesso');
+
             SalvarParcelasDoPagamento(
             	PedidoRetornado,
             	PagamentoPedidoVenda
             );
 
-            Conexao.Commit;
+            ShowMessage('Parcela salva com sucesso');
 
-            SalvarConteudoEmArquivo(
-                TPath.Combine(TPath.GetDocumentsPath, 'PEDIDO-WOOCOMMERCE.txt'),
-                TJson.ObjectToJsonString(WooPedido)
-            );
+            Conexao.Commit;
 
             Res.Status(THTTPStatus.Created)
             	.Send('Pedido criado com sucesso!');
@@ -1221,6 +1359,7 @@ else
 end;
 
 function TfrmTela_Principal.BuscarOuInserirClienteNoBanco(
+	CodIdSite: string;
     Billing: TBilling;
     CodIdEmpresa: Integer;
     CodIdLoja: Integer
@@ -1232,8 +1371,23 @@ var
 begin
     Query := CriarQuery;
 	Municipio := nil;
+    Result := nil;
 
 	try
+        Result := BuscarClienteNoBanco(
+            CodIdSite,
+            CodIdEmpresa,
+            CodIdLoja,
+            Billing.Cpf,
+            Billing.Cnpj
+        );
+
+        if Assigned(Result) then
+        begin
+            ShowMessage('Cliente encontrado no banco');
+            Exit(Result);
+        end;
+
     	Municipio := BuscarMunicipio(Billing.City);
 
         if not Assigned(Municipio) then
@@ -1241,59 +1395,62 @@ begin
 
 		Query.SQL.Text :=
             'INSERT INTO db_sgci.clientes ( ' +
-            '    COD_ID_EMPRESA, ' +
-            '    COD_ID_LOJA, ' +
-            '    NUM_TIPO, ' +
-            '    NUM_SEXO, ' +
-            '    DSC_NOME, ' +
-            '    DSC_ENDERECO, ' +
-            '    DSC_NUMERO, ' +
-            '    DSC_COMPLEMENTO, ' +
-            '    DSC_BAIRRO, ' +
-            '    COD_ID_UF, ' +
-            '    COD_ID_MUNICIPIO, ' +
-            '    DSC_CEP, ' +
-            '    DSC_TELEFONE, ' +
-            '    DSC_CELULAR, ' +
-            '    DSC_CPF_CNPJ, ' +
-            '    DSC_EMAIL, ' +
-            '    DAT_NASCIMENTO, ' +
-            '    DSC_IE, ' +
-            '    DAT_CADASTRO ' +
+            '	COD_ID_EMPRESA, ' +
+            '   COD_ID_LOJA, ' +
+            '	COD_ID_SITE,' +
+            '   NUM_TIPO, ' +
+            '   NUM_SEXO, ' +
+            '   DSC_NOME, ' +
+            '   DSC_ENDERECO, ' +
+            '   DSC_NUMERO, ' +
+            '   DSC_COMPLEMENTO, ' +
+            '   DSC_BAIRRO, ' +
+            '   COD_ID_UF, ' +
+            '   COD_ID_MUNICIPIO, ' +
+            '   DSC_CEP, ' +
+            '   DSC_TELEFONE, ' +
+            '   DSC_CELULAR, ' +
+            '   DSC_CPF_CNPJ, ' +
+            '   DSC_EMAIL, ' +
+            '   DAT_NASCIMENTO, ' +
+            '   DSC_IE, ' +
+            '   DAT_CADASTRO ' +
             ') VALUES ( ' +
-            '    :COD_ID_EMPRESA, ' +
-            '    :COD_ID_LOJA, ' +
-            '    :NUM_TIPO, ' +
-            '    :NUM_SEXO, ' +
-            '    :DSC_NOME, ' +
-            '    :DSC_ENDERECO, ' +
-            '    :DSC_NUMERO, ' +
-            '    :DSC_COMPLEMENTO, ' +
-            '    :DSC_BAIRRO, ' +
-            '    :COD_ID_UF, ' +
-            '    :COD_ID_MUNICIPIO, ' +
-            '    :DSC_CEP, ' +
-            '    :DSC_TELEFONE, ' +
-            '    :DSC_CELULAR, ' +
-            '    :DSC_CPF_CNPJ, ' +
-            '    :DSC_EMAIL, ' +
-            '    :DAT_NASCIMENTO, ' +
-            '    :DSC_IE, ' +
-            '    NOW() ' +
+            '   :COD_ID_EMPRESA, ' +
+            '	:COD_ID_SITE,' +
+            '   :COD_ID_LOJA, ' +
+            '   :NUM_TIPO, ' +
+            '   :NUM_SEXO, ' +
+            '   :DSC_NOME, ' +
+            '   :DSC_ENDERECO, ' +
+            '   :DSC_NUMERO, ' +
+            '   :DSC_COMPLEMENTO, ' +
+            '   :DSC_BAIRRO, ' +
+            '   :COD_ID_UF, ' +
+            '   :COD_ID_MUNICIPIO, ' +
+            '   :DSC_CEP, ' +
+            '   :DSC_TELEFONE, ' +
+            '   :DSC_CELULAR, ' +
+            '   :DSC_CPF_CNPJ, ' +
+            '   :DSC_EMAIL, ' +
+            '   :DAT_NASCIMENTO, ' +
+            '   :DSC_IE, ' +
+            '   NOW() ' +
             ') ON DUPLICATE KEY UPDATE ' +
             '    COD_CLIENTE = LAST_INSERT_ID(COD_CLIENTE)';
 
         Query.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
-        Query.ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
+        Query.ParamByName('COD_ID_LOJA').AsInteger    := CodIdLoja;
+        Query.ParamByName('COD_ID_SITE').AsString     := CodIdSite;
 
         if Billing.PersonType = 'F' then
         begin
-        	Query.ParamByName('NUM_TIPO').AsInteger := 0;
+        	Query.ParamByName('NUM_TIPO').AsInteger    := 0;
         	Query.ParamByName('DSC_CPF_CNPJ').AsString := AplicarMascaraCPF(Billing.Cpf);
         end
         else
         begin
-            Query.ParamByName('NUM_TIPO').AsInteger := 1;
+            Query.ParamByName('NUM_TIPO').AsInteger    := 1;
             Query.ParamByName('DSC_CPF_CNPJ').AsString := AplicarMascaraCNPJ(Billing.Cnpj);
         end;
 
@@ -1307,11 +1464,11 @@ begin
         Query.ParamByName('DSC_NOME').AsString :=
         	Trim(Billing.FirstName + ' ' + Billing.LastName);
 
-        Query.ParamByName('DSC_ENDERECO').AsString := Billing.Address1;
-        Query.ParamByName('DSC_NUMERO').AsString := Billing.Number;
+        Query.ParamByName('DSC_ENDERECO').AsString    := Billing.Address1;
+        Query.ParamByName('DSC_NUMERO').AsString      := Billing.Number;
         Query.ParamByName('DSC_COMPLEMENTO').AsString := Billing.Address2;
-        Query.ParamByName('DSC_BAIRRO').AsString := Billing.Neighborhood;
-        Query.ParamByName('DSC_CEP').AsString := AplicarMascaraCEP(Billing.Postcode);
+        Query.ParamByName('DSC_BAIRRO').AsString      := Billing.Neighborhood;
+        Query.ParamByName('DSC_CEP').AsString         := AplicarMascaraCEP(Billing.Postcode);
 
         if Assigned(Municipio) then
         begin
@@ -1355,29 +1512,95 @@ begin
         ClienteID := Query.FieldByName('ID').AsInteger;
         Query.Close;
 
-        Query.SQL.Text := 'SELECT * FROM db_sgci.clientes WHERE COD_CLIENTE = :ID';
+        Query.SQL.Text := 'SELECT * FROM db_sgci.clientes WHERE COD_ID_CLIENTE = :ID';
         Query.ParamByName('ID').AsInteger := ClienteID;
         Query.Open;
 
-        Result 				   := TCliente.Create;
-        Result.CodIdCliente    := ClienteID;
-        Result.CodIdEmpresa    := Query.FieldByName('COD_ID_EMPRESA').AsInteger;
-        Result.CodIdLoja       := Query.FieldByName('COD_ID_LOJA').AsInteger;
-        Result.CodCliente      := Query.FieldByName('COD_CLIENTE').AsInteger;
-        Result.DscNome         := Query.FieldByName('DSC_NOME').AsString;
-        Result.DscCpfCnpj      := Query.FieldByName('DSC_CPF_CNPJ').AsString;
-        Result.DscEmail        := Query.FieldByName('DSC_EMAIL').AsString;
-        Result.DscTelefone     := Query.FieldByName('DSC_TELEFONE').AsString;
-        Result.DscCelular      := Query.FieldByName('DSC_CELULAR').AsString;
-        Result.DscEndereco     := Query.FieldByName('DSC_ENDERECO').AsString;
-        Result.DscNumero       := Query.FieldByName('DSC_NUMERO').AsString;
-        Result.DscComplemento  := Query.FieldByName('DSC_COMPLEMENTO').AsString;
-        Result.DscBairro       := Query.FieldByName('DSC_BAIRRO').AsString;
-        Result.CodCep          := Query.FieldByName('DSC_CEP').AsString;
-        Result.DatInclusao     := Query.FieldByName('DAT_CADASTRO').AsDateTime;
+        Result := SQLToCliente(Query, ClienteID);
 	finally
     	Query.Free;
 	end;
+end;
+
+function TfrmTela_Principal.BuscarClienteNoBanco(
+    CodIdSite: string;
+    CodIdEmpresa: Integer;
+    CodIdLoja: Integer;
+    CPF: string;
+	CNPJ: string
+): TCliente;
+var
+	Query: TUniQuery;
+begin
+    Query := nil;
+    Result := nil;
+
+    try
+        Query := CriarQuery;
+
+        try
+        	with Query do
+            begin
+                SQL.Text :=
+                    'SELECT * FROM db_sgci.clientes ' +
+                    'WHERE COD_ID_EMPRESA = :COD_ID_EMPRESA' +
+                    '	AND COD_ID_LOJA   = :COD_ID_LOJA' +
+                    '	AND COD_ID_SITE   = :COD_ID_SITE' +
+                    '	AND DSC_CPF_CNPJ  = COALESCE(:CPF, :CNPJ)';
+
+                ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
+                ParamByName('COD_ID_LOJA').AsInteger    := CodIdLoja;
+                ParamByName('COD_ID_SITE').AsString     := CodIdSite;
+
+                if (CPF <> '') and (CNPJ = '') then
+                    ParamByName('CPF').AsString := AplicarMascaraCPF(CPF)
+                else
+                    ParamByName('CNPJ').AsString := AplicarMascaraCNPJ(CNPJ)
+        	end;
+
+            Query.Open;
+
+            if Query.IsEmpty then
+            	Exit;
+
+            Result := SQLToCliente(Query);
+        except
+            Result.Free;
+            raise;
+        end;
+    finally
+        Query.Free;
+    end;
+end;
+
+function TfrmTela_Principal.SQLToCliente(
+    Query: TUniQuery;
+	IdCliente: Integer = 0
+): TCliente;
+begin
+	with Query do
+    begin
+    	Result := TCliente.Create;
+
+        if IdCliente <> 0 then
+        	Result.CodIdCliente := FieldByName('COD_ID_CLIENTE').AsInteger;
+
+        Result.CodIdSite       := FieldByName('COD_ID_SITE').AsString;
+        Result.CodIdEmpresa    := FieldByName('COD_ID_EMPRESA').AsInteger;
+        Result.CodIdLoja       := FieldByName('COD_ID_LOJA').AsInteger;
+        Result.CodCliente      := FieldByName('COD_CLIENTE').AsInteger;
+        Result.DscNome         := FieldByName('DSC_NOME').AsString;
+        Result.DscCpfCnpj      := FieldByName('DSC_CPF_CNPJ').AsString;
+        Result.DscEmail        := FieldByName('DSC_EMAIL').AsString;
+        Result.DscTelefone     := FieldByName('DSC_TELEFONE').AsString;
+        Result.DscCelular      := FieldByName('DSC_CELULAR').AsString;
+        Result.DscEndereco     := FieldByName('DSC_ENDERECO').AsString;
+        Result.DscNumero       := FieldByName('DSC_NUMERO').AsString;
+        Result.DscComplemento  := FieldByName('DSC_COMPLEMENTO').AsString;
+        Result.DscBairro       := FieldByName('DSC_BAIRRO').AsString;
+        Result.CodCep          := FieldByName('DSC_CEP').AsString;
+        Result.DatInclusao     := FieldByName('DAT_CADASTRO').AsDateTime;
+    end;
 end;
 
 function TfrmTela_Principal.BuscarMunicipio(Municipio: string): TMunicipio;
@@ -1399,13 +1622,13 @@ begin
         		ParamByName('DSC_MUNICIPIO').AsString := Municipio;
                 Open;
 
-            	Result := TMunicipio.Create;
-                Result.CodIdMunicipio := FieldByName('COD_ID_MUNICIPIO').AsInteger;
-                Result.CodIdUf := FieldByName('COD_ID_UF').AsInteger;
-                Result.CodUf := FieldByName('COD_UF').AsInteger;
+            	Result                  := TMunicipio.Create;
+                Result.CodIdMunicipio   := FieldByName('COD_ID_MUNICIPIO').AsInteger;
+                Result.CodIdUf          := FieldByName('COD_ID_UF').AsInteger;
+                Result.CodUf            := FieldByName('COD_UF').AsInteger;
                 Result.CodMunicipioIbge := FieldByName('COD_MUNICIPIO_IBGE').AsInteger;
-                Result.DscMunicipio := FieldByName('DSC_MUNICIPIO').AsString;
-                Result.DscChave := FieldByName('DSC_CHAVE').AsString;
+                Result.DscMunicipio     := FieldByName('DSC_MUNICIPIO').AsString;
+                Result.DscChave         := FieldByName('DSC_CHAVE').AsString;
             end;
         except
             Result.Free;
@@ -1416,7 +1639,7 @@ begin
     end;
 end;
 
-function TfrmTela_Principal.SalvarPedidoNoBanco(
+function TfrmTela_Principal.BuscarOuInserirPedidoVendaNoBanco(
 	CodIdEmpresa: Integer;
     CodIdLoja: Integer;
     WooPedido: TWooPedido;
@@ -1432,12 +1655,17 @@ begin
     Result := nil;
 
 	try
-    	Pedido := WooPedidoToPedidoVenda(
+        Result := BuscarPedidoVendaNoBanco(
+        	WooPedido.Id.ToString,
             CodIdEmpresa,
-            CodIdLoja,
-            WooPedido,
-            Cliente.CodIdCliente
+            CodIdLoja
         );
+
+        if Assigned(Result) then
+        begin
+            ShowMessage('Pedido encontrado no banco');
+            Exit(Result);
+        end;
 
 		Query := CriarQuery;
 
@@ -1448,25 +1676,28 @@ begin
                   'INSERT INTO db_sgci.pedido_venda ( ' +
                   '	COD_ID_EMPRESA,' +
                   '	COD_ID_LOJA,' +
+                  '	COD_ID_PEDIDO_SITE,' +
                   '	COD_ID_CLIENTE,' +
                   '	DAT_PEDIDO,' +
                   '	DAT_INCLUSAO,' +
                   '	NUM_STATUS_PEDIDO ' +
                   ') VALUES ( ' +
-                  '	:COD_ID_EMPRESA, ' +
+                  '	:COD_ID_EMPRESA,' +
                   '	:COD_ID_LOJA, ' +
+                  '	:COD_ID_PEDIDO_SITE,' +
                   '	:COD_ID_CLIENTE, ' +
                   '	:DAT_PEDIDO, ' +
                   '	:DAT_INCLUSAO, ' +
                   '	:NUM_STATUS_PEDIDO' +
                   ')';
 
-                ParamByName('COD_ID_EMPRESA').AsInteger := Pedido.CodIdEmpresa;
-                ParamByName('COD_ID_LOJA').AsInteger := Pedido.CodIdLoja;
-                ParamByName('COD_ID_CLIENTE').AsInteger := Pedido.CodIdCliente;
-                ParamByName('DAT_PEDIDO').AsDateTime := Pedido.DatPedido;
-                ParamByName('DAT_INCLUSAO').AsDateTime := Now;
-                ParamByName('NUM_STATUS_PEDIDO').AsInteger := Pedido.NumStatusPedido;
+                ParamByName('COD_ID_EMPRESA').AsInteger    := CodIdEmpresa;
+                ParamByName('COD_ID_LOJA').AsInteger       := CodIdLoja;
+                ParamByName('COD_ID_PEDIDO_SITE').AsString := WooPedido.Id.ToString;
+                ParamByName('COD_ID_CLIENTE').AsInteger    := Cliente.CodIdCliente;
+                ParamByName('DAT_PEDIDO').AsDateTime       := ISO8601ToDate(WooPedido.DateCreated);
+                ParamByName('DAT_INCLUSAO').AsDateTime     := Now;
+                ParamByName('NUM_STATUS_PEDIDO').AsInteger := ChecarStatusDoPedido(WooPedido.Status);
 
                 ExecSQL;
 
@@ -1490,6 +1721,44 @@ begin
 	end;
 end;
 
+function TfrmTela_Principal.BuscarPedidoVendaNoBanco(
+	CodIdPedidoSite: string;
+	CodIdEmpresa: Integer;
+	CodIdLoja: Integer
+): TPedidoVenda;
+var
+    Query: TUniQuery;
+begin
+	Query := nil;
+    Result := nil;
+
+    try
+        Query := CriarQuery;
+
+        with Query do
+        begin
+            SQL.Text :=
+            	'SELECT * FROM db_sgci.pedido_venda ' +
+                'WHERE COD_ID_EMPRESA      = :COD_ID_EMPRESA' +
+                '	AND COD_ID_LOJA        = :COD_ID_LOJA' +
+                '	AND COD_ID_PEDIDO_SITE = :COD_ID_PEDIDO_SITE';
+
+            ParamByName('COD_ID_EMPRESA').AsInteger    := CodIdEmpresa;
+            ParamByName('COD_ID_LOJA').AsInteger       := CodIdLoja;
+            ParamByName('COD_ID_PEDIDO_SITE').AsString := CodIdPedidoSite;
+
+            Open;
+
+            if Query.IsEmpty then
+            	Exit;
+
+            Result := SQLToPedidoVenda(Query);
+        end;
+    finally
+        Query.Free;
+    end;
+end;
+
 function TfrmTela_Principal.SQLToPedidoVenda(Query: TUniQuery): TPedidoVenda;
 begin
 	Result := nil;
@@ -1502,6 +1771,7 @@ begin
         	Result.CodIdPedido        := FieldByName('COD_ID_PEDIDO').AsLargeInt;
         	Result.CodIdEmpresa       := FieldByName('COD_ID_EMPRESA').AsInteger;
             Result.CodIdLoja          := FieldByName('COD_ID_LOJA').AsInteger;
+            Result.CodIdPedidoSite    := FieldByName('COD_ID_PEDIDO_SITE').AsString;
             Result.CodIdCliente       := FieldByName('COD_ID_CLIENTE').AsInteger;
             Result.DatPedido          := FieldByName('DAT_PEDIDO').AsDateTime ;
             Result.DatInclusao        := FieldByName('DAT_INCLUSAO').AsDateTime;
@@ -1514,39 +1784,18 @@ begin
     end;
 end;
 
-function TfrmTela_Principal.WooPedidoToPedidoVenda(
-    CodIdEmpresa: Integer;
-    CodIdLoja: Integer;
-    WooPedido: TWooPedido;
-    IdCliente: Integer
-): TPedidoVenda;
-var
-    StatusPedido: Integer;
+function TfrmTela_Principal.ChecarStatusDoPedido(Status: string): Integer;
 begin
-    Result := nil;
-
-    try
-        Result := TPedidoVenda.Create;
-        Result.CodIdEmpresa := CodIdEmpresa;
-        Result.CodIdLoja := CodIdLoja;
-        Result.CodIdCliente := IdCliente;
-        Result.DatPedido := ISO8601ToDate(WooPedido.DateCreated);
-        Result.DatInclusao := ISO8601ToDate(WooPedido.DateCreated);
-
-        if(WooPedido.Status = 'pending') or
-        	(WooPedido.Status = 'on-hold')
-        then
-        	StatusPedido := 0
-        else if WooPedido.Status = 'processing' then
-        	StatusPedido := 1
-        else if WooPedido.Status = 'completed' then
-            StatusPedido := 2
-        else
-            raise Exception.Create('Status do pedido não reconhecido');
-    except
-        Result.Free;
-        raise;
-    end;
+    if (Status = 'pending') or
+    	(Status = 'on-hold')
+    then
+    	Result := 0
+    else if Status = 'processing' then
+    	Result := 1
+    else if Status = 'completed' then
+    	Result := 2
+    else
+    	raise Exception.Create('Status do pedido não reconhecido');
 end;
 
 function TfrmTela_Principal.RetornarItensDoPedidoDeVenda(
@@ -1570,26 +1819,28 @@ begin
             	Produto := BuscarProdutoNoBanco(
                     CodIdEmpresa,
                     CodIdLoja,
+                    Item.ProductId.ToString,
                     Item.Sku.ToInt64
                 );
 
                 if not Assigned(Produto) then
                     raise Exception.Create(
                         Format(
-                            '%S não é um produto cadastrado no sistema',
+                            '%s não é um produto cadastrado no sistema',
                             [Item.Name]
                         )
                     );
 
-                PedidoVendaItem := TPedidoVendaItem.Create;
-                PedidoVendaItem.CodIdEmpresa := CodIdEmpresa;
-                PedidoVendaItem.CodIdLoja := CodIdLoja;
-                PedidoVendaItem.CodIdPedido := CodIdPedido;
-                PedidoVendaItem.CodIdProduto := Produto.CodIdProduto;
-                PedidoVendaItem.CodProduto := Produto.CodProduto;
-                PedidoVendaItem.DscCompleta := Produto.DscCompleta;
+                PedidoVendaItem                  := TPedidoVendaItem.Create;
+                PedidoVendaItem.CodIdEmpresa     := CodIdEmpresa;
+                PedidoVendaItem.CodIdLoja        := CodIdLoja;
+                PedidoVendaItem.CodIdPedido      := CodIdPedido;
+                PedidoVendaItem.CodIdProduto     := Produto.CodIdProduto;
+                PedidoVendaItem.CodIdSite 		 := Item.Id.ToString;
+                PedidoVendaItem.CodProduto       := Produto.CodProduto;
+                PedidoVendaItem.DscCompleta      := Produto.DscCompleta;
                 PedidoVendaItem.NumValorUnitario := Produto.NumPrecoVarejo;
-                PedidoVendaItem.NumQuantidade := Item.Quantity;
+                PedidoVendaItem.NumQuantidade    := Item.Quantity;
 
                 SalvarConteudoEmArquivo(TPath.Combine(
                     TPath.GetDocumentsPath, 'itens-pedido.txt'),
@@ -1615,6 +1866,7 @@ end;
 function TfrmTela_Principal.BuscarProdutoNoBanco(
 	CodIdEmpresa: Integer;
 	CodIdLoja: Integer;
+    CodIdSite: string;
 	SKU: Int64
 ): TProduto;
 var
@@ -1631,8 +1883,9 @@ begin
             SQL.Text :=
              'SELECT pd.COD_ID_PRODUTO, ' +
              '	pd.COD_ID_EMPRESA, ' +
-             '	pd.COD_ID_LOJA, ' +
-             '	pd.COD_PRODUTO, ' +
+             '	pd.COD_ID_LOJA,' +
+             '	pd.COD_PRODUTO,' +
+             '	pd.COD_ID_SITE,' +
              '	pd.COD_BARRAS, ' +
              '	pd.COD_ID_GRADE, ' +
              '	pd.COD_ID_SECAO, ' +
@@ -1670,24 +1923,26 @@ begin
              '	END AS ESTOQUE_ATUAL ' +
              'FROM db_sgci.produtos pd ' +
              'INNER JOIN db_sgci.precos pr ' +
-             '	ON pd.COD_ID_PRODUTO = pr.COD_ID_PRODUTO ' +
+             '	ON pd.COD_ID_PRODUTO  = pr.COD_ID_PRODUTO ' +
              '	AND pd.COD_ID_EMPRESA = pr.COD_ID_EMPRESA ' +
-             '	AND pd.COD_ID_LOJA = pr.COD_ID_LOJA ' +
+             '	AND pd.COD_ID_LOJA    = pr.COD_ID_LOJA ' +
              'LEFT JOIN db_sgci.estoques e ' +
-             '	ON pd.COD_ID_PRODUTO = e.COD_ID_PRODUTO ' +
+             '	ON pd.COD_ID_PRODUTO  = e.COD_ID_PRODUTO ' +
              '	AND pd.COD_ID_EMPRESA = e.COD_ID_EMPRESA ' +
-             '	AND pd.COD_ID_LOJA = e.COD_ID_LOJA ' +
+             '	AND pd.COD_ID_LOJA    = e.COD_ID_LOJA ' +
              'INNER JOIN db_sgci.empresas emp ' +
              '	ON emp.COD_ID_EMPRESA = pd.COD_ID_EMPRESA ' +
              'INNER JOIN db_sgci.lojas lj ' +
-             '	ON lj.COD_ID_EMPRESA = pd.COD_ID_EMPRESA ' +
-             '	AND lj.COD_ID_LOJA = pd.COD_ID_LOJA ' +
+             '	ON lj.COD_ID_EMPRESA  = pd.COD_ID_EMPRESA ' +
+             '	AND lj.COD_ID_LOJA    = pd.COD_ID_LOJA ' +
              'WHERE pd.COD_ID_EMPRESA = :COD_ID_EMPRESA ' +
-             '	AND pd.COD_ID_LOJA = :COD_ID_LOJA ' +
-             '	AND pd.COD_PRODUTO = :COD_PRODUTO';
+             '	AND pd.COD_ID_LOJA    = :COD_ID_LOJA ' +
+             '	AND pd.COD_ID_SITE    = :COD_ID_SITE' +
+             '	AND pd.COD_PRODUTO    = :COD_PRODUTO';
 
             ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
             ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
+            ParamByName('COD_ID_SITE').AsString := CodIdSite;
             ParamByName('COD_PRODUTO').AsLargeInt := SKU;
 
             Open;
@@ -1695,13 +1950,22 @@ begin
             Result := TProduto.Create;
 
             try
-                Result.CodIdEmpresa := FieldByName('COD_ID_EMPRESA').AsInteger;
-                Result.CodIdLoja := FieldByName('COD_ID_LOJA').AsInteger;
-                Result.CodIdProduto := FieldByName('COD_ID_PRODUTO').AsInteger;
-                Result.CodProduto := FieldByName('COD_PRODUTO').AsLargeInt;
-                Result.DscCompleta := FieldByName('DSC_COMPLETA').AsString;
+                Result.CodIdEmpresa   := FieldByName('COD_ID_EMPRESA').AsInteger;
+                Result.CodIdLoja      := FieldByName('COD_ID_LOJA').AsInteger;
+                Result.CodIdProduto   := FieldByName('COD_ID_PRODUTO').AsInteger;
+                Result.CodIdSite      := FieldByName('COD_ID_SITE').AsString;
+                Result.CodProduto     := FieldByName('COD_PRODUTO').AsLargeInt;
+                Result.DscCompleta    := FieldByName('DSC_COMPLETA').AsString;
                 Result.NumPrecoVarejo := FieldByName('PRECO_VAREJO').AsCurrency;
-                Result.NumEstqAtual := FieldByName('ESTOQUE_ATUAL').AsFloat;
+                Result.NumEstqAtual   := FieldByName('ESTOQUE_ATUAL').AsFloat;
+
+                ShowMessage(
+                	'COD_ID_EMPRESA: ' + Result.CodIdEmpresa.ToString + sLinebreak +
+                    'COD_ID_LOJA: ' + Result.CodIdLoja.ToString + sLinebreak +
+                    'COD_ID_PRODUTO: ' + Result.CodIdProduto.ToString + sLinebreak +
+                    'COD_PRODUTO: ' + Result.CodProduto.ToString + sLinebreak +
+                    'COD_ID_SITE: ' +  Result.CodIdSite
+                );
             except
                 Result.Free;
                 raise;
@@ -1723,6 +1987,8 @@ begin
         Query := CriarQuery;
         Valores := '';
 
+        ShowMessage('Método Salvar Produtos do Pedido');
+
         with Query do
         begin
             for var I := 0 to High(ProdutosPedido) do
@@ -1731,18 +1997,19 @@ begin
                 	Valores := Valores + ',';
 
                 Valores := Valores + Format(
-                    '(' +
-                    '	:COD_ID_EMPRESA_%d,' +
-                    '	:COD_ID_LOJA_%d,' +
-                    '	:COD_ID_PEDIDO_%d,' +
-                    '	:DAT_INCLUSAO_%d,' +
-                    '	:COD_ID_PRODUTO_%d, ' +
-                    '	:COD_PRODUTO_%d, ' +
-                    '	:DSC_COMPLETA_%d, ' +
-                    '	:NUM_VALOR_UNITARIO_%d, ' +
-                    '	:NUM_QUANTIDADE_%d' +
+                    '( ' +
+                    ':COD_ID_EMPRESA_%d, ' +
+                    ':COD_ID_LOJA_%d, ' +
+                    ':COD_ID_SITE_%d, ' +
+                    ':COD_ID_PEDIDO_%d, ' +
+                    ':DAT_INCLUSAO_%d, ' +
+                    ':COD_ID_PRODUTO_%d, ' +
+                    ':COD_PRODUTO_%d, ' +
+                    ':DSC_COMPLETA_%d, ' +
+                    ':NUM_VALOR_UNITARIO_%d, ' +
+                    ':NUM_QUANTIDADE_%d' +
                     ' )',
-                	[I, I, I, I, I, I, I, I, I]
+                	[I, I, I, I, I, I, I, I, I, I]
                 );
             end;
 
@@ -1751,6 +2018,7 @@ begin
                 '( ' +
                 '	COD_ID_EMPRESA,' +
     			'	COD_ID_LOJA,' +
+                '	COD_ID_SITE,' +
     			'	COD_ID_PEDIDO,' +
                 '	DAT_INCLUSAO,' +
                 '	COD_ID_PRODUTO, ' +
@@ -1770,6 +2038,8 @@ begin
                 	:= ProdutosPedido[I].CodIdEmpresa;
                 ParamByName('COD_ID_LOJA_' + I.ToString).AsInteger
                 	:= ProdutosPedido[I].CodIdLoja;
+                ParamByName('COD_ID_SITE_' + I.ToString).AsString
+                    := ProdutosPedido[I].CodIdSite;
                 ParamByName('COD_ID_PEDIDO_' + I.ToString).AsLargeInt
                 	:= ProdutosPedido[I].CodIdPedido;
                 ParamByName('DAT_INCLUSAO_' + I.ToString).AsDateTime
@@ -1787,6 +2057,8 @@ begin
     		end;
 
             ExecSQL;
+
+            ShowMessage('Salvar produtos do pedido');
         end;
     finally
         Query.Free;
@@ -1807,9 +2079,16 @@ begin
     Query := nil;
     Result := nil;
 
+    ShowMessage(
+        'Método BuscarOuInserirFinalizadora' + sLineBreak +
+        'COD_ID_CLIENTE: ' + CodIdCliente.ToString + sLineBreak +
+        'Payment Method: ' + PaymentMethod + sLineBreak +
+        'Payment Method Title: ' + PaymentMethodTitle
+    );
+
     try
         Result := BuscarFinalizadorasDoBanco(
-            PaymentMethodTitle,
+            PaymentMethod,
             CodIdEmpresa,
             CodIdLoja
         );
@@ -1827,6 +2106,7 @@ begin
                 'INSERT INTO db_sgci.finalizadoras (' +
                 '	COD_ID_EMPRESA,' +
                 '	COD_ID_LOJA,' +
+                '	COD_ID_SITE,' +
                 '	COD_ID_CLIENTE,' +
                 '	DSC_COMPLETA,' +
                 '	DSC_ABREVIADA,' +
@@ -1836,6 +2116,7 @@ begin
                 'VALUES (' +
                 '	:COD_ID_EMPRESA,' +
                 '	:COD_ID_LOJA,' +
+                '	:COD_ID_SITE,' +
                 '	:COD_ID_CLIENTE,' +
                 '	:DSC_COMPLETA,' +
                 '	:DSC_ABREVIADA,' +
@@ -1846,22 +2127,24 @@ begin
                 '	COD_ID_FINALIZADORA = LAST_INSERT_ID(COD_ID_FINALIZADORA)';
 
             ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
-            ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
+            ParamByName('COD_ID_LOJA').AsInteger    := CodIdLoja;
+            ParamByName('COD_ID_SITE').AsString     := PaymentMethod;
             ParamByName('COD_ID_CLIENTE').AsInteger := CodIdCliente;
-            ParamByName('DSC_COMPLETA').AsString:= PaymentMethodTitle;
+            ParamByName('DSC_COMPLETA').AsString    := PaymentMethodTitle;
 
-            if LowerCase(RemoverAcentos(PaymentMethodTitle))
-            	.Contains('cod') then
+            if LowerCase(RemoverAcentos(PaymentMethod))
+            	.Contains('cod')
+            then
             begin
-               ParamByName('NUM_ESPECIE').AsInteger := 0;
-               ParamByName('DSC_ABREVIADA').AsString := 'DINHEIRO';
-               ParamByName('NUM_MODALIDADE').AsInteger := 0;
+                ParamByName('NUM_ESPECIE').AsInteger    := 0;
+               	ParamByName('DSC_ABREVIADA').AsString   := 'DINHEIRO';
+               	ParamByName('NUM_MODALIDADE').AsInteger := 0;
             end
             else if LowerCase(RemoverAcentos(PaymentMethodTitle))
             	.Contains('cheque') then
             begin
-                ParamByName('NUM_ESPECIE').AsInteger := 1;
-                ParamByName('DSC_ABREVIADA').AsString := 'CHEQUE';
+                ParamByName('NUM_ESPECIE').AsInteger    := 1;
+                ParamByName('DSC_ABREVIADA').AsString   := 'CHEQUE';
                 ParamByName('NUM_MODALIDADE').AsInteger := 0;
             end
             else if LowerCase(RemoverAcentos(PaymentMethodTitle))
@@ -1880,63 +2163,63 @@ begin
             else if LowerCase(RemoverAcentos(PaymentMethodTitle))
             	.Contains('ticket') then
             begin
-                ParamByName('NUM_ESPECIE').AsInteger := 3;
-                ParamByName('DSC_ABREVIADA').AsString := 'TICKET ALIMENTAÇÃO/REF.';
+                ParamByName('NUM_ESPECIE').AsInteger    := 3;
+                ParamByName('DSC_ABREVIADA').AsString   := 'TICKET ALIMENTAÇÃO/REF.';
                 ParamByName('NUM_MODALIDADE').AsInteger := 0;
             end
             else if LowerCase(RemoverAcentos(PaymentMethodTitle))
             	.Contains('vale credito') then
             begin
-            	ParamByName('NUM_ESPECIE').AsInteger := 4;
-                ParamByName('DSC_ABREVIADA').AsString := 'VALE CRÉDITO';
+            	ParamByName('NUM_ESPECIE').AsInteger    := 4;
+                ParamByName('DSC_ABREVIADA').AsString   := 'VALE CRÉDITO';
                 ParamByName('NUM_MODALIDADE').AsInteger := 0;
             end
             else if LowerCase(RemoverAcentos(PaymentMethodTitle))
             	.Contains('crediario') then
             begin
-                ParamByName('NUM_ESPECIE').AsInteger := 5;
-                ParamByName('DSC_ABREVIADA').AsString := 'CREDIARIO';
+                ParamByName('NUM_ESPECIE').AsInteger    := 5;
+                ParamByName('DSC_ABREVIADA').AsString   := 'CREDIARIO';
                 ParamByName('NUM_MODALIDADE').AsInteger := 0;
             end
             else if LowerCase(RemoverAcentos(PaymentMethodTitle))
             	.Contains('convenio') then
             begin
-            	ParamByName('NUM_ESPECIE').AsInteger := 6;
-                ParamByName('DSC_ABREVIADA').AsString := 'CONVENIO';
+            	ParamByName('NUM_ESPECIE').AsInteger    := 6;
+                ParamByName('DSC_ABREVIADA').AsString   := 'CONVENIO';
                 ParamByName('NUM_MODALIDADE').AsInteger := 0;
             end
             else if LowerCase(RemoverAcentos(PaymentMethodTitle))
             	.Contains('boleto') then
             begin
-            	ParamByName('NUM_ESPECIE').AsInteger := 7;
-                ParamByName('DSC_ABREVIADA').AsString := 'BOLETO';
+            	ParamByName('NUM_ESPECIE').AsInteger    := 7;
+                ParamByName('DSC_ABREVIADA').AsString   := 'BOLETO';
                 ParamByName('NUM_MODALIDADE').AsInteger := 0;
             end
             else if LowerCase(RemoverAcentos(PaymentMethodTitle))
             	.Contains('transferencia') then
             begin
-            	ParamByName('NUM_ESPECIE').AsInteger := 8;
-                ParamByName('DSC_ABREVIADA').AsString := 'DEPóSITO/TRANSFERÊNCIA';
+            	ParamByName('NUM_ESPECIE').AsInteger    := 8;
+                ParamByName('DSC_ABREVIADA').AsString   := 'DEPóSITO/TRANSFERÊNCIA';
                 ParamByName('NUM_MODALIDADE').AsInteger := 0;
             end
             else if LowerCase(RemoverAcentos(PaymentMethodTitle))
             	.Contains('pix') then
             begin
-            	ParamByName('NUM_ESPECIE').AsInteger := 10;
-                ParamByName('DSC_ABREVIADA').AsString := 'PIX';
+            	ParamByName('NUM_ESPECIE').AsInteger    := 10;
+                ParamByName('DSC_ABREVIADA').AsString   := 'PIX';
                 ParamByName('NUM_MODALIDADE').AsInteger := 1;
             end
             else if LowerCase(RemoverAcentos(PaymentMethodTitle))
             	.Contains('carteira digital') then
             begin
-                ParamByName('NUM_ESPECIE').AsInteger := 11;
-                ParamByName('DSC_ABREVIADA').AsString := 'CARTEIRA DIGITAL';
+                ParamByName('NUM_ESPECIE').AsInteger    := 11;
+                ParamByName('DSC_ABREVIADA').AsString   := 'CARTEIRA DIGITAL';
                 ParamByName('NUM_MODALIDADE').AsInteger := 0;
             end
             else
             begin
-            	ParamByName('NUM_ESPECIE').AsInteger := 9;
-                ParamByName('DSC_ABREVIADA').AsString := 'OUTRAS';
+            	ParamByName('NUM_ESPECIE').AsInteger    := 9;
+                ParamByName('DSC_ABREVIADA').AsString   := 'OUTRAS';
                 ParamByName('NUM_MODALIDADE').AsInteger := 0;
             end;
 
@@ -1958,7 +2241,7 @@ begin
 end;
 
 function TfrmTela_Principal.BuscarFinalizadorasDoBanco(
-    MetodoPagamento: string;
+    CodIdSite: string;
     CodIdEmpresa: Integer;
     CodIdLoja: Integer
 ): TFinalizadora;
@@ -1975,11 +2258,11 @@ begin
         Query.SQL.Text :=
             'SELECT * FROM db_sgci.finalizadoras ' +
             'WHERE COD_ID_EMPRESA = :COD_ID_EMPRESA ' +
-            '	AND COD_ID_LOJA = :COD_ID_LOJA'+
-            '	AND DSC_COMPLETA LIKE :DSC';
+            '	AND COD_ID_LOJA   = :COD_ID_LOJA' +
+            '	AND COD_ID_SITE   = :COD_ID_SITE';
         Query.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
-        Query.ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
-        Query.ParamByName('DSC').AsString := '%' + MetodoPagamento + '%';
+        Query.ParamByName('COD_ID_LOJA').AsInteger    := CodIdLoja;
+        Query.ParamByName('COD_ID_SITE').AsString     := CodIdSite;
         Query.Open;
 
         if not Query.Eof then
@@ -2003,6 +2286,7 @@ begin
         with Query do
         begin
         	Result.CodIdFinalizadora := FieldByName('COD_ID_FINALIZADORA').AsInteger;
+            Result.CodIdSite         := FieldByName('COD_ID_SITE').AsString;
             Result.CodIdEmpresa      := FieldByName('COD_ID_EMPRESA').AsInteger;
             Result.CodIdLoja         := FieldByName('COD_ID_LOJA').AsInteger;
             Result.CodIdCliente      := FieldByName('COD_ID_CLIENTE').AsInteger;
@@ -2160,21 +2444,22 @@ begin
                 '	:NUM_VALOR_PARCELA ' +
                 ')';
 
-                ParcelaID := (DateTimeToUnix(Now, False) * 1000) + Random(1000);
-                ParamByNAME('COD_ID_PARCELA').AsLargeInt := ParcelaID;
-                ParamByName('COD_ID_EMPRESA').AsInteger := PedidoVenda.CodIdEmpresa;
-                ParamByName('COD_ID_LOJA').AsInteger := PedidoVenda.CodIdLoja;
-                ParamByName('COD_ID_PEDIDO').AsLargeInt := PedidoVenda.CodIdPedido;
-                ParamByName('COD_ID_PAGAMENTO').AsLargeInt := Pagamento.CodIdPagamento;
-                ParamByName('COD_ID_CLIENTE').AsInteger := PedidoVenda.CodIdCliente;
+                ParcelaID := (DateTimeToUnix(Now, False) * 1000)
+                	+ Random(1000);
+                ParamByNAME('COD_ID_PARCELA').AsLargeInt     := ParcelaID;
+                ParamByName('COD_ID_EMPRESA').AsInteger      := PedidoVenda.CodIdEmpresa;
+                ParamByName('COD_ID_LOJA').AsInteger         := PedidoVenda.CodIdLoja;
+                ParamByName('COD_ID_PEDIDO').AsLargeInt      := PedidoVenda.CodIdPedido;
+                ParamByName('COD_ID_PAGAMENTO').AsLargeInt   := Pagamento.CodIdPagamento;
+                ParamByName('COD_ID_CLIENTE').AsInteger      := PedidoVenda.CodIdCliente;
                 ParamByName('COD_ID_FINALIZADORA').AsInteger := Pagamento.CodIdFinalizadora;
-                ParamByName('DAT_LANCAMENTO').AsDateTime := Pagamento.datPagamento;
+                ParamByName('DAT_LANCAMENTO').AsDateTime     := Pagamento.datPagamento;
 
 				// Valor de teste. Esse valor vai variar de acordo com
 				// as informações que vêm do ecommerce
-                ParamByName('NUM_PARCELAS').AsInteger := 1;
+                ParamByName('NUM_PARCELAS').AsInteger      := 1;
                 ParamByName('NUM_VALOR_PRINCIPAL').AsFloat := Pagamento.NumValorPago;
-                ParamByName('NUM_VALOR_PARCELA').AsFloat := Pagamento.NumValorPago;
+                ParamByName('NUM_VALOR_PARCELA').AsFloat   := Pagamento.NumValorPago;
 
                 ExecSQL;
 
@@ -2193,6 +2478,24 @@ procedure TfrmTela_Principal.OnFormDestroy(Sender: TObject);
 begin
 	if THorse.IsRunning then
     	THorse.StopListen;
+end;
+
+procedure TfrmTela_Principal.ShowTables(Sender: TObject);
+var
+	Query: TUniQuery;
+begin
+    Query := nil;
+
+    try
+        Query := CriarQuery;
+
+        Query.SQL.Text := 'SHOW CREATE TABLE db_sgci.pedido_venda_pgtos_parcelas';
+        Query.Open;
+        Query.SaveToXML(TPath.Combine(FFolderPath, 'create-table_pedido-venda-pgtos-parcelas.xml'));
+
+    finally
+    	Query.Free;
+    end;
 end;
 
 end.

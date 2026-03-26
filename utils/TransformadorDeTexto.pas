@@ -22,20 +22,20 @@ end;
 
 function RemoverAcentos(Texto: string): string;
 var
-  Normalizado: string;
-  Len: Integer;
+	Normalizado: string;
+    Len: Integer;
 begin
-  Len := NormalizeString(NormalizationD, PChar(Texto), Length(Texto), nil, 0);
-  SetLength(Normalizado, Len);
-  NormalizeString(NormalizationD, PChar(Texto), Length(Texto), PChar(Normalizado), Len);
+	Len := NormalizeString(NormalizationD, PChar(Texto), Length(Texto), nil, 0);
+    SetLength(Normalizado, Len);
+    NormalizeString(NormalizationD, PChar(Texto), Length(Texto), PChar(Normalizado), Len);
 
-  Result := '';
-  for var C in Normalizado do
-  begin
-    if not CharInSet(C, [#768..#879]) then // Unicode combining marks
-      Result := Result + C;
-  end;
-end;
+    Result := '';
+    for var C in Normalizado do
+        begin
+            if not CharInSet(C, [#768..#879]) then // Unicode combining marks
+            Result := Result + C;
+        end;
+	end;
 end.
 
 

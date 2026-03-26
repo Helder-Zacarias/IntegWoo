@@ -4,36 +4,32 @@ interface
 
 type TProduto = class
     private
-        FCod_Id_Produto: Integer;
-        FCod_Id_Empresa: Integer;
-        FCod_Id_Loja: Integer;
-        FCod_Produto: Int64;
-        FCod_Barras: string;
-        FCod_Id_Grade: Integer;
-        FCod_Id_Secao: Integer;
-        FDsc_Completa: string;
-        FNum_Tipo_Produto: Integer;
-        FNum_Preco_Varejo: Currency;
-        FNum_Estq_Atual: Double;
-        FSku: string;
-        FCOD_ID_WOOCOMMERCE: Int64;
-        FSTATUS_SINCRONIZADO_WOOCOMMERCE: Integer;
+        FCOD_ID_PRODUTO: Integer;
+        FCOD_ID_SITE: string;
+        FCOD_ID_EMPRESA: Integer;
+        FCOD_ID_LOJA: Integer;
+        FCOD_PRODUTO: Int64;
+        FCOD_BARRAS: string;
+        FCOD_ID_GRADE: Integer;
+        FCOD_ID_SECAO: Integer;
+        FDSC_COMPLETA: string;
+        FNUM_TIPO_PRODUTO: Integer;
+        FNUM_PRECO_VAREJO: Currency;
+        FNUM_ESTQ_ATUAL: Double;
     public
-        property CodIdProduto: Integer read FCod_Id_Produto write FCod_Id_Produto;
-        property CodIdEmpresa: Integer read FCod_Id_Empresa write FCod_Id_Empresa;
-        property CodIdLoja: Integer read FCod_Id_Loja write FCod_Id_Loja;
-        property CodProduto: Int64 read FCod_Produto write FCod_Produto;
-        property CodBarras: string read FCod_Barras write FCod_Barras;
-        property CodIdGrade: Integer read FCod_Id_Grade write FCod_Id_Grade;
-        property CodIdSecao: Integer read FCod_Id_Secao write FCod_Id_Secao;
-        property DscCompleta: string read FDsc_Completa write FDsc_Completa;
-        property NumTipoProduto: Integer read FNum_Tipo_Produto write FNum_Tipo_Produto;
-        property NumPrecoVarejo: Currency read FNum_Preco_Varejo write FNum_Preco_Varejo;
-        property NumEstqAtual: Double read FNum_Estq_Atual write FNum_Estq_Atual;
-        property Sku: string read FSku write FSku;
-        property FCodIdWooCommerce: Int64 read FCOD_ID_WOOCOMMERCE write FCOD_ID_WOOCOMMERCE;
-        property FStatusSincronizadoWooCommerce: Integer read FSTATUS_SINCRONIZADO_WOOCOMMERCE write FSTATUS_SINCRONIZADO_WOOCOMMERCE;
-	end;
+        property CodIdProduto: Integer read FCOD_ID_PRODUTO write FCOD_ID_PRODUTO;
+        property CodIdSite: string read FCOD_ID_SITE write FCOD_ID_SITE;
+        property CodIdEmpresa: Integer read FCOD_ID_EMPRESA write FCOD_ID_EMPRESA;
+        property CodIdLoja: Integer read FCOD_ID_LOJA write FCOD_ID_LOJA;
+        property CodProduto: Int64 read FCOD_PRODUTO write FCOD_PRODUTO;
+        property CodBarras: string read FCOD_BARRAS write FCOD_BARRAS;
+        property CodIdGrade: Integer read FCOD_ID_GRADE write FCOD_ID_GRADE;
+        property CodIdSecao: Integer read FCOD_ID_SECAO write FCOD_ID_SECAO;
+        property DscCompleta: string read FDSC_COMPLETA write FDSC_COMPLETA;
+        property NumTipoProduto: Integer read FNUM_TIPO_PRODUTO write FNUM_TIPO_PRODUTO;
+        property NumPrecoVarejo: Currency read FNUM_PRECO_VAREJO write FNUM_PRECO_VAREJO;
+        property NumEstqAtual: Double read FNUM_ESTQ_ATUAL write FNUM_ESTQ_ATUAL;
+    end;
 implementation
 
 end.
