@@ -1495,10 +1495,6 @@ begin
         Query.SQL.Text := 'SELECT LAST_INSERT_ID() AS ID';
         Query.Open;
         ClienteID := Query.FieldByName('ID').AsInteger;
-        ShowMessage(
-            'Meótodo BuscarOuInserirClienteNoBanco.' + sLineBreak +
-        	'ClienteID: ' + ClienteId.ToString
-        );
         Query.Close;
 
         Query.SQL.Text := 'SELECT * FROM db_sgci.clientes WHERE COD_ID_CLIENTE = :ID';
@@ -2113,6 +2109,9 @@ begin
                 '	COD_ID_EMPRESA     = :COD_ID_EMPRESA ' +
                 '	AND COD_ID_LOJA    = :COD_ID_LOJA ' +
                 '	AND COD_ID_SITE    = :COD_ID_SITE';
+            Query.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
+            Query.ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
+            Query.ParamByName('COD_ID_SITE').AsString := CodIdSite;
             Query.Open;
 
             if Query.IsEmpty then
@@ -2168,7 +2167,7 @@ begin
     	DescricaoAbreviada := 'CARTAO';
         EspeciePagamento   := 2;
 
-        if UpperCase(RemoverAcentos(DescricaoPagamentoDetalhada)).Contains('CRÉDITO') then
+        if UpperCase(RemoverAcentos(DescricaoPagamentoDetalhada)).Contains('CREDITO') then
             ModalidadePagamento := 0
         else
             ModalidadePagamento := 1;
@@ -2313,6 +2312,8 @@ begin
             ParamByName('DSC_ABREVIADA').AsString := DescricaoPagamento;
             ParamByName('NUM_ESPECIE').AsInteger := EspeciePagamento;
             ParamByName('NUM_MODALIDADE').AsInteger := ModalidadePagamento;
+
+            ExecSQL;
 
             SQL.Text := 'SELECT LAST_INSERT_ID() AS ID';
           	Open;
