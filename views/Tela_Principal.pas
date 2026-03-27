@@ -31,7 +31,6 @@ type
         btnHamburguer: TButton;
         panelSide: TPanel;
         btnEnviarProdutosMandala: TBitBtn;
-    Button1: TButton;
         procedure OnFormCreate(Sender: TObject);
         procedure RegistrarRotas;
         procedure DatabaseConnectionLost(Sender: TObject; Component: TComponent;
@@ -99,7 +98,6 @@ type
         function SQLToPagamentoDaVenda(Query: TUniQuery): TPedidoVendaPgtos;
         procedure SalvarParcelasDoPagamento(PedidoVenda: TPedidoVenda; Pagamento: TPedidoVendaPgtos);
         procedure OnFormDestroy(Sender: TObject);
-        procedure ShowTables(Sender: TObject);
 	private
     	FSQLProdutosBase: string;
         FSQLImagensBase: string;
@@ -482,7 +480,7 @@ begin
     if Response.StatusCode in [200, 201] then
     begin
         if not MensagemAposRetorno.IsEmpty then
-        	ShowMessage(MensagemAposRetorno);
+        	OutputDebugString(PChar(MensagemAposRetorno));
     end
     else
     	raise Exception.Create('Requisição falhou. ' + Response.StatusCode.ToString + ': ' + Response.Content);
@@ -1237,8 +1235,6 @@ begin
                 TJson.ObjectToJsonString(WooPedido)
             );
 
-        ShowMessage('Id do pedido WOOCOMMERCE:' + WooPedido.Id.ToString);
-
         Conexao := Database;
 
         try
@@ -1251,22 +1247,11 @@ begin
                 CodIdLoja
             );
 
-            ShowMessage(
-            	'Cliente salvo com sucesso' +sLineBreak +
-                'ID_CLIENTE: ' + Cliente.CodIdCliente.ToString
-            );
-
             PedidoRetornado := BuscarOuInserirPedidoVendaNoBanco(
             	CodIdEmpresa,
                 CodIdLoja,
                 WooPedido,
                 Cliente
-            );
-
-            ShowMessage(
-            	'Pedido salvo com sucesso:' + sLineBreak +
-                'COD_ID_PEDIDO: ' + PedidoRetornado.CodIdPedido.ToString + sLineBreak +
-                'COD_ID_PEDIDO_SITE: ' + PedidoRetornado.CodIdPedidoSite
             );
 
             ProdutosPedido := RetornarItensDoPedidoDeVenda(
@@ -1276,11 +1261,7 @@ begin
                 PedidoRetornado.CodIdPedido
             );
 
-            ShowMessage('Produtos retornados com sucesso');
-
             SalvarProdutosDoPedido(ProdutosPedido);
-
-            ShowMessage('Produtos salvo com sucesso');
 
             Finalizadora := BuscarOuInserirFinalizadora(
                 WooPedido.PaymentMethod,
@@ -1289,8 +1270,6 @@ begin
                 CodIdLoja,
                 Cliente.CodIdCliente
             );
-
-            ShowMessage('Finalizadora salva com sucesso');
 
             PagamentoPedidoVenda := InserirPagamentoNoBanco(
             	CodIdEmpresa,
@@ -1304,14 +1283,10 @@ begin
                 )
             );
 
-            ShowMessage('Pagamento salvo com sucesso');
-
             SalvarParcelasDoPagamento(
             	PedidoRetornado,
             	PagamentoPedidoVenda
             );
-
-            ShowMessage('Parcela salva com sucesso');
 
             Conexao.Commit;
 
@@ -1374,7 +1349,7 @@ begin
     Result := nil;
 
 	try
-        Result := BuscarClienteNoBanco(
+    	Result := BuscarClienteNoBanco(
             CodIdSite,
             CodIdEmpresa,
             CodIdLoja,
@@ -1384,7 +1359,7 @@ begin
 
         if Assigned(Result) then
         begin
-            ShowMessage('Cliente encontrado no banco');
+            OutputDebugString(PChar('Cliente encontrado no banco'));
             Exit(Result);
         end;
 
@@ -1417,8 +1392,8 @@ begin
             '   DAT_CADASTRO ' +
             ') VALUES ( ' +
             '   :COD_ID_EMPRESA, ' +
-            '	:COD_ID_SITE,' +
-            '   :COD_ID_LOJA, ' +
+            '	:COD_ID_LOJA,' +
+            '   :COD_ID_SITE, ' +
             '   :NUM_TIPO, ' +
             '   :NUM_SEXO, ' +
             '   :DSC_NOME, ' +
@@ -1543,25 +1518,37 @@ begin
             begin
                 SQL.Text :=
                     'SELECT * FROM db_sgci.clientes ' +
-                    'WHERE COD_ID_EMPRESA = :COD_ID_EMPRESA' +
-                    '	AND COD_ID_LOJA   = :COD_ID_LOJA' +
-                    '	AND COD_ID_SITE   = :COD_ID_SITE' +
-                    '	AND DSC_CPF_CNPJ  = COALESCE(:CPF, :CNPJ)';
+                    'WHERE COD_ID_EMPRESA = :COD_ID_EMPRESA ' +
+                    '	AND COD_ID_LOJA   = :COD_ID_LOJA ';
+
+                if CodIdSite <> '0' then
+                begin
+                   SQL.Add('AND COD_ID_SITE = :COD_ID_SITE ');
+                   ParamByName('COD_ID_SITE').AsString := CodIdSite;
+                end;
+
+                if CPF <> '' then
+                begin
+                    SQL.Add('AND DSC_CPF_CNPJ = :CPF ');
+                    ParamByName('CPF').AsString := AplicarMascaraCPF(CPF);
+                end
+                else if CNPJ <> '' then
+                begin
+                    SQL.Add('AND DSC_CPF_CNPJ = :CNPJ ');
+                    ParamByName('CNPJ').AsString := AplicarMascaraCNPJ(CNPJ);
+                end;
 
                 ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
                 ParamByName('COD_ID_LOJA').AsInteger    := CodIdLoja;
-                ParamByName('COD_ID_SITE').AsString     := CodIdSite;
-
-                if (CPF <> '') and (CNPJ = '') then
-                    ParamByName('CPF').AsString := AplicarMascaraCPF(CPF)
-                else
-                    ParamByName('CNPJ').AsString := AplicarMascaraCNPJ(CNPJ)
         	end;
 
             Query.Open;
 
             if Query.IsEmpty then
-            	Exit;
+            begin
+                OutputDebugString(PChar('Usuário não foi encontrado'));
+                Exit;
+            end;
 
             Result := SQLToCliente(Query);
         except
@@ -1663,7 +1650,7 @@ begin
 
         if Assigned(Result) then
         begin
-            ShowMessage('Pedido encontrado no banco');
+            OutputDebugString(PChar('Pedido encontrado no banco'));
             Exit(Result);
         end;
 
@@ -1739,9 +1726,9 @@ begin
         begin
             SQL.Text :=
             	'SELECT * FROM db_sgci.pedido_venda ' +
-                'WHERE COD_ID_EMPRESA      = :COD_ID_EMPRESA' +
-                '	AND COD_ID_LOJA        = :COD_ID_LOJA' +
-                '	AND COD_ID_PEDIDO_SITE = :COD_ID_PEDIDO_SITE';
+                'WHERE  COD_ID_EMPRESA      = :COD_ID_EMPRESA' +
+                '	AND COD_ID_LOJA         = :COD_ID_LOJA' +
+                '	AND COD_ID_PEDIDO_SITE  = :COD_ID_PEDIDO_SITE';
 
             ParamByName('COD_ID_EMPRESA').AsInteger    := CodIdEmpresa;
             ParamByName('COD_ID_LOJA').AsInteger       := CodIdLoja;
@@ -1750,7 +1737,10 @@ begin
             Open;
 
             if Query.IsEmpty then
+            begin
+            	OutputDebugString(PChar('Pedido não foi encontrado no banco'));
             	Exit;
+            end;
 
             Result := SQLToPedidoVenda(Query);
         end;
@@ -1958,14 +1948,6 @@ begin
                 Result.DscCompleta    := FieldByName('DSC_COMPLETA').AsString;
                 Result.NumPrecoVarejo := FieldByName('PRECO_VAREJO').AsCurrency;
                 Result.NumEstqAtual   := FieldByName('ESTOQUE_ATUAL').AsFloat;
-
-                ShowMessage(
-                	'COD_ID_EMPRESA: ' + Result.CodIdEmpresa.ToString + sLinebreak +
-                    'COD_ID_LOJA: ' + Result.CodIdLoja.ToString + sLinebreak +
-                    'COD_ID_PRODUTO: ' + Result.CodIdProduto.ToString + sLinebreak +
-                    'COD_PRODUTO: ' + Result.CodProduto.ToString + sLinebreak +
-                    'COD_ID_SITE: ' +  Result.CodIdSite
-                );
             except
                 Result.Free;
                 raise;
@@ -1986,8 +1968,6 @@ begin
     try
         Query := CriarQuery;
         Valores := '';
-
-        ShowMessage('Método Salvar Produtos do Pedido');
 
         with Query do
         begin
@@ -2057,8 +2037,6 @@ begin
     		end;
 
             ExecSQL;
-
-            ShowMessage('Salvar produtos do pedido');
         end;
     finally
         Query.Free;
@@ -2078,13 +2056,6 @@ var
 begin
     Query := nil;
     Result := nil;
-
-    ShowMessage(
-        'Método BuscarOuInserirFinalizadora' + sLineBreak +
-        'COD_ID_CLIENTE: ' + CodIdCliente.ToString + sLineBreak +
-        'Payment Method: ' + PaymentMethod + sLineBreak +
-        'Payment Method Title: ' + PaymentMethodTitle
-    );
 
     try
         Result := BuscarFinalizadorasDoBanco(
@@ -2478,24 +2449,6 @@ procedure TfrmTela_Principal.OnFormDestroy(Sender: TObject);
 begin
 	if THorse.IsRunning then
     	THorse.StopListen;
-end;
-
-procedure TfrmTela_Principal.ShowTables(Sender: TObject);
-var
-	Query: TUniQuery;
-begin
-    Query := nil;
-
-    try
-        Query := CriarQuery;
-
-        Query.SQL.Text := 'SHOW CREATE TABLE db_sgci.pedido_venda_pgtos_parcelas';
-        Query.Open;
-        Query.SaveToXML(TPath.Combine(FFolderPath, 'create-table_pedido-venda-pgtos-parcelas.xml'));
-
-    finally
-    	Query.Free;
-    end;
 end;
 
 end.

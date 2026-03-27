@@ -43,15 +43,12 @@ begin
     begin
         Result.RegularPrice := FormatFloat('0.00', Produto.NumPrecoVarejo, TFormatSettings.Invariant);
         Result.StockQuantity := Produto.NumEstqAtual;
-        ShowMessage('Produto Simples');
     end;
 
     if Assigned(ListaImagensProduto) then
     begin
       for var ImagemProduto in ListaImagensProduto do
     	Result.AdicionarImagem(ImagemProduto);
-
-        ShowMessage('Adicionou imagens');
     end;
 
     if Assigned(TermosProduto) then
@@ -75,7 +72,6 @@ begin
         end;
     end;
 
-    ShowMessage('Atribuição do produto finalizada');
     SalvarConteudoEmArquivo(
     	TPath.Combine(TPath.GetDocumentsPath, 'produto-payload.txt'),
         TJson.ObjectToJsonString(Result)
