@@ -73,13 +73,16 @@ type
         	CodIdEmpresa: Integer; CodIdLoja: Integer): TCliente;
         function BuscarClienteNoBanco(CodIdSite: string; CodIdEmpresa: Integer;
         	CodIdLoja: Integer; CPF: string; CNPJ: string): TCliente;
-        function SQLToCliente(Query: TUniQuery; IdCliente: Integer = 0): TCliente;
+        function SQLToCliente(Query: TUniQuery): TCliente;
         function BuscarMunicipio(Municipio: string): TMunicipio;
         function BuscarOuInserirPedidoVendaNoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer;
         	WooPedido: TWooPedido; Cliente: TCliente): TPedidoVenda;
         function BuscarPedidoVendaNoBanco(CodIdPedidoSite: string; CodIdEmpresa: Integer;
         	CodIdLoja: Integer): TPedidoVenda;
         function ChecarStatusDoPedido(Status: string): Integer;
+        function InserirFinalizadora(CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdCliente: Integer;
+        	DescricaoPagamento: string; DescricaoPagamentoDetalhada: string;
+            EspeciePagamento: Integer; ModalidadePagamento: Integer): TFinalizadora;
         function SQLToPedidoVenda(Query: TUniQuery): TPedidoVenda;
         function RetornarItensDoPedidoDeVenda(Itens: TArray<TLineItem>; CodIdEmpresa: Integer;
         	CodIdLoja: Integer; CodIdPedido: Int64): TArray<TPedidoVendaItem>;
@@ -90,9 +93,9 @@ type
         	CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdCliente: Integer): TFinalizadora;
         function BuscarFinalizadoraPorCodIdSite(CodIdEmpresa: Integer; CodIdLoja: Integer;
         	CodIdSite: string): TFinalizadora;
-        function BuscarFinalizadorasDoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer): TArray<TFinalizadora>;
-        function AssociarFinalizadora( DescricaoPagamento: string; DescricaoPagamentoDetalhada: string;
-        	Finalizadoras: TArray<TFinalizadora>): TFinalizadora;
+        function CadastrarFinalizadora(CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdCliente: Integer;
+        	DescricaoPagamento: string; DescricaoPagamentoDetalhada: string): TFinalizadora;
+        function BuscarFinalizadoraDinheiro(CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdSite: string; CodIdCliente: Integer): TFinalizadora;
         function SQLToFinalizadora(Query: TUniQuery): TFinalizadora;
         function InserirPagamentoNoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer;
             CodIdPedido: Int64; CodIdFinalizadora: Integer; DataPagamento: TDateTime;
@@ -1249,6 +1252,11 @@ begin
                 CodIdLoja
             );
 
+            SalvarConteudoEmArquivo(
+                TPath.Combine(FFolderPath, 'cliente-.txt'),
+                TJson.ObjectToJsonString(Cliente)
+            );
+
             PedidoRetornado := BuscarOuInserirPedidoVendaNoBanco(
             	CodIdEmpresa,
                 CodIdLoja,
@@ -1414,7 +1422,7 @@ begin
             '   :DSC_IE, ' +
             '   NOW() ' +
             ') ON DUPLICATE KEY UPDATE ' +
-            '    COD_CLIENTE = LAST_INSERT_ID(COD_CLIENTE)';
+            '    COD_ID_CLIENTE = LAST_INSERT_ID(COD_ID_CLIENTE)';
 
         Query.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
         Query.ParamByName('COD_ID_LOJA').AsInteger    := CodIdLoja;
@@ -1487,13 +1495,17 @@ begin
         Query.SQL.Text := 'SELECT LAST_INSERT_ID() AS ID';
         Query.Open;
         ClienteID := Query.FieldByName('ID').AsInteger;
+        ShowMessage(
+            'Meótodo BuscarOuInserirClienteNoBanco.' + sLineBreak +
+        	'ClienteID: ' + ClienteId.ToString
+        );
         Query.Close;
 
         Query.SQL.Text := 'SELECT * FROM db_sgci.clientes WHERE COD_ID_CLIENTE = :ID';
         Query.ParamByName('ID').AsInteger := ClienteID;
         Query.Open;
 
-        Result := SQLToCliente(Query, ClienteID);
+        Result := SQLToCliente(Query);
 	finally
     	Query.Free;
 	end;
@@ -1563,17 +1575,13 @@ begin
 end;
 
 function TfrmTela_Principal.SQLToCliente(
-    Query: TUniQuery;
-	IdCliente: Integer = 0
+    Query: TUniQuery
 ): TCliente;
 begin
 	with Query do
     begin
-    	Result := TCliente.Create;
-
-        if IdCliente <> 0 then
-        	Result.CodIdCliente := FieldByName('COD_ID_CLIENTE').AsInteger;
-
+    	Result                 := TCliente.Create;
+        Result.CodIdCliente    := FieldByName('COD_ID_CLIENTE').AsInteger;
         Result.CodIdSite       := FieldByName('COD_ID_SITE').AsString;
         Result.CodIdEmpresa    := FieldByName('COD_ID_EMPRESA').AsInteger;
         Result.CodIdLoja       := FieldByName('COD_ID_LOJA').AsInteger;
@@ -1865,7 +1873,7 @@ var
     Query: TUniQuery;
 begin
     Query := nil;
-    Result := NIL;
+    Result := nil;
 
     try
         Query := CriarQuery;
@@ -2053,11 +2061,9 @@ function TfrmTela_Principal.BuscarOuAssociarFinalizadora(
     CodIdCliente: Integer
 ): TFinalizadora;
 var
-    Finalizadoras: TArray<TFinalizadora>;
     FinalizadoraID: Integer;
 begin
     Result := nil;
-    Finalizadoras := nil;
 
     try
         Result := BuscarFinalizadoraPorCodIdSite(
@@ -2068,21 +2074,18 @@ begin
 
         if not Assigned(Result) then
         begin
-        	Finalizadoras := BuscarFinalizadorasDoBanco(
-            	CodIdEmpresa,
-            	CodIdLoja
-        	);
-
-            Result := AssociarFinalizadora(
+            Result := CadastrarFinalizadora(
+                CodIdEmpresa,
+                CodIdLoja,
+                CodIdCliente,
             	PaymentMethod,
-            	PaymentMethodTitle,
-        		Finalizadoras
+            	PaymentMethodTitle
         	);
         end;
 
         if not Assigned(Result) then
         begin
-            raise Exception.Create('Erro na associaç~çao da finalizadora');
+            raise Exception.Create('Erro na associação da finalizadora');
         end;
     except
         Result.Free;
@@ -2128,86 +2131,53 @@ begin
     end;
 end;
 
-function TfrmTela_Principal.BuscarFinalizadorasDoBanco(
-	CodIdEmpresa: Integer;
-	CodIdLoja: Integer
-): TArray<TFinalizadora>;
-var
-    Query: TUniQuery;
-    Finalizadora: TFinalizadora;
-begin
-	Query := nil;
-    SetLength(Result, 0);
-
-    try
-        Query := CriarQuery;
-
-        with Query do
-        begin
-            try
-            	SQL.Text :=
-                	'SELECT * FROM db_sgci.finalizadoras ' +
-            		'WHERE  COD_ID_EMPRESA = :COD_ID_EMPRESA ' +
-            		'	AND COD_ID_LOJA    = :COD_ID_LOJA';
-
-                ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
-                ParamByName('COD_ID_LOJA').AsInteger    := CodIdLoja;
-                Open;
-
-                if isEmpty then
-                	raise Exception.Create('Nenhuma finalizadora encontrda no banco!');
-
-                while not Eof do
-                begin
-                    Finalizadora := SQLToFinalizadora(Query);
-                    SetLength(Result, Length(Result) + 1);
-                    Result[High(Result)] := Finalizadora;
-                    Next;
-                end;
-            except
-            	for var I := 0 to High(Result) do
-                begin
-                	if Assigned(Result[I]) then
-                    	Result[I].Free;
-                end;
-                raise;
-            end;
-        end;
-    finally
-        Query.Free;
-    end;
-end;
-
-function TfrmTela_Principal.AssociarFinalizadora(
+function TfrmTela_Principal.CadastrarFinalizadora(
+    CodIdEmpresa: Integer;
+    CodIdLoja: Integer;
+	CodIdCliente: Integer;
     DescricaoPagamento: string;
-    DescricaoPagamentoDetalhada: string;
-    Finalizadoras: TArray<TFinalizadora>
+    DescricaoPagamentoDetalhada: string
 ): TFinalizadora;
 var
     DescricaoAbreviada: string;
+    EspeciePagamento: Integer;
+    ModalidadePagamento: Integer;
 begin
     Result := nil;
 
-    ShowMessage(
-        'Payment Method: ' + UpperCase(RemoverAcentos(DescricaoPagamento)) + sLineBreak +
-        'Payment Method Title: ' + UpperCase(RemoverAcentos(DescricaoPagamentoDetalhada))
-    );
-
-    if UpperCase(RemoverAcentos(DescricaoPagamento)) = 'COD'then
+    if (UpperCase(RemoverAcentos(DescricaoPagamento)) = 'COD') or
+        (UpperCase(RemoverAcentos(DescricaoPagamento)) = 'DINHEIRO')
+    then
     begin
-       DescricaoAbreviada := 'DINHEIRO';
+    	Result := BuscarFinalizadoraDinheiro(
+            CodIdEmpresa,
+            CodIdLoja,
+            DescricaoPagamento,
+            CodIdCliente
+        );
+        Exit(Result);
     end
     else if UpperCase(RemoverAcentos(DescricaoPagamentoDetalhada)) = 'PIX' then
     begin
-        DescricaoAbreviada := 'PIX';
+        DescricaoAbreviada  := 'PIX';
+        EspeciePagamento    := 11;
+        ModalidadePagamento := 0;
     end
     else if UpperCase(RemoverAcentos(DescricaoPagamentoDetalhada)).Contains('CARTAO') then
     begin
-    	DescricaoAbreviada := 'CARTAO' ;
+    	DescricaoAbreviada := 'CARTAO';
+        EspeciePagamento   := 2;
+
+        if UpperCase(RemoverAcentos(DescricaoPagamentoDetalhada)).Contains('CRÉDITO') then
+            ModalidadePagamento := 0
+        else
+            ModalidadePagamento := 1;
     end
     else if UpperCase(RemoverAcentos(DescricaoPagamentoDetalhada)).Contains('BOLETO') then
     begin
-        DescricaoAbreviada := 'BOLETO' ;
+        DescricaoAbreviada  := 'BOLETO';
+        EspeciePagamento    := 7;
+        ModalidadePagamento := 0;
     end
     else
     begin
@@ -2215,23 +2185,148 @@ begin
     end;
 
     try
-    	for var I := 0 to High(Finalizadoras) do
-        begin
-        	if DescricaoAbreviada = UpperCase(RemoverAcentos(Finalizadoras[I].DscAbreviada))
-            then
-            begin
-            	if(UpperCase(RemoverAcentos(Finalizadoras[I].DscAbreviada)) = 'PIX') and
-                	(UpperCase(RemoverAcentos(Finalizadoras[I].DscCompleta)) <> 'PIX')
-                then
-                    continue;
-                Result := Finalizadoras[I];
-                Result.CodIdSite := DescricaoPagamento;
-                break;
-            end;
-        end;
+        Result := InserirFinalizadora(
+        	CodIdEmpresa,
+            CodIdLoja,
+            CodIdCliente,
+            DescricaoPagamento,
+            DescricaoPagamentoDetalhada,
+            EspeciePagamento,
+            ModalidadePagamento
+        );
     except
         Result.Free;
         raise;
+    end;
+end;
+
+function TfrmTela_Principal.BuscarFinalizadoraDinheiro(
+    CodIdEmpresa: Integer;
+    CodIdLoja: Integer;
+    CodIdSite: string;
+    CodIdCliente: Integer
+): TFinalizadora;
+var
+    QuerySelect: TUniQuery;
+    QueryUpdate: TUniQuery;
+    CodIdFinalizadora: Integer;
+    Finalizadora: TFinalizadora;
+begin
+    Result := nil;
+
+    QuerySelect := CriarQuery;
+    QueryUpdate := CriarQuery;
+
+    try
+        QuerySelect.SQL.Text :=
+            'SELECT *' +
+            'FROM db_sgci.finalizadoras ' +
+            'WHERE COD_ID_EMPRESA = :COD_ID_EMPRESA ' +
+            '  AND COD_ID_LOJA    = :COD_ID_LOJA ' +
+            '  AND DSC_COMPLETA   = :DSC_COMPLETA';
+
+        QuerySelect.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
+        QuerySelect.ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
+        QuerySelect.ParamByName('DSC_COMPLETA').AsString := 'DINHEIRO';
+
+        QuerySelect.Open;
+
+        if QuerySelect.IsEmpty then
+            raise Exception.Create('Finalizadora DINHEIRO não encontrada');
+
+        Finalizadora := SQLToFinalizadora(QuerySelect);
+
+        CodIdFinalizadora := QuerySelect.FieldByName('COD_ID_FINALIZADORA').AsInteger;
+
+        if QuerySelect.FieldByName('COD_ID_SITE').AsString <> CodIdSite then
+        begin
+            QueryUpdate.SQL.Text :=
+                'UPDATE db_sgci.finalizadoras ' +
+                'SET COD_ID_SITE = :COD_ID_SITE ' +
+                'WHERE COD_ID_FINALIZADORA = :COD_ID_FINALIZADORA';
+
+            QueryUpdate.ParamByName('COD_ID_SITE').AsString := CodIdSite;
+            QueryUpdate.ParamByName('COD_ID_FINALIZADORA').AsInteger := CodIdFinalizadora;
+
+            QueryUpdate.ExecSQL;
+
+            Finalizadora.CodIdSite := CodIdSite;
+        end;
+
+        Result := Finalizadora;
+
+    finally
+        QuerySelect.Free;
+        QueryUpdate.Free;
+    end;
+end;
+
+function TfrmTela_Principal.InserirFinalizadora(
+    CodIdEmpresa: Integer;
+    CodIdLoja: Integer;
+    CodIdCliente: Integer;
+    DescricaoPagamento: string;
+    DescricaoPagamentoDetalhada: string;
+	EspeciePagamento: Integer;
+    ModalidadePagamento: Integer
+): TFinalizadora;
+var
+    Query: TUniQuery;
+    FinalizadoraID: Integer;
+begin
+    Query := nil;
+
+    try
+    	Query := CriarQuery;
+
+        with Query do
+        begin
+        	SQL.Text :=
+              	'INSERT INTO db_sgci.finalizadoras (' +
+                '	COD_ID_EMPRESA,' +
+                '	COD_ID_LOJA,' +
+                '	COD_ID_SITE,' +
+                '	COD_ID_CLIENTE,' +
+                '	DSC_COMPLETA,' +
+                '	DSC_ABREVIADA,' +
+                '	NUM_ESPECIE,' +
+                '	NUM_MODALIDADE ' +
+                ')' +
+                'VALUES (' +
+                '	:COD_ID_EMPRESA,' +
+                '	:COD_ID_LOJA,' +
+                '	:COD_ID_SITE,' +
+                '	:COD_ID_CLIENTE,' +
+                '	:DSC_COMPLETA,' +
+                '	:DSC_ABREVIADA,' +
+                '	:NUM_ESPECIE,' +
+                '	:NUM_MODALIDADE ' +
+                ') ' +
+                'ON DUPLICATE KEY UPDATE ' +
+                '	COD_ID_FINALIZADORA = LAST_INSERT_ID(COD_ID_FINALIZADORA)';
+
+            ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
+            ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
+            ParamByName('COD_ID_SITE').AsString := DescricaoPagamento;
+            ParamByName('COD_ID_CLIENTE').AsInteger := CodIdCliente;
+            ParamByName('DSC_COMPLETA').AsString := DescricaoPagamentoDetalhada;
+            ParamByName('DSC_ABREVIADA').AsString := DescricaoPagamento;
+            ParamByName('NUM_ESPECIE').AsInteger := EspeciePagamento;
+            ParamByName('NUM_MODALIDADE').AsInteger := ModalidadePagamento;
+
+            SQL.Text := 'SELECT LAST_INSERT_ID() AS ID';
+          	Open;
+          	FinalizadoraID := Query.FieldByName('ID').AsInteger;
+          	Close;
+
+            SQL.Text := 'SELECT * FROM db_sgci.finalizadoras WHERE COD_ID_FINALIZADORA = :ID';
+            ParamByName('ID').AsInteger := FinalizadoraID;
+            Open;
+
+            Result := SQLToFinalizadora(Query);
+        end;
+    finally
+        Query.Free;
     end;
 end;
 

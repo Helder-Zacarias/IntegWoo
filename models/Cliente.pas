@@ -28,8 +28,6 @@ type
     FCOD_CEP: string;
     FNUM_STATUS: Integer;
     FDAT_INCLUSAO: TDateTime;
-    FCOD_ID_WOOCOMMERCE: Int64;
-    FSTATUS_SINCRONIZADO_WOOCOMMERCE: Integer;
 
   public
     property CodIdCliente: Integer
@@ -91,12 +89,6 @@ type
 
     property DatInclusao: TDateTime
     	read FDAT_INCLUSAO write FDAT_INCLUSAO;
-
-    property CodIdWooCommerce: Int64
-    	read FCOD_ID_WOOCOMMERCE write FCOD_ID_WOOCOMMERCE;
-
-    property StatusSincronizadoWooCommerce: Integer
-    	read FSTATUS_SINCRONIZADO_WOOCOMMERCE write FSTATUS_SINCRONIZADO_WOOCOMMERCE;
   end;
 
 implementation

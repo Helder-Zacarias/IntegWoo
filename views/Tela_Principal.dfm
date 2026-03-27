@@ -31,7 +31,6 @@ object frmTela_Principal: TfrmTela_Principal
     Align = alLeft
     TabOrder = 1
     Visible = False
-    ExplicitTop = 2
     object btnEnviarProdutosMandala: TBitBtn
       Left = 0
       Top = 205
