@@ -128,10 +128,6 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
-        <DCCReference Include="views\Tela_Envio_Produto.pas">
-            <Form>frmTela_Envio</Form>
-            <FormType>dfm</FormType>
-        </DCCReference>
         <DCCReference Include="models\Produto.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\WooCategoriaRequest.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\WooImagemRequest.pas"/>
@@ -150,14 +146,6 @@
         <DCCReference Include="rest-client\woocommerce-api\WooAtributoDaVariacao.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\WooAtributoRequest.pas"/>
         <DCCReference Include="rest-client\woocommerce-api\WooTermoAtributoRequest.pas"/>
-        <DCCReference Include="views\Tela_Cadastro_Atributo.pas">
-            <Form>frmTela_Cadastro_Atributo</Form>
-            <FormType>dfm</FormType>
-        </DCCReference>
-        <DCCReference Include="views\Tela_Adicionar_Termo.pas">
-            <Form>frmTela_Adicionar_Termo</Form>
-            <FormType>dfm</FormType>
-        </DCCReference>
         <DCCReference Include="rest-client\woocommerce-api\WooAtributoResponse.pas"/>
         <DCCReference Include="utils\CustomObjectMapper.pas"/>
         <DCCReference Include="utils\FileWriter.pas"/>

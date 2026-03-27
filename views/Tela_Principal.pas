@@ -10,8 +10,7 @@ uses
     Data.DB, Uni, UniProvider, MySQLUniProvider, DBAccess, MemData, MemDS,
     REST.Json, Rest.Json.Types, RESTRequest4D,
     Horse,
-    AppConfig, Tela_Envio_Produto, Tela_Cadastro_Atributo,
-    FileWriter, TransformadorDeTexto, ContentPrinter, CustomObjectMapper, AplicadorMascara,
+    AppConfig,FileWriter, TransformadorDeTexto, ContentPrinter, CustomObjectMapper, AplicadorMascara,
     Produto, ProdutoGrade, ProdutoImagem, Secao, Variacao,
     Cliente, PedidoVenda, PedidoVendaItem, PedidoVendaPgtos, Municipio, Uf, Finalizadora,
     WooProdutoRequest, WooProdutoResponse,
@@ -31,7 +30,6 @@ type
         btnHamburguer: TButton;
         panelSide: TPanel;
         btnEnviarProdutosMandala: TBitBtn;
-    Button1: TButton;
         procedure OnFormCreate(Sender: TObject);
         procedure RegistrarRotas;
         procedure DatabaseConnectionLost(Sender: TObject; Component: TComponent;
@@ -102,7 +100,6 @@ type
         function SQLToPagamentoDaVenda(Query: TUniQuery): TPedidoVendaPgtos;
         procedure SalvarParcelasDoPagamento(PedidoVenda: TPedidoVenda; Pagamento: TPedidoVendaPgtos);
         procedure OnFormDestroy(Sender: TObject);
-    procedure AlterFinalziadoras(Sender: TObject);
 	private
     	FSQLProdutosBase: string;
         FSQLImagensBase: string;
@@ -2178,26 +2175,6 @@ begin
         end;
     finally
         Query.Free;
-    end;
-end;
-
-procedure TfrmTela_Principal.AlterFinalziadoras(Sender: TObject);
-var
-	Query: TUniQuery;
-begin
-	Query := nil;
-
-    try
-        Query := CriarQuery;
-        Query.SQL.Text :=
-        	'SELECT * FROM db_sgci.finalizadoras WHERE ' +
-            '	COD_ID_EMPRESA  = 2433 ' +
-            '	AND COD_ID_LOJA = 90';
-
-        Query.Open;
-        Query.SaveToXML(TPath.Combine(FFolderPath, 'alter-finalizadora.xml'));
-    finally
-    	Query.Free;
     end;
 end;
 

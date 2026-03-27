@@ -2,7 +2,6 @@ program IntegWoo;
 
 uses
   Vcl.Forms,
-  Tela_Envio_Produto in 'views\Tela_Envio_Produto.pas' {frmTela_Envio},
   Produto in 'models\Produto.pas',
   WooCategoriaRequest in 'rest-client\woocommerce-api\WooCategoriaRequest.pas',
   WooImagemRequest in 'rest-client\woocommerce-api\WooImagemRequest.pas',
@@ -18,8 +17,6 @@ uses
   WooAtributoDaVariacao in 'rest-client\woocommerce-api\WooAtributoDaVariacao.pas',
   WooAtributoRequest in 'rest-client\woocommerce-api\WooAtributoRequest.pas',
   WooTermoAtributoRequest in 'rest-client\woocommerce-api\WooTermoAtributoRequest.pas',
-  Tela_Cadastro_Atributo in 'views\Tela_Cadastro_Atributo.pas' {frmTela_Cadastro_Atributo},
-  Tela_Adicionar_Termo in 'views\Tela_Adicionar_Termo.pas' {frmTela_Adicionar_Termo},
   WooAtributoResponse in 'rest-client\woocommerce-api\WooAtributoResponse.pas',
   CustomObjectMapper in 'utils\CustomObjectMapper.pas',
   FileWriter in 'utils\FileWriter.pas',
@@ -55,7 +52,5 @@ begin
   TAppConfig.Load;
   Application.MainFormOnTaskbar := True;
   Application.CreateForm(TfrmTela_Principal, frmTela_Principal);
-  Application.CreateForm(TfrmTela_Cadastro_Atributo, frmTela_Cadastro_Atributo);
-  Application.CreateForm(TfrmTela_Adicionar_Termo, frmTela_Adicionar_Termo);
   Application.Run;
 end.
