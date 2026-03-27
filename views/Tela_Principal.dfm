@@ -31,6 +31,7 @@ object frmTela_Principal: TfrmTela_Principal
     Align = alLeft
     TabOrder = 1
     Visible = False
+    ExplicitTop = 2
     object btnEnviarProdutosMandala: TBitBtn
       Left = 0
       Top = 205
@@ -39,6 +40,15 @@ object frmTela_Principal: TfrmTela_Principal
       Caption = 'Enviar Produtos'
       TabOrder = 0
       OnClick = btnEnviarProdutosClick
+    end
+    object Button1: TButton
+      Left = 48
+      Top = 304
+      Width = 75
+      Height = 25
+      Caption = 'Button1'
+      TabOrder = 1
+      OnClick = AlterFinalziadoras
     end
   end
   object MySQL: TMySQLUniProvider

@@ -2,14 +2,16 @@ unit TransformadorDeTexto;
 
 interface
 uses
-	Winapi.Windows, System.SysUtils;
+	Winapi.Windows,
+    System.SysUtils, System.Character, System.SysConst;
 
-function NormalizarTexto(Texto: string): string;
+function NormalizarTexto(const Texto: string): string;
 function SubstituirEspacosPorTraco(Texto: string): string;
-function RemoverAcentos(Texto: string): string;
+function RemoverAcentos(const Texto: string): string;
 
 implementation
-function NormalizarTexto(Texto: string): string;
+
+function NormalizarTexto(const Texto: string): string;
 begin
     Result := Trim(UpperCase(Texto))
 end;
@@ -20,22 +22,21 @@ begin
     Result := UpperCase(Texto);
 end;
 
-function RemoverAcentos(Texto: string): string;
+function RemoverAcentos(const Texto: string): string;
+const
+  // Mapeamento expandido para cobrir casos comuns e especiais
+  ComAcentos = 'ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ';
+  SemAcentos = 'AAAAAAACEEEEIIIIDNOOOOOOUUUUYbsaaaaaaaceeeeiiiidnoooooouuuuyby';
 var
-	Normalizado: string;
-    Len: Integer;
+  i, p: Integer;
 begin
-	Len := NormalizeString(NormalizationD, PChar(Texto), Length(Texto), nil, 0);
-    SetLength(Normalizado, Len);
-    NormalizeString(NormalizationD, PChar(Texto), Length(Texto), PChar(Normalizado), Len);
+  Result := Texto;
+  for i := 1 to Length(Result) do
+  begin
+    p := Pos(Result[i], ComAcentos);
+    if p > 0 then
+      Result[i] := SemAcentos[p];
+  end;
+end;
 
-    Result := '';
-    for var C in Normalizado do
-        begin
-            if not CharInSet(C, [#768..#879]) then // Unicode combining marks
-            Result := Result + C;
-        end;
-	end;
 end.
-
-
