@@ -68,6 +68,7 @@ type
         procedure CriarVariacoesDoProduto(ProdutoResponse:
         	TWooProdutoResponse; ProdutosGrade: TObjectList<TProdutoGrade>);
         procedure HorseAPISalvarPedido(Req: THorseRequest; Res: THorseResponse; Next: TProc);
+        procedure HorseAPIReceberWebHookDoMercadoPago(Req: THorseRequest; Res: THorseResponse; Next: TProc);
         function ChecarBodyDoWebHook(ReqBody: string): Boolean;
         function BuscarOuInserirClienteNoBanco(CodIdSite: string; Billing: TBilling;
         	CodIdEmpresa: Integer; CodIdLoja: Integer): TCliente;
@@ -80,9 +81,6 @@ type
         function BuscarPedidoVendaNoBanco(CodIdPedidoSite: string; CodIdEmpresa: Integer;
         	CodIdLoja: Integer): TPedidoVenda;
         function ChecarStatusDoPedido(Status: string): Integer;
-        function InserirFinalizadora(CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdCliente: Integer;
-        	DescricaoPagamento: string; DescricaoPagamentoDetalhada: string;
-            EspeciePagamento: Integer; ModalidadePagamento: Integer): TFinalizadora;
         function SQLToPedidoVenda(Query: TUniQuery): TPedidoVenda;
         function RetornarItensDoPedidoDeVenda(Itens: TArray<TLineItem>; CodIdEmpresa: Integer;
         	CodIdLoja: Integer; CodIdPedido: Int64): TArray<TPedidoVendaItem>;
@@ -93,9 +91,10 @@ type
         	CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdCliente: Integer): TFinalizadora;
         function BuscarFinalizadoraPorCodIdSite(CodIdEmpresa: Integer; CodIdLoja: Integer;
         	CodIdSite: string): TFinalizadora;
-        function CadastrarFinalizadora(CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdCliente: Integer;
+        function AssociarFinalizadora(CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdCliente: Integer;
         	DescricaoPagamento: string; DescricaoPagamentoDetalhada: string): TFinalizadora;
-        function BuscarFinalizadoraDinheiro(CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdSite: string; CodIdCliente: Integer): TFinalizadora;
+        function BuscarFinalizadoraNaoAssociada(CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdSite: string;
+        	CodIdCliente: Integer; DescricaoFinalizadora: string): TFinalizadora;
         function SQLToFinalizadora(Query: TUniQuery): TFinalizadora;
         function InserirPagamentoNoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer;
             CodIdPedido: Int64; CodIdFinalizadora: Integer; DataPagamento: TDateTime;
@@ -138,6 +137,11 @@ begin
 	THorse.Post(
         '/api/pedido-woocommerce/:codIdEmpresa/:codIdLoja',
         HorseAPISalvarPedido
+    );
+
+    THorse.Post(
+    	'/api/pagamento/mercado-pago',
+        HorseAPIReceberWebHookDoMercadoPago
     );
 
     THorse.Listen(HORSE_PORT);
@@ -874,7 +878,8 @@ begin
     end;
 end;
 
-function TfrmTela_Principal.EnviarImagem(ListaImagens: TObjectList<TProdutoImagem>): TObjectList<TWPImagemResponse>;
+function TfrmTela_Principal.EnviarImagem(ListaImagens: TObjectList<TProdutoImagem>)
+	: TObjectList<TWPImagemResponse>;
 var
 	iRes: IResponse;
       Stream: TMemoryStream;
@@ -1236,9 +1241,12 @@ begin
         WooPedido := TJSON.JsonToObject<TWooPedido>(Req.Body);
 
         SalvarConteudoEmArquivo(
-                TPath.Combine(TPath.GetDocumentsPath, 'PEDIDO-WOOCOMMERCE.txt'),
-                TJson.ObjectToJsonString(WooPedido)
-            );
+            TPath.Combine(
+                TPath.GetDocumentsPath,
+                Format(' PEDIDO-WOOCOMMERCE_%s.txt', [FormatDateTime('yyyy-mm-dd_hh-nn-ss', Now)])
+            ),
+            TJson.ObjectToJsonString(WooPedido)
+        );
 
         Conexao := Database;
 
@@ -1250,11 +1258,6 @@ begin
                 WooPedido.Billing,
                 CodIdEmpresa,
                 CodIdLoja
-            );
-
-            SalvarConteudoEmArquivo(
-                TPath.Combine(FFolderPath, 'cliente-.txt'),
-                TJson.ObjectToJsonString(Cliente)
             );
 
             PedidoRetornado := BuscarOuInserirPedidoVendaNoBanco(
@@ -1318,6 +1321,30 @@ begin
         WooPedido.Free;
     	Cliente.Free;
 	end;
+end;
+
+procedure TfrmTela_Principal.HorseAPIReceberWebHookDoMercadoPago(
+	Req: THorseRequest;
+	Res: THorseResponse;
+	Next: TProc
+);
+begin
+    try
+    	ChecarBodyDoWebHook(Req.Body);
+        SalvarConteudoEmArquivo(
+        	TPath.Combine(FFolderPath, 'WEBHOOK-MERCADO_PAGO.txt'),
+        	Req.Body
+        );
+
+        Res.Status(THTTPStatus.Created)
+        	.Send('Webhook recebido com sucesso!');
+    except
+    	on E: Exception do
+        begin
+        	Res.Status(THTTPStatus.InternalServerError)
+            	.Send('Erro no recebimento do webhook!\n');
+        end;
+    end;
 end;
 
 function TfrmTela_Principal.ChecarBodyDoWebHook(ReqBody: string): Boolean;
@@ -2070,7 +2097,7 @@ begin
 
         if not Assigned(Result) then
         begin
-            Result := CadastrarFinalizadora(
+            Result := AssociarFinalizadora(
                 CodIdEmpresa,
                 CodIdLoja,
                 CodIdCliente,
@@ -2130,7 +2157,7 @@ begin
     end;
 end;
 
-function TfrmTela_Principal.CadastrarFinalizadora(
+function TfrmTela_Principal.AssociarFinalizadora(
     CodIdEmpresa: Integer;
     CodIdLoja: Integer;
 	CodIdCliente: Integer;
@@ -2143,67 +2170,90 @@ var
     ModalidadePagamento: Integer;
 begin
     Result := nil;
-
-    if (UpperCase(RemoverAcentos(DescricaoPagamento)) = 'COD') or
-        (UpperCase(RemoverAcentos(DescricaoPagamento)) = 'DINHEIRO')
-    then
-    begin
-    	Result := BuscarFinalizadoraDinheiro(
-            CodIdEmpresa,
-            CodIdLoja,
-            DescricaoPagamento,
-            CodIdCliente
-        );
-        Exit(Result);
-    end
-    else if UpperCase(RemoverAcentos(DescricaoPagamentoDetalhada)) = 'PIX' then
-    begin
-        DescricaoAbreviada  := 'PIX';
-        EspeciePagamento    := 11;
-        ModalidadePagamento := 0;
-    end
-    else if UpperCase(RemoverAcentos(DescricaoPagamentoDetalhada)).Contains('CARTAO') then
-    begin
-    	DescricaoAbreviada := 'CARTAO';
-        EspeciePagamento   := 2;
-
-        if UpperCase(RemoverAcentos(DescricaoPagamentoDetalhada)).Contains('CREDITO') then
-            ModalidadePagamento := 0
-        else
-            ModalidadePagamento := 1;
-    end
-    else if UpperCase(RemoverAcentos(DescricaoPagamentoDetalhada)).Contains('BOLETO') then
-    begin
-        DescricaoAbreviada  := 'BOLETO';
-        EspeciePagamento    := 7;
-        ModalidadePagamento := 0;
-    end
-    else
-    begin
-       raise Exception.Create('Forma de pagamento não é suportada!');
-    end;
+    DescricaoPagamento := UpperCase(RemoverAcentos(DescricaoPagamento));
+    DescricaoPagamentoDetalhada := UpperCase(RemoverAcentos(DescricaoPagamentoDetalhada));
 
     try
-        Result := InserirFinalizadora(
-        	CodIdEmpresa,
-            CodIdLoja,
-            CodIdCliente,
-            DescricaoPagamento,
-            DescricaoPagamentoDetalhada,
-            EspeciePagamento,
-            ModalidadePagamento
-        );
-    except
+    	if (DescricaoPagamento = 'COD') or
+        	(DescricaoPagamento = 'DINHEIRO')
+        then
+        begin
+            Result := BuscarFinalizadoraNaoAssociada(
+                CodIdEmpresa,
+                CodIdLoja,
+                DescricaoPagamento,
+                CodIdCliente,
+                'DINHEIRO'
+            );
+        end
+        else if (DescricaoPagamento = 'PIX') or
+        	(DescricaoPagamentoDetalhada = 'PIX') then
+        begin
+            Result := BuscarFinalizadoraNaoAssociada(
+                CodIdEmpresa,
+                CodIdLoja,
+                DescricaoPagamento,
+                CodIdCliente,
+                'PIX'
+            );
+        end
+        else if
+        	DescricaoPagamento.Contains('CARTAO') or
+        		DescricaoPagamentoDetalhada.Contains('CARTAO') or
+            DescricaoPagamento.Contains('VISA') or
+            	DescricaoPagamentoDetalhada.Contains('VISA') or
+            DescricaoPagamento.Contains('MASTERCARD') or
+            	DescricaoPagamentoDetalhada.Contains('MASTERCARD') or
+            DescricaoPagamento.Contains('ELO') or
+            	DescricaoPagamentoDetalhada.Contains('ELO')
+        then
+        begin
+
+        	if DescricaoPagamentoDetalhada.Contains('CREDITO') then
+                Result := BuscarFinalizadoraNaoAssociada(
+                    CodIdEmpresa,
+                    CodIdLoja,
+                    DescricaoPagamento,
+                    CodIdCliente,
+                    'CRÉDITO - POS STONE'
+        		)
+            else if DescricaoPagamentoDetalhada.Contains('DEBITO') then
+                Result := BuscarFinalizadoraNaoAssociada(
+                    CodIdEmpresa,
+                    CodIdLoja,
+                    DescricaoPagamento,
+                    CodIdCliente,
+                    'DEBITO - POS STONE'
+                )
+            else
+                raise Exception.Create('Tipo de pagamento por cartão não suportado');
+        end
+        else if DescricaoPagamento.Contains('BOLETO') or
+        	DescricaoPagamentoDetalhada.Contains('BOLETO')
+        then
+        begin
+            Result := BuscarFinalizadoraNaoAssociada(
+                CodIdEmpresa,
+                CodIdLoja,
+                DescricaoPagamento,
+                CodIdCliente,
+                'BOLETO BANCÁRIO'
+            );
+        end
+        else
+        	raise Exception.Create('Forma de pagamento não é suportada!');
+	except
         Result.Free;
         raise;
-    end;
+	end;
 end;
 
-function TfrmTela_Principal.BuscarFinalizadoraDinheiro(
+function TfrmTela_Principal.BuscarFinalizadoraNaoAssociada(
     CodIdEmpresa: Integer;
     CodIdLoja: Integer;
     CodIdSite: string;
-    CodIdCliente: Integer
+    CodIdCliente: Integer;
+    DescricaoFinalizadora: string
 ): TFinalizadora;
 var
     QuerySelect: TUniQuery;
@@ -2226,12 +2276,12 @@ begin
 
         QuerySelect.ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
         QuerySelect.ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
-        QuerySelect.ParamByName('DSC_COMPLETA').AsString := 'DINHEIRO';
+        QuerySelect.ParamByName('DSC_COMPLETA').AsString := DescricaoFinalizadora;
 
         QuerySelect.Open;
 
         if QuerySelect.IsEmpty then
-            raise Exception.Create('Finalizadora DINHEIRO não encontrada');
+            raise Exception.Create('Finalizadora não encontrada');
 
         Finalizadora := SQLToFinalizadora(QuerySelect);
 
@@ -2257,77 +2307,6 @@ begin
     finally
         QuerySelect.Free;
         QueryUpdate.Free;
-    end;
-end;
-
-function TfrmTela_Principal.InserirFinalizadora(
-    CodIdEmpresa: Integer;
-    CodIdLoja: Integer;
-    CodIdCliente: Integer;
-    DescricaoPagamento: string;
-    DescricaoPagamentoDetalhada: string;
-	EspeciePagamento: Integer;
-    ModalidadePagamento: Integer
-): TFinalizadora;
-var
-    Query: TUniQuery;
-    FinalizadoraID: Integer;
-begin
-    Query := nil;
-
-    try
-    	Query := CriarQuery;
-
-        with Query do
-        begin
-        	SQL.Text :=
-              	'INSERT INTO db_sgci.finalizadoras (' +
-                '	COD_ID_EMPRESA,' +
-                '	COD_ID_LOJA,' +
-                '	COD_ID_SITE,' +
-                '	COD_ID_CLIENTE,' +
-                '	DSC_COMPLETA,' +
-                '	DSC_ABREVIADA,' +
-                '	NUM_ESPECIE,' +
-                '	NUM_MODALIDADE ' +
-                ')' +
-                'VALUES (' +
-                '	:COD_ID_EMPRESA,' +
-                '	:COD_ID_LOJA,' +
-                '	:COD_ID_SITE,' +
-                '	:COD_ID_CLIENTE,' +
-                '	:DSC_COMPLETA,' +
-                '	:DSC_ABREVIADA,' +
-                '	:NUM_ESPECIE,' +
-                '	:NUM_MODALIDADE ' +
-                ') ' +
-                'ON DUPLICATE KEY UPDATE ' +
-                '	COD_ID_FINALIZADORA = LAST_INSERT_ID(COD_ID_FINALIZADORA)';
-
-            ParamByName('COD_ID_EMPRESA').AsInteger := CodIdEmpresa;
-            ParamByName('COD_ID_LOJA').AsInteger := CodIdLoja;
-            ParamByName('COD_ID_SITE').AsString := DescricaoPagamento;
-            ParamByName('COD_ID_CLIENTE').AsInteger := CodIdCliente;
-            ParamByName('DSC_COMPLETA').AsString := DescricaoPagamentoDetalhada;
-            ParamByName('DSC_ABREVIADA').AsString := DescricaoPagamento;
-            ParamByName('NUM_ESPECIE').AsInteger := EspeciePagamento;
-            ParamByName('NUM_MODALIDADE').AsInteger := ModalidadePagamento;
-
-            ExecSQL;
-
-            SQL.Text := 'SELECT LAST_INSERT_ID() AS ID';
-          	Open;
-          	FinalizadoraID := Query.FieldByName('ID').AsInteger;
-          	Close;
-
-            SQL.Text := 'SELECT * FROM db_sgci.finalizadoras WHERE COD_ID_FINALIZADORA = :ID';
-            ParamByName('ID').AsInteger := FinalizadoraID;
-            Open;
-
-            Result := SQLToFinalizadora(Query);
-        end;
-    finally
-        Query.Free;
     end;
 end;
 
