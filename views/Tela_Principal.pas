@@ -106,6 +106,9 @@ type
 
         function ChecarBodyDoWebHook(ReqBody: string): Boolean;
 
+        function ProcessarCliente(WooPedido: TWooPedido; CodIdEmpresa:Integer;
+        	CodIdLoja: Integer): TCliente;
+
         function BuscarOuInserirClienteNoBanco(CodIdSite: string; Billing: TBilling;
         	CodIdEmpresa: Integer; CodIdLoja: Integer): TCliente;
 
@@ -115,6 +118,9 @@ type
         function SQLToCliente(Query: TUniQuery): TCliente;
 
         function BuscarMunicipio(Municipio: string): TMunicipio;
+
+        function ProcessarPedido(WooPedido: TWooPedido; Cliente: TCliente; CodIdEmpresa,
+        	CodIdLoja: Integer): TPedidoVenda;
 
         function BuscarOuInserirPedidoVendaNoBanco(CodIdEmpresa: Integer; CodIdLoja: Integer;
         	WooPedido: TWooPedido; Cliente: TCliente): TPedidoVenda;
@@ -133,6 +139,9 @@ type
         	CodIdSite: string; SKU: Int64): TProduto;
 
         procedure SalvarProdutosDoPedido(ProdutosPedido: TArray<TPedidoVendaItem>);
+
+        procedure ProcessarPagamento(WooPedido: TWooPedido; Pedido: TPedidoVenda; Cliente: TCliente;
+        	CodIdEmpresa: Integer; CodIdLoja: Integer);
 
         function BuscarOuAssociarFinalizadora(PaymentMethod: string; PaymentMethodTitle: string;
         	CodIdEmpresa: Integer; CodIdLoja: Integer; CodIdCliente: Integer): TFinalizadora;
@@ -1272,165 +1281,53 @@ end;
 
 // Início das funções para salvar pedido
 procedure TfrmTela_Principal.HorseAPISalvarPedido(
-	Req  : THorseRequest;
-    Res  : THorseResponse;
-	Next : TProc
+	Req: THorseRequest;
+	Res: THorseResponse;
+	Next: TProc
 );
 var
-	CodIdEmpresa         : Integer;
-    CodIdLoja            : Integer;
-    Conexao              : TUniConnection;
-    Cliente              : TCliente;
-    ProdutosPedido       : TArray<TPedidoVendaItem>;
-    Finalizadora         : TFinalizadora;
-    WooPedido            : TWooPedido;
-    PedidoRetornado      : TPedidoVenda;
-    PagamentoPedidoVenda : TPedidoVendaPgtos;
-    MetaDadosPagamento   : TMetaData;
-    MetaDadosParcela     : TMetaData;
-    NumParcelas          : Integer;
-    ValorParcela         : Double;
+	CodIdEmpresa: Integer;
+    CodIdLoja: Integer;
+    Conexao: TUniConnection;
+    WooPedido: TWooPedido;
+    Cliente: TCliente;
+	Pedido: TPedidoVenda;
 begin
-    Cliente              := nil;
-    Finalizadora         := nil;
-    WooPedido            := nil;
-    PedidoRetornado      := nil;
-    Conexao              := nil;
-    PagamentoPedidoVenda := nil;
-    MetaDadosPagamento   := nil;
-    MetaDadosParcela     := nil;
+	Conexao := Database;
+    WooPedido := nil;
 
-	try
-        CodIdEmpresa := Req.Params
-            .Field('codIdEmpresa')
-            .Required(True)
-            .RequiredMessage('"codIdEmpresa" não foi recebido na URL da requisição')
-            .AsInteger;
-
-        CodIdLoja := Req.Params
-            .Field('codIdLoja')
-            .Required(True)
-            .RequiredMessage('"codIdLoja" não foi recebido na URL da requisição')
-            .AsInteger;
-
-        ChecarBodyDoWebHook(Req.Body);
-        WooPedido := TJSON.JsonToObject<TWooPedido>(Req.Body);
-
-        SalvarConteudoEmArquivo(
-            TPath.Combine(
-                TPath.GetDocumentsPath,
-                Format(' PEDIDO-WOOCOMMERCE_%s.txt', [FormatDateTime('yyyy-mm-dd_hh-nn-ss', Now)])
-            ),
-            TJson.ObjectToJsonString(WooPedido)
-        );
-
-        Conexao := Database;
-
+    try
         try
+        	CodIdEmpresa := Req.Params.Field('codIdEmpresa').AsInteger;
+            CodIdLoja := Req.Params.Field('codIdLoja').AsInteger;
+
+            ChecarBodyDoWebHook(Req.Body);
+            WooPedido := TJSON.JsonToObject<TWooPedido>(Req.Body);
+
             Conexao.StartTransaction;
 
-            Cliente := BuscarOuInserirClienteNoBanco(
-                WooPedido.CustomerId.ToString,
-                WooPedido.Billing,
-                CodIdEmpresa,
-                CodIdLoja
-            );
-
-            PedidoRetornado := BuscarOuInserirPedidoVendaNoBanco(
-            	CodIdEmpresa,
-                CodIdLoja,
-                WooPedido,
-                Cliente
-            );
-
-            ProdutosPedido := RetornarItensDoPedidoDeVenda(
-                WooPedido.LineItems,
-                CodIdEmpresa,
-                CodIdLoja,
-                PedidoRetornado.CodIdPedido
-            );
-
-            SalvarProdutosDoPedido(ProdutosPedido);
-
-            Finalizadora := BuscarOuAssociarFinalizadora(
-                WooPedido.PaymentMethod,
-                WooPedido.PaymentMethodTitle,
-                CodIdEmpresa,
-                CodIdLoja,
-                Cliente.CodIdCliente
-            );
-
-            if Uppercase(RemoverAcentos(Finalizadora.DscCompleta))
-            	.Contains('CREDITO')
-            then
-            begin
-            	MetaDadosPagamento := ResgatarMetaDados(
-                    WooPedido.MetaData,
-                    'mp_installments'
-                );
-
-                MetaDadosParcela := ResgatarMetaDados(
-                    WooPedido.MetaData,
-                    'mp_transaction_details'
-                );
-            end;
-
-            if not Assigned(MetaDadosPagamento) then
-                NumParcelas := 1
-            else
-                NumParcelas := MetaDadosPagamento.Value.ToInteger;
-
-            if not Assigned(MetaDadosParcela) then
-                ValorParcela := StrToFloat(
-                    WooPedido.Total,
-                    TFormatSettings.Invariant
-                )
-            else
-                ValorParcela := StrToFloat(
-                    MetaDadosParcela.Value,
-                    TFormatSettings.Invariant
-                );
-
-            PagamentoPedidoVenda := InserirPagamentoNoBanco(
-            	CodIdEmpresa,
-                CodIdLoja,
-                PedidoRetornado.CodIdPedido,
-                Finalizadora.CodIdFinalizadora,
-                PedidoRetornado.DatPedido,
-                StrToFloat(
-                    WooPedido.Total,
-                    TFormatSettings.Invariant
-                ),
-                NumParcelas
-            );
-
-            SalvarParcelasDoPagamento(
-            	PedidoRetornado,
-            	PagamentoPedidoVenda,
-                ValorParcela,
-                NumParcelas
-            );
+            Cliente := ProcessarCliente(WooPedido, CodIdEmpresa, CodIdLoja);
+            Pedido  := ProcessarPedido(WooPedido, Cliente, CodIdEmpresa, CodIdLoja);
+            ProcessarPagamento(WooPedido, Pedido, Cliente, CodIdEmpresa, CodIdLoja);
 
             Conexao.Commit;
 
-            Res.Status(THTTPStatus.Created)
-            	.Send('Pedido criado com sucesso!');
+            Res.Status(THTTPStatus.Created).Send('Pedido criado com sucesso!');
         except
-            on E: Exception do
-            begin
-                Res.Status(THTTPStatus.InternalServerError)
-                	.Send('Erro ao salvar pedido!\n');
-                if Conexao.InTransaction then
-                	Conexao.Rollback;
-            end;
+        	on E: Exception do
+        	begin
+            	if Conexao.InTransaction then
+            		Conexao.Rollback;
+
+          		Res.Status(THTTPStatus.InternalServerError)
+            		.Send('Erro ao salvar pedido: ' + E.Message);
+        	end;
         end;
-	finally
-    	PagamentoPedidoVenda.Free;
-    	Finalizadora.Free;
-    	PedidoRetornado.Free;
+    finally
         WooPedido.Free;
-    	Cliente.Free;
-	end;
+        Cliente.Free;
+        Pedido.Free;
+    end;
 end;
 
 function TfrmTela_Principal.ChecarBodyDoWebHook(ReqBody: string): Boolean;
@@ -1454,6 +1351,20 @@ else
 //            Res.Status(THTTPStatus.OK).Send(Resp)
 //        else
 //            Res.Status(THTTPStatus.BadRequest).Send(Resp);
+end;
+
+function TfrmTela_Principal.ProcessarCliente(
+	WooPedido    : TWooPedido;
+	CodIdEmpresa : Integer;
+    CodIdLoja    : Integer
+): TCliente;
+begin
+	Result := BuscarOuInserirClienteNoBanco(
+        WooPedido.CustomerId.ToString,
+        WooPedido.Billing,
+        CodIdEmpresa,
+        CodIdLoja
+    );
 end;
 
 function TfrmTela_Principal.BuscarOuInserirClienteNoBanco(
@@ -1742,6 +1653,36 @@ begin
         end;
     finally
         Query.Free;
+    end;
+end;
+
+function TfrmTela_Principal.ProcessarPedido(
+	WooPedido: TWooPedido;
+    Cliente: TCliente;
+    CodIdEmpresa, CodIdLoja: Integer
+): TPedidoVenda;
+var
+	Produtos: TArray<TPedidoVendaItem>;
+begin
+    Result := BuscarOuInserirPedidoVendaNoBanco(
+        CodIdEmpresa,
+        CodIdLoja,
+        WooPedido,
+        Cliente
+    );
+
+    Produtos := RetornarItensDoPedidoDeVenda(
+        WooPedido.LineItems,
+        CodIdEmpresa,
+        CodIdLoja,
+        Result.CodIdPedido
+    );
+
+    try
+    	SalvarProdutosDoPedido(Produtos);
+    finally
+    	for var Item in Produtos do
+    		Item.Free;
     end;
 end;
 
@@ -2160,6 +2101,77 @@ begin
     finally
         Query.Free;
     end;
+end;
+
+procedure TfrmTela_Principal.ProcessarPagamento(
+	WooPedido    : TWooPedido;
+	Pedido       : TPedidoVenda;
+	Cliente      : TCliente;
+    CodIdEmpresa : Integer;
+    CodIdLoja    : Integer
+);
+var
+	Finalizadora  : TFinalizadora;
+    Pagamento     : TPedidoVendaPgtos;
+    MetaPagamento : TMetaData;
+    MetaParcela   : TMetaData;
+    NumParcelas   : Integer;
+    ValorParcela  : Double;
+    Forma         : string;
+begin
+	Finalizadora  := nil;
+    Pagamento     := nil;
+    MetaPagamento := nil;
+    MetaParcela   := nil;
+
+    try
+        Finalizadora := BuscarOuAssociarFinalizadora(
+            WooPedido.PaymentMethod,
+            WooPedido.PaymentMethodTitle,
+            CodIdEmpresa,
+            CodIdLoja,
+            Cliente.CodIdCliente
+        );
+
+    	Forma := UpperCase(RemoverAcentos(Finalizadora.DscCompleta));
+
+        if Forma.Contains('CREDITO') then
+        begin
+            MetaPagamento := ResgatarMetaDados(WooPedido.MetaData, 'mp_installments');
+            MetaParcela   := ResgatarMetaDados(WooPedido.MetaData, 'mp_transaction_details');
+        end;
+
+        if Assigned(MetaPagamento) then
+        	NumParcelas := MetaPagamento.Value.ToInteger
+        else
+        	NumParcelas := 1;
+
+    	if Assigned(MetaParcela) then
+        	ValorParcela := StrToFloat(MetaParcela.Value, TFormatSettings.Invariant)
+        else
+        	ValorParcela := StrToFloat(WooPedido.Total, TFormatSettings.Invariant);
+
+        Pagamento := InserirPagamentoNoBanco(
+            CodIdEmpresa,
+            CodIdLoja,
+            Pedido.CodIdPedido,
+            Finalizadora.CodIdFinalizadora,
+            Pedido.DatPedido,
+            StrToFloat(WooPedido.Total, TFormatSettings.Invariant),
+            NumParcelas
+        );
+
+        SalvarParcelasDoPagamento(
+            Pedido,
+            Pagamento,
+            ValorParcela,
+            NumParcelas
+        );
+
+  finally
+  		Finalizadora.Free;
+    	Pagamento.Free;
+  end;
 end;
 
 function TfrmTela_Principal.BuscarOuAssociarFinalizadora(
