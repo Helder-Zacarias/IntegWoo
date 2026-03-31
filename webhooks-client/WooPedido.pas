@@ -24,19 +24,6 @@ type
     property Value: string read FValue write FValue;
   end;
 
-  // 🔹 Image
-  TImage = class
-  private
-    FId: string;
-    FSrc: string;
-  published
-    [JSONName('id')]
-    property Id: string read FId write FId;
-
-    [JSONName('src')]
-    property Src: string read FSrc write FSrc;
-  end;
-
   // 🔹 Line Item
   TLineItem = class
   private
@@ -47,7 +34,6 @@ type
     FTotal: string;
     FPrice: string;
     FSku: string;
-    FImage: TImage;
   published
     [JSONName('id')]
     property Id: Integer read FId write FId;
@@ -69,9 +55,6 @@ type
 
     [JSONName('sku')]
     property Sku: string read FSku write FSku;
-
-    [JSONName('image')]
-    property Image: TImage read FImage write FImage;
   end;
 
   // 🔹 Billing

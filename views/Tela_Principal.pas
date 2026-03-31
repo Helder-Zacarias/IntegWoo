@@ -10,7 +10,8 @@ uses
     Data.DB, Uni, UniProvider, MySQLUniProvider, DBAccess, MemData, MemDS,
     REST.Json, Rest.Json.Types, RESTRequest4D,
     Horse,
-    AppConfig,FileWriter, TransformadorDeTexto, ContentPrinter, CustomObjectMapper, AplicadorMascara,
+    AppConfig,FileWriter, TransformadorDeTexto, ContentPrinter,
+    CustomObjectMapper, AplicadorMascara, TransformadorData,
     Produto, ProdutoGrade, ProdutoImagem, Secao, Variacao,
     Cliente, PedidoVenda, PedidoVendaItem, PedidoVendaPgtos, Municipio, Uf, Finalizadora,
     WooProdutoRequest, WooProdutoResponse,
@@ -171,15 +172,12 @@ type
         procedure SalvarParcelasDoPagamento(PedidoVenda: TPedidoVenda; Pagamento: TPedidoVendaPgtos;
         	ValorParcela : Double; NumParcelas: Integer);
 
-        procedure HorseAPIReceberWebHookDoMercadoPago(Req: THorseRequest; Res: THorseResponse;
-        	Next: TProc);
-
         procedure OnFormDestroy(Sender: TObject);
 	private
-    	FSQLProdutosBase: string;
-        FSQLImagensBase: string;
-    	FTabelasVariacao: TArray<string>;
-    	FFolderPath: string;
+    	FSQLProdutosBase : string;
+        FSQLImagensBase  : string;
+    	FTabelasVariacao : TArray<string>;
+    	FFolderPath      : string;
         const HORSE_PORT = 9000;
     	{ Private declarations }
 	public
@@ -210,11 +208,6 @@ begin
 	THorse.Post(
         '/api/pedido-woocommerce/:codIdEmpresa/:codIdLoja',
         HorseAPISalvarPedido
-    );
-
-    THorse.Post(
-    	'/api/pagamento/mercado-pago',
-        HorseAPIReceberWebHookDoMercadoPago
     );
 
     THorse.Listen(HORSE_PORT);
@@ -1304,6 +1297,11 @@ begin
             ChecarBodyDoWebHook(Req.Body);
             WooPedido := TJSON.JsonToObject<TWooPedido>(Req.Body);
 
+            SalvarConteudoEmArquivo(
+                TPath.Combine(FFolderPath, Format('PAYLOAD-PEDIDO_%s.txt', [FormatDateTime('yyyy-mm-dd_hh-nn-ss', Now)])),
+                Req.Body
+            );
+
             Conexao.StartTransaction;
 
             Cliente := ProcessarCliente(WooPedido, CodIdEmpresa, CodIdLoja);
@@ -1364,6 +1362,11 @@ begin
         WooPedido.Billing,
         CodIdEmpresa,
         CodIdLoja
+    );
+
+    SalvarConteudoEmArquivo(
+        TPath.Combine(FFolderPath, Format('BUSCA_CLIENTE_EM_%s.txt', [FormatDateTime('yyyy-mm-dd_hh-nn-ss', Now)])),
+        TJson.ObjectToJsonString(Result)
     );
 end;
 
@@ -1511,7 +1514,7 @@ begin
 
         if Billing.Birthdate <> '' then
         	Query.ParamByName('DAT_NASCIMENTO').AsDate :=
-            	StrToDateDef(Billing.Birthdate, 0)
+            	ParseDataWoo(Billing.BirthDate)
         else
         	Query.ParamByName('DAT_NASCIMENTO').Clear;
 
@@ -1552,14 +1555,14 @@ begin
             begin
                 SQL.Text :=
                     'SELECT * FROM db_sgci.clientes ' +
-                    'WHERE COD_ID_EMPRESA = :COD_ID_EMPRESA ' +
-                    '	AND COD_ID_LOJA   = :COD_ID_LOJA ';
+                    'WHERE  COD_ID_EMPRESA = :COD_ID_EMPRESA ' +
+                    '	AND COD_ID_LOJA    = :COD_ID_LOJA ';
 
-                if CodIdSite <> '0' then
-                begin
-                   SQL.Add('AND COD_ID_SITE = :COD_ID_SITE ');
-                   ParamByName('COD_ID_SITE').AsString := CodIdSite;
-                end;
+//                if CodIdSite <> '0' then
+//                begin
+//                   SQL.Add('AND COD_ID_SITE = :COD_ID_SITE ');
+//                   ParamByName('COD_ID_SITE').AsString := CodIdSite;
+//                end;
 
                 if CPF <> '' then
                 begin
@@ -1586,7 +1589,7 @@ begin
 
             Result := SQLToCliente(Query);
         except
-            Result.Free;
+            FreeAndNil(Result);
             raise;
         end;
     finally
@@ -1742,7 +1745,10 @@ begin
                 ParamByName('COD_ID_LOJA').AsInteger       := CodIdLoja;
                 ParamByName('COD_ID_PEDIDO_SITE').AsString := WooPedido.Id.ToString;
                 ParamByName('COD_ID_CLIENTE').AsInteger    := Cliente.CodIdCliente;
-                ParamByName('DAT_PEDIDO').AsDateTime       := ISO8601ToDate(WooPedido.DateCreated);
+                if WooPedido.DateCreated <> '' then
+                	ParamByName('DAT_PEDIDO').AsDateTime := ISO8601ToDate(WooPedido.DateCreated)
+                else
+                	ParamByName('DAT_PEDIDO').AsDateTime := Now;
                 ParamByName('DAT_INCLUSAO').AsDateTime     := Now;
                 ParamByName('NUM_STATUS_PEDIDO').AsInteger := ChecarStatusDoPedido(WooPedido.Status);
 
@@ -2139,6 +2145,12 @@ begin
         begin
             MetaPagamento := ResgatarMetaDados(WooPedido.MetaData, 'mp_installments');
             MetaParcela   := ResgatarMetaDados(WooPedido.MetaData, 'mp_transaction_details');
+
+            ShowMessage(
+            	'Método ProcessarPagamento.' + sLineBreak +
+                'NumParcelas: ' + MetaPagamento.Value + sLineBreak +
+                'Valor Parcela: ' + MetaParcela.Value + sLineBreak
+            );
         end;
 
         if Assigned(MetaPagamento) then
@@ -2629,37 +2641,6 @@ begin
     	Query.Free;
     end;
 end;
-
-procedure TfrmTela_Principal.HorseAPIReceberWebHookDoMercadoPago(
-	Req  : THorseRequest;
-	Res  : THorseResponse;
-	Next : TProc
-);
-begin
-    try
-    	ChecarBodyDoWebHook(Req.Body);
-
-        SalvarConteudoEmArquivo(
-        	TPath.Combine(FFolderPath,
-            	Format(
-                    'WEBHOOK-MERCADO_PAGO_%s.txt',
-                    [FormatDateTime('yyyy-mm-dd_hh-nn-ss', Now)]
-                )
-            ),
-        	Req.Body
-        );
-
-        Res.Status(THTTPStatus.Created)
-        	.Send('Webhook recebido com sucesso!');
-    except
-    	on E: Exception do
-        begin
-        	Res.Status(THTTPStatus.InternalServerError)
-            	.Send('Erro no recebimento do webhook!\n');
-        end;
-    end;
-end;
-
 // Fim das funções para salvar pedido
 
 procedure TfrmTela_Principal.OnFormDestroy(Sender: TObject);

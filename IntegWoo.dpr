@@ -43,7 +43,8 @@ uses
   Uf in 'models\Uf.pas',
   WooPedido in 'webhooks-client\WooPedido.pas',
   Finalizadora in 'models\Finalizadora.pas',
-  PedidoVendaPgtosParcelas in 'models\PedidoVendaPgtosParcelas.pas';
+  PedidoVendaPgtosParcelas in 'models\PedidoVendaPgtosParcelas.pas',
+  TransformadorData in 'utils\TransformadorData.pas';
 
 {$R *.res}
 
